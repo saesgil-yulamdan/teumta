@@ -14,6 +14,7 @@ import {
   searchPlacesController,
   updatePlaceController,
 } from '../controllers/place.controller';
+import { getRoutesByPlaceIdController } from '../controllers/route.controller';
 
 export const placeRouter = Router();
 
@@ -23,6 +24,11 @@ placeRouter.get('/local-places', getNearbyLocalPlacesByContentIdController);
 placeRouter.get('/congestion', getRealtimeCongestionController);
 
 placeRouter.get('/places', getPlacesController);
+
+placeRouter.get(
+  '/places/:placeId/routes',
+  getRoutesByPlaceIdController,
+);
 
 placeRouter.get(
   '/places/:id/local-places',

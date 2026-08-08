@@ -1,5 +1,6 @@
 import cors from 'cors';
 import express from 'express';
+import tripRouter from './routes/trip.routes';
 
 import { healthRouter } from './routes/health.routes';
 import {
@@ -10,6 +11,7 @@ import {
 import { placeRouter } from './routes/place.routes';
 import { adminAuthMiddleware } from './middlewares/admin-auth.middleware';
 import { errorMiddleware } from './middlewares/error.middleware';
+import routeRouter from './routes/route.routes';
 
 export const app = express();
 
@@ -28,5 +30,7 @@ app.use('/api/admin', adminAuthMiddleware);
 app.use('/api', tagRouter);
 app.use('/api', concentrationMatchingRouter);
 app.use('/api', placeRouter);
+app.use('/api', routeRouter);
+app.use('/api', tripRouter);
 
 app.use(errorMiddleware);
