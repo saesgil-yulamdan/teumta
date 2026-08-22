@@ -32,8 +32,8 @@
 
 ## 현재 상태 한 줄 요약
 
-**백엔드 API는 전부 준비됐고 앱 화면도 대부분 붙었다. 남은 병목은 ① 코스 데이터 입력 ② 프론트 잔여 1건
-③ 제출물(기능설명서·스토어 등록).**
+**백엔드 API는 전부 준비됐고 앱 화면도 대부분 붙었다. 프론트 잔여 항목은 전부 정리됐고,
+남은 병목은 ① 관리자 웹 코스 데이터 입력(성과 분석용) ② 제출물(기능설명서·스토어 등록).**
 
 ---
 
@@ -77,7 +77,7 @@
 
 ---
 
-## 📱 프론트 담당 — 남은 1건
+## 📱 프론트 담당 — 남은 0건 (2026-08-22 기준)
 
 앞선 항목(TOUR 목적지 실시간 혼잡도, `404 CONGESTION_DATA_NOT_FOUND` 안내, 집중률 예측 화면,
 출처 표기 범위 확대)은 코드에서 반영 확인됨.
@@ -99,11 +99,19 @@
 이미 반영돼 있었고, 이번에 이동 경로 색을 정류지 마커(초록)와 겹치던 초록에서
 **파랑**(`#2F6FED`)으로 분리해 더 명확하게 구분되도록 했다. 브랜치 `fix/search-clear-and-crowded-popup`.
 
-### 3. 코스 화면 실데이터 확인 — 코스 입력 후
+### 3. 코스 화면 실데이터 확인 — 구조 변경으로 해당 없음 (2026-08-22 확인)
 
-코스 목록/상세는 `GET /api/places/:placeId/routes`, `GET /api/routes/:routeId` 연동 완료.
-DB에 코스가 들어간 뒤 **실제 좌표로 지도·타임라인이 맞게 그려지는지** 한 번 확인한다
-(`stops[].pathFromPrevious` 폴리라인, 복귀 구간 `Route.returnPath`).
+이 항목은 "DB에 저장된 `Route`를 `GET /api/places/:placeId/routes`로 조회하는 화면"을
+전제로 썼는데, **그 구조를 앱이 더는 쓰지 않는다.**
+
+- `mobile/src` 전체에서 `/places/:placeId/routes`, `/routes/:routeId` 호출 0건(grep 확인)
+- 지금 코스 화면(`detours.tsx` → `course-map.tsx`)은 요청 시점 실시간 생성(`GET /api/courses`,
+  `course-generation.service.ts`)을 쓴다 — DB에 코스가 없어도 전국 어디든 동작
+- 실제 좌표 폴리라인(`pathFromPrevious`/`returnPath`)도 `course-path.ts`가 이미 조립해서
+  `course-map.tsx`가 그리고 있고, 전용 테스트(`course-path.test.ts`) 통과 확인
+- `Route`/`RouteStop` DB 테이블 자체는 남아있지만 쓰임새는 **관리자 웹 코스 관리 CRUD**와
+  **성과 분석 화면의 공급 지표**(데이터로직 담당 표의 "코스 보유 관광지 수" 등)로 바뀌었다 —
+  모바일 코스 화면과는 무관해졌으니 "코스 입력 후 재확인" 자체가 불필요
 
 ### 상시 원칙
 
