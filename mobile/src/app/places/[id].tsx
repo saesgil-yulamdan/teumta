@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -56,8 +57,8 @@ const CONGESTION_BAR_RATIO: Record<CongestionLevel, number> = {
 const CONGESTION_MESSAGE: Record<CongestionLevel, string> = {
   low: '주변이 여유로운 편이에요. 지금 방문하기 좋아요.',
   medium: '무난한 편이지만, 여유를 원한다면 주변 로컬 장소를 먼저 둘러보는 것도 좋아요.',
-  high: '혼잡한 편이에요. 아래 근처 로컬 장소로 잠시 우회했다가 다시 방문해 보세요.',
-  veryHigh: '매우 혼잡해요. 지금은 근처 로컬 장소를 먼저 둘러보는 걸 추천해요.',
+  high: '아래 틈타 코스를 확인해 다른 장소로 우회했다가 다시 방문해보세요.',
+  veryHigh: '아래 틈타 코스를 확인해 다른 장소로 우회했다가 다시 방문해보세요.',
 };
 
 /** 중앙값 대비 오늘의 위치. KTO는 등급 미제공이라 상대 표현만. */
@@ -116,6 +117,8 @@ export default function PlaceDetailScreen() {
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 
+  const [showCrowdedAlert, setShowCrowdedAlert] = useState(false);
+
   useEffect(() => {
     if (!id || !source) return;
 
@@ -124,6 +127,7 @@ export default function PlaceDetailScreen() {
     setCongestion(null);
     setNearby([]);
     setForecast(null);
+    setShowCrowdedAlert(false);
 
     // TOUR 목적지도 서버가 TMAP POI로 매칭해 조회(api-spec 3.4a)
     setCongestionStatus('loading');
@@ -174,6 +178,16 @@ export default function PlaceDetailScreen() {
     };
   }, [id, source, refreshNonce]);
 
+  useEffect(() => {
+    if (!congestion) return;
+    const level = REALTIME_LEVEL_TO_CONGESTION_LEVEL[congestion.level];
+    if (level !== 'high' && level !== 'veryHigh') return;
+
+    setShowCrowdedAlert(true);
+    const timer = setTimeout(() => setShowCrowdedAlert(false), 5000);
+    return () => clearTimeout(timer);
+  }, [congestion]);
+
   if (!id || !source || !name) {
     return (
       <View style={styles.emptyContainer}>
@@ -191,6 +205,16 @@ export default function PlaceDetailScreen() {
   const crowdedNow =
     congestionStatus === 'idle' &&
     (congestionLevel === 'high' || congestionLevel === 'veryHigh');
+
+  function goToDetours() {
+    router.push({
+      pathname: '/detours',
+      params: {
+        ...(source === 'TOUR' ? { contentId: id } : { poiId: id }),
+        name,
+      },
+    });
+  }
 
   return (
     <View style={styles.screen}>
@@ -293,13 +317,15 @@ export default function PlaceDetailScreen() {
                     ]}
                   />
                 </View>
-                <View style={styles.congestionBanner}>
+                <View style={[styles.congestionBanner, crowdedNow && styles.congestionBannerAlert]}>
                   <Image
                     source={require('@/assets/images/icons/info.svg')}
                     style={styles.bannerIcon}
                     contentFit="contain"
                   />
-                  <Text style={styles.bannerText}>{CONGESTION_MESSAGE[congestionLevel]}</Text>
+                  <Text style={[styles.bannerText, crowdedNow && styles.bannerTextAlert]}>
+                    {CONGESTION_MESSAGE[congestionLevel]}
+                  </Text>
                 </View>
               </>
             )}
@@ -465,30 +491,35 @@ export default function PlaceDetailScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
-        {crowdedNow && palette && (
-          <View style={[styles.ctaNotice, { backgroundColor: palette.background }]}>
-            <View style={[styles.ctaNoticeDot, { backgroundColor: palette.dot }]} />
-            <Text style={[styles.ctaNoticeText, { color: palette.text }]}>
-              지금 붐비는 시간이에요. 근처 로컬을 먼저 둘러보고 오면 한산해져요.
-            </Text>
-          </View>
-        )}
         <Pressable
           style={[styles.ctaButton, crowdedNow && styles.ctaButtonCrowded]}
-          onPress={() =>
-            router.push({
-              pathname: '/detours',
-              params: {
-                ...(source === 'TOUR' ? { contentId: id } : { poiId: id }),
-                name,
-              },
-            })
-          }>
-          <Text style={styles.ctaLabel}>
-            {crowdedNow ? '지금 붐벼요 — 틈타 코스로 비켜가기' : '틈타 코스 보기'}
-          </Text>
+          onPress={goToDetours}>
+          <Text style={styles.ctaLabel}>틈타 코스 보기</Text>
         </Pressable>
       </View>
+
+      <Modal
+        visible={showCrowdedAlert}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCrowdedAlert(false)}>
+        <Pressable style={styles.alertBackdrop} onPress={() => setShowCrowdedAlert(false)}>
+          <Pressable style={styles.alertCard} onPress={() => {}}>
+            <Text style={styles.alertTitle}>잠깐!</Text>
+            <Text style={styles.alertBody}>
+              붐비는 장소예요{'\n'}틈타 코스를 이용해보시겠어요?
+            </Text>
+            <Pressable
+              style={styles.alertButton}
+              onPress={() => {
+                setShowCrowdedAlert(false);
+                goToDetours();
+              }}>
+              <Text style={styles.alertButtonLabel}>틈타 코스 보기</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -625,6 +656,13 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '500',
     lineHeight: 14,
+  },
+  congestionBannerAlert: {
+    backgroundColor: Teumta.congestion.veryHigh.background,
+  },
+  bannerTextAlert: {
+    color: Teumta.congestion.veryHigh.text,
+    fontWeight: '700',
   },
   sectionRow: {
     alignItems: 'center',
@@ -797,26 +835,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
   },
-  ctaNotice: {
-    alignItems: 'center',
-    borderRadius: 12,
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-  },
-  ctaNoticeDot: {
-    borderRadius: 4,
-    height: 8,
-    width: 8,
-  },
-  ctaNoticeText: {
-    flex: 1,
-    fontSize: 11,
-    fontWeight: '700',
-    lineHeight: 15,
-  },
   ctaButton: {
     alignItems: 'center',
     backgroundColor: Teumta.green,
@@ -825,7 +843,49 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   ctaButtonCrowded: {
-    backgroundColor: Teumta.greenDark,
+    backgroundColor: Teumta.congestion.veryHigh.text,
+  },
+  alertBackdrop: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 20, 17, 0.55)',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 28,
+  },
+  alertCard: {
+    alignItems: 'center',
+    backgroundColor: Teumta.surface,
+    borderRadius: 20,
+    gap: 10,
+    maxWidth: 320,
+    padding: 24,
+    width: '100%',
+  },
+  alertTitle: {
+    color: Teumta.congestion.veryHigh.text,
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  alertBody: {
+    color: Teumta.textPrimary,
+    fontSize: 15,
+    fontWeight: '600',
+    lineHeight: 22,
+    textAlign: 'center',
+  },
+  alertButton: {
+    alignItems: 'center',
+    backgroundColor: Teumta.green,
+    borderRadius: 14,
+    height: 46,
+    justifyContent: 'center',
+    marginTop: 6,
+    width: '100%',
+  },
+  alertButtonLabel: {
+    color: Teumta.surface,
+    fontSize: 14,
+    fontWeight: '700',
   },
   ctaLabel: {
     color: Teumta.surface,
