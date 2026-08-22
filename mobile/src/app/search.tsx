@@ -63,6 +63,9 @@ export default function SearchScreen() {
   function handleChangeKeyword(text: string) {
     setKeyword(text);
     setHasSearched(false);
+    if (!text.trim()) {
+      setResults([]);
+    }
   }
 
   async function runSearch(term: string) {
