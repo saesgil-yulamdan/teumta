@@ -6,6 +6,7 @@ import {
   getConcentrationForecastByContentIdController,
 } from '../controllers/congestion.controller';
 import { generateCoursesController } from '../controllers/course.controller';
+import { getNearbyFestivalsController } from '../controllers/festival.controller';
 import {
   createPlaceController,
   deletePlaceController,
@@ -27,6 +28,7 @@ placeRouter.get('/local-places', getNearbyLocalPlacesByContentIdController);
 // 정적 경로가 먼저 걸리도록 목록 라우트 뒤, 파라미터 라우트 앞에 둔다.
 placeRouter.get('/local-places/detail', getLocalPlaceDetailController);
 placeRouter.get('/congestion', getRealtimeCongestionController);
+placeRouter.get('/festivals/nearby', getNearbyFestivalsController);
 // 집중률 예측 실시간 조회(전국, DB 미사용). 적재된 Place 기준 조회는 아래 /places/:id/... 유지.
 placeRouter.get('/concentration-forecast', getConcentrationForecastByContentIdController);
 placeRouter.get('/courses', generateCoursesController);

@@ -1,5 +1,5 @@
 import { Link } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -20,6 +20,7 @@ import {
   loadRecentSearches,
   saveRecentSearches,
 } from '@/utils/recent-searches';
+import { isStaleRequest, nextRequestId } from '@/utils/async-request';
 
 type SearchStatus = 'idle' | 'loading' | 'error';
 
@@ -39,6 +40,7 @@ export default function SearchScreen() {
   const [status, setStatus] = useState<SearchStatus>('idle');
   const [hasSearched, setHasSearched] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
+  const searchRequestId = useRef(0);
 
   useEffect(() => {
     void loadRecentSearches().then(setRecent);
@@ -61,7 +63,9 @@ export default function SearchScreen() {
   }
 
   function handleChangeKeyword(text: string) {
+    searchRequestId.current = nextRequestId(searchRequestId.current);
     setKeyword(text);
+    setStatus('idle');
     setHasSearched(false);
   }
 
@@ -72,15 +76,25 @@ export default function SearchScreen() {
     setKeyword(trimmed);
     rememberKeyword(trimmed);
     setStatus('loading');
+    const requestId = nextRequestId(searchRequestId.current);
+    searchRequestId.current = requestId;
     try {
       const data = await searchPlaces(trimmed);
+      if (isStaleRequest(requestId, searchRequestId.current)) {
+        return;
+      }
       setResults(data);
       setStatus('idle');
     } catch {
+      if (isStaleRequest(requestId, searchRequestId.current)) {
+        return;
+      }
       setResults([]);
       setStatus('error');
     } finally {
-      setHasSearched(true);
+      if (!isStaleRequest(requestId, searchRequestId.current)) {
+        setHasSearched(true);
+      }
     }
   }
 

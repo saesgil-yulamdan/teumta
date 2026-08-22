@@ -57,6 +57,7 @@ export type RealtimeCongestion = {
 
 /** GET /api/local-places 응답 항목. DB 미저장 — 내부 id 없이 name+좌표로 구분. */
 export type NearbyLocalPlaceResult = {
+  kind?: 'LOCAL_PLACE' | 'FESTIVAL';
   /** TourAPI 콘텐츠 식별자. 상세 소개 조회 키. */
   tourApiContentId: string;
   name: string;
@@ -69,6 +70,10 @@ export type NearbyLocalPlaceResult = {
   /** TMAP 실측 보행거리(m). 직선거리 아님. */
   distanceMeters: number;
   travelTimeMinutes: number;
+  /** 행사 시작일(YYYYMMDD). 상설 로컬이면 null. */
+  eventStartDate?: string | null;
+  /** 행사 종료일(YYYYMMDD). 상설 로컬이면 null. */
+  eventEndDate?: string | null;
 };
 
 /** GET /api/concentration-forecast 응답. 날짜별 예측 — 실시간 혼잡도 아님. */

@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   getConcentrationForecast,
+  getNearbyFestivals,
   getNearbyLocalPlaces,
   getRealtimeCongestion,
 } from '@/api/places';
@@ -79,6 +80,21 @@ function measuredAtLabel(measuredAt: string | null): string | null {
   return `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
 }
 
+function festivalPeriodLabel(start?: string | null, end?: string | null): string {
+  const format = (value?: string | null) => {
+    if (!value || !/^\d{8}$/.test(value)) {
+      return null;
+    }
+    return `${Number(value.slice(4, 6))}.${Number(value.slice(6, 8))}`;
+  };
+  const startLabel = format(start);
+  const endLabel = format(end);
+  if (startLabel && endLabel) {
+    return startLabel === endLabel ? startLabel : `${startLabel}-${endLabel}`;
+  }
+  return startLabel ?? endLabel ?? '일정 확인 필요';
+}
+
 const LEGEND_STEPS = [
   { key: 'low', label: '여유' },
   { key: 'medium', label: '보통' },
@@ -110,6 +126,9 @@ export default function PlaceDetailScreen() {
   const [nearby, setNearby] = useState<NearbyLocalPlaceResult[]>([]);
   const [nearbyStatus, setNearbyStatus] = useState<Status>('loading');
 
+  const [festivals, setFestivals] = useState<NearbyLocalPlaceResult[]>([]);
+  const [festivalStatus, setFestivalStatus] = useState<Status>('loading');
+
   const [forecast, setForecast] = useState<ConcentrationForecast | null>(null);
 
   // 당겨서 새로고침 — 값이 바뀌면 아래 효과가 전부 다시 조회한다(서버 5분 캐시가 흡수).
@@ -120,57 +139,87 @@ export default function PlaceDetailScreen() {
     if (!id || !source) return;
 
     let ignored = false;
+    let deferredLoad: ReturnType<typeof setTimeout> | null = null;
 
-    setCongestion(null);
-    setNearby([]);
-    setForecast(null);
+    const startLoad = setTimeout(() => {
+      if (ignored) {
+        return;
+      }
 
-    // TOUR 목적지도 서버가 TMAP POI로 매칭해 조회(api-spec 3.4a)
-    setCongestionStatus('loading');
-    getRealtimeCongestion(source === 'TOUR' ? { contentId: id } : { poiId: id })
-      .then((data) => {
-        // 당김 스피너는 대표 조회(혼잡도)가 끝나면 내린다 — 반영 여부와 무관.
-        setRefreshing(false);
-        if (ignored) return;
-        setCongestion(data);
-        setCongestionStatus('idle');
-      })
-      .catch((error: unknown) => {
-        setRefreshing(false);
-        if (ignored) return;
-        // 404는 SK 미커버 장소 — 장애가 아니라 원래 없는 데이터
-        const status = (error as { response?: { status?: number } }).response?.status;
-        setCongestionStatus(status === 404 ? 'unavailable' : 'error');
-      });
+      setCongestion(null);
+      setNearby([]);
+      setFestivals([]);
+      setForecast(null);
 
-    // 집중률 예측은 TourAPI 목적지 전용(관광지 단위 데이터)
-    if (source === 'TOUR') {
-      getConcentrationForecast(id)
+      // TOUR 목적지도 서버가 TMAP POI로 매칭해 조회(api-spec 3.4a)
+      setCongestionStatus('loading');
+      getRealtimeCongestion(source === 'TOUR' ? { contentId: id } : { poiId: id })
         .then((data) => {
-          if (!ignored) {
-            setForecast(data);
-          }
+          // 당김 스피너는 대표 조회(혼잡도)가 끝나면 내린다 — 반영 여부와 무관.
+          setRefreshing(false);
+          if (ignored) return;
+          setCongestion(data);
+          setCongestionStatus('idle');
         })
-        .catch(() => {
-          // 예측 없는 장소도 많음 → 실패 시 해당 섹션만 숨김
+        .catch((error: unknown) => {
+          setRefreshing(false);
+          if (ignored) return;
+          // 404는 SK 미커버 장소 — 장애가 아니라 원래 없는 데이터
+          const status = (error as { response?: { status?: number } }).response?.status;
+          setCongestionStatus(status === 404 ? 'unavailable' : 'error');
         });
-    }
 
-    setNearbyStatus('loading');
-    const identifier = source === 'TOUR' ? { contentId: id } : { poiId: id };
-    getNearbyLocalPlaces(identifier)
-      .then((data) => {
-        if (ignored) return;
-        setNearby(data);
-        setNearbyStatus('idle');
-      })
-      .catch(() => {
-        if (ignored) return;
-        setNearbyStatus('error');
-      });
+      setNearbyStatus('loading');
+      setFestivalStatus('loading');
+      const identifier = source === 'TOUR' ? { contentId: id } : { poiId: id };
+      deferredLoad = setTimeout(() => {
+        if (ignored) {
+          return;
+        }
+
+        // 첫 화면 혼잡도 표시를 우선한다. 아래 섹션 데이터는 짧게 늦춰 외부 API 호출 폭주를 줄인다.
+        if (source === 'TOUR') {
+          getConcentrationForecast(id)
+            .then((data) => {
+              if (!ignored) {
+                setForecast(data);
+              }
+            })
+            .catch(() => {
+              // 예측 없는 장소도 많음 → 실패 시 해당 섹션만 숨김
+            });
+        }
+
+        getNearbyLocalPlaces(identifier)
+          .then((data) => {
+            if (ignored) return;
+            setNearby(data);
+            setNearbyStatus('idle');
+          })
+          .catch(() => {
+            if (ignored) return;
+            setNearbyStatus('error');
+          });
+
+        getNearbyFestivals(identifier)
+          .then((data) => {
+            if (ignored) return;
+            setFestivals(data);
+            setFestivalStatus('idle');
+          })
+          .catch(() => {
+            if (ignored) return;
+            setFestivalStatus('error');
+          });
+      }, 350);
+    }, 0);
 
     return () => {
       ignored = true;
+      clearTimeout(startLoad);
+      if (deferredLoad !== null) {
+        clearTimeout(deferredLoad);
+      }
     };
   }, [id, source, refreshNonce]);
 
@@ -405,6 +454,59 @@ export default function PlaceDetailScreen() {
           )}
 
           <View style={styles.sectionRow}>
+            <Text style={styles.sectionTitle}>요즘 근처 행사</Text>
+            <Text style={styles.sectionAction}>진행 중·예정</Text>
+          </View>
+
+          {festivalStatus === 'loading' && <ActivityIndicator style={styles.stateBox} />}
+          {festivalStatus === 'error' && (
+            <Text style={styles.stateText}>근처 행사 정보를 불러오지 못했어요.</Text>
+          )}
+          {festivalStatus === 'idle' && festivals.length === 0 && (
+            <Text style={styles.stateText}>가까운 진행 중·예정 행사가 없어요.</Text>
+          )}
+
+          <View style={styles.nearbyList}>
+            {festivals.map((festival) => (
+              <Pressable
+                key={`${festival.tourApiContentId}-${festival.name}`}
+                style={styles.nearbyCard}
+                onPress={() =>
+                  router.push({
+                    pathname: '/local-places/[id]',
+                    params: {
+                      id: festival.name,
+                      contentId: festival.tourApiContentId,
+                      name: festival.name,
+                      latitude: String(festival.latitude),
+                      longitude: String(festival.longitude),
+                      distanceMeters: String(festival.distanceMeters),
+                      travelTimeMinutes: String(festival.travelTimeMinutes),
+                      destinationName: name,
+                      category: '행사·축제',
+                      ...(festival.address ? { address: festival.address } : {}),
+                      ...(festival.imageUrl ? { imageUrl: festival.imageUrl } : {}),
+                    },
+                  })
+                }>
+                <PlaceThumbnail
+                  imageUrl={festival.imageUrl}
+                  category="행사·축제"
+                  variant="card"
+                  style={styles.nearbyThumb}
+                />
+                <View style={styles.nearbyTexts}>
+                  <Text style={styles.nearbyName}>{festival.name}</Text>
+                  <Text style={styles.nearbyMeta}>
+                    {festivalPeriodLabel(festival.eventStartDate, festival.eventEndDate)} · 도보{' '}
+                    {festival.travelTimeMinutes}분 · {festival.distanceMeters}m
+                  </Text>
+                </View>
+              </Pressable>
+            ))}
+          </View>
+
+          <View style={styles.sectionRow}>
             <Text style={styles.sectionTitle}>근처에서 잠깐 둘러볼 곳</Text>
           </View>
 
@@ -458,7 +560,7 @@ export default function PlaceDetailScreen() {
           </View>
 
           {/* 주변 로컬 장소 목록도 TourAPI 데이터라 목적지 출처와 무관하게 표기한다. */}
-          {(source === 'TOUR' || nearby.length > 0) && (
+          {(source === 'TOUR' || nearby.length > 0 || festivals.length > 0) && (
             <TourApiAttribution style={styles.attribution} />
           )}
         </View>

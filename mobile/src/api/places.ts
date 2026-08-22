@@ -70,3 +70,17 @@ export async function getNearbyLocalPlaces(
   });
   return response.data.data;
 }
+
+/** GET /api/festivals/nearby — 목적지 주변 진행 중/예정 행사·축제. */
+export async function getNearbyFestivals(
+  identifier: { contentId: string } | { poiId: string },
+  radius = 5000,
+): Promise<NearbyLocalPlaceResult[]> {
+  const response = await apiClient.get<{ data: NearbyLocalPlaceResult[] }>(
+    '/festivals/nearby',
+    {
+      params: { ...identifier, radius },
+    },
+  );
+  return response.data.data;
+}

@@ -5,6 +5,7 @@ import {
   externalConfig,
   requestJson,
 } from '../common';
+import { logExternalApiIssue } from '../../utils/structured-log';
 import type { SkCongestionResponse, SkPoiListResponse } from './congestion.dto';
 
 /**
@@ -76,10 +77,17 @@ export async function fetchCongestionPoiPage(
 
   const code = response.status?.code;
   if (code !== '00') {
-    throw new ExternalApiResponseError(
+    const error = new ExternalApiResponseError(
       SERVICE,
       `Puzzle API returned status ${code ?? 'UNKNOWN'} for poi list`,
     );
+    logExternalApiIssue({
+      service: SERVICE,
+      phase: 'puzzle_meta_status',
+      error,
+      detailCode: code,
+    });
+    throw error;
   }
   return response;
 }
@@ -96,22 +104,43 @@ function assertPuzzleOk(response: SkCongestionResponse): void {
   const error = response.error;
   if (error) {
     if (error.message === NOT_FOUND_POI_MESSAGE || error.code === '404') {
-      throw new ExternalApiNotFoundError(SERVICE, 'Puzzle API has no data for this POI', {
+      const notFound = new ExternalApiNotFoundError(SERVICE, 'Puzzle API has no data for this POI', {
         code: 'CONGESTION_DATA_NOT_FOUND',
       });
+      logExternalApiIssue({
+        service: SERVICE,
+        phase: 'puzzle_not_found',
+        error: notFound,
+        detailCode: error.code ?? error.message,
+      });
+      throw notFound;
     }
-    throw new ExternalApiResponseError(
+    const responseError = new ExternalApiResponseError(
       SERVICE,
       `Puzzle API returned error ${error.code ?? 'UNKNOWN'}`,
     );
+    logExternalApiIssue({
+      service: SERVICE,
+      phase: 'puzzle_error',
+      error: responseError,
+      detailCode: error.code,
+    });
+    throw responseError;
   }
 
   const code = response.status?.code;
   if (code === '00') {
     return;
   }
-  throw new ExternalApiResponseError(
+  const statusError = new ExternalApiResponseError(
     SERVICE,
     `Puzzle API returned status ${code ?? 'UNKNOWN'}: ${response.status?.message ?? 'Unknown error'}`,
   );
+  logExternalApiIssue({
+    service: SERVICE,
+    phase: 'puzzle_status',
+    error: statusError,
+    detailCode: code,
+  });
+  throw statusError;
 }

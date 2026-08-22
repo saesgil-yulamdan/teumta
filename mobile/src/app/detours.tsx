@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Fragment, useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -16,6 +16,8 @@ import {
   type DestinationIdentifier,
   type GeneratedCourse,
 } from '@/types/course';
+import { isStaleRequest, nextRequestId } from '@/utils/async-request';
+import { courseCompositionLabel, courseTitle, formatKilometers } from '@/utils/course-labels';
 import { withRoJosa } from '@/utils/text';
 import { timeLabelAfter } from '@/utils/time';
 
@@ -31,15 +33,6 @@ type DetoursParams = {
   poiId?: string;
   name?: string;
 };
-
-function formatKilometers(meters: number) {
-  return `${(meters / 1000).toFixed(1)}km`;
-}
-
-/** 코스 이름은 서버 미제공 → 정류지 이름을 이어 붙여 생성. */
-function courseTitle(course: GeneratedCourse) {
-  return course.stops.map((stop) => stop.name).join(' · ');
-}
 
 type RouteCardProps = {
   course: GeneratedCourse;
@@ -65,6 +58,7 @@ function RouteCard({
     { value: distanceLabel, label: '걷는 거리' },
   ];
   const stopNames = [...course.stops.map((stop) => stop.name), `${destination.name} 복귀`];
+  const recommendationTags = course.recommendationTags ?? [];
 
   return (
     <Pressable
@@ -101,11 +95,21 @@ function RouteCard({
             <Text
               numberOfLines={1}
               style={selected ? styles.cardDescription : styles.cardDescriptionAlternative}>
-              로컬 {course.stops.length}곳을 들르고 돌아오는 코스예요.
+              {courseCompositionLabel(course)}
             </Text>
           </View>
           <View style={selected ? styles.radioOn : styles.radioOff} />
         </View>
+
+        {recommendationTags.length > 0 && (
+          <View style={styles.reasonRow}>
+            {recommendationTags.map((tag) => (
+              <View key={tag} style={styles.reasonChip}>
+                <Text style={styles.reasonChipLabel}>{tag}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         <View style={styles.stopsRow}>
           {stopNames.map((stop, index) => (
@@ -147,6 +151,8 @@ export default function DetoursScreen() {
   const [courses, setCourses] = useState<GeneratedCourse[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [status, setStatus] = useState<Status>('loading');
+  const [variant, setVariant] = useState(0);
+  const loadRequestId = useRef(0);
 
   const identifier: DestinationIdentifier | null = contentId
     ? { contentId }
@@ -155,39 +161,47 @@ export default function DetoursScreen() {
       : null;
 
   const load = useCallback(async () => {
-    if (!identifier) {
+    const currentIdentifier: DestinationIdentifier | null = contentId
+      ? { contentId }
+      : poiId
+        ? { poiId }
+        : null;
+    const requestId = nextRequestId(loadRequestId.current);
+    loadRequestId.current = requestId;
+
+    if (!currentIdentifier) {
       setStatus('error');
       return;
     }
 
     setStatus('loading');
     try {
-      const result = await fetchCourses(identifier, availableMinutes);
+      const result = await fetchCourses(currentIdentifier, availableMinutes, variant);
+      if (isStaleRequest(requestId, loadRequestId.current)) {
+        return;
+      }
       setDestination(result.destination);
       setCourses(result.courses);
       setSelectedIndex(0);
       setStatus('idle');
     } catch {
+      if (isStaleRequest(requestId, loadRequestId.current)) {
+        return;
+      }
       setCourses([]);
       setStatus('error');
     }
-    // identifier는 매 렌더 새 객체 → 의존성 대신 원본 파라미터 참조
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contentId, poiId, availableMinutes]);
+  }, [contentId, poiId, availableMinutes, variant]);
 
   useEffect(() => {
-    let ignored = false;
-
     // 코스 생성은 외부 API 다중 호출 → 화면 전환 뒤 늦게 온 응답이 상태를 덮어쓰지 않게
-    void (async () => {
-      if (ignored) {
-        return;
-      }
-      await load();
-    })();
+    const timer = setTimeout(() => {
+      void load();
+    }, 0);
 
     return () => {
-      ignored = true;
+      clearTimeout(timer);
+      loadRequestId.current = nextRequestId(loadRequestId.current);
     };
   }, [load]);
 
@@ -207,6 +221,18 @@ export default function DetoursScreen() {
     // 내 여행 탭 "최근 본 코스"에 기기 전용으로 남긴다 — 앱을 껐다 켜도 재진입 가능.
     logViewedCourse(selected);
     router.push('/course-map');
+  };
+
+  const handleChangeMinutes = (minutes: (typeof DURATION_OPTIONS)[number]) => {
+    setAvailableMinutes(minutes);
+    setVariant(0);
+  };
+
+  const handleRefreshCourses = () => {
+    if (status === 'loading') {
+      return;
+    }
+    setVariant((current) => current + 1);
   };
 
   const destinationName = destination?.name ?? name ?? '목적지';
@@ -240,7 +266,7 @@ export default function DetoursScreen() {
             return (
               <Pressable
                 key={minutes}
-                onPress={() => setAvailableMinutes(minutes)}
+                onPress={() => handleChangeMinutes(minutes)}
                 disabled={status === 'loading'}
                 style={[styles.chip, chipSelected && styles.chipSelected]}>
                 <Text style={[styles.chipLabel, chipSelected && styles.chipLabelSelected]}>
@@ -306,6 +332,10 @@ export default function DetoursScreen() {
             </View>
 
             <TourApiAttribution style={styles.attribution} />
+
+            <Pressable style={styles.secondaryButton} onPress={handleRefreshCourses}>
+              <Text style={styles.secondaryButtonLabel}>다른 코스 보기</Text>
+            </Pressable>
 
             <Pressable style={styles.ctaButton} onPress={handleStart}>
               <Text style={styles.ctaLabel}>선택한 코스 자세히 보기</Text>
@@ -504,6 +534,23 @@ const styles = StyleSheet.create({
     fontSize: 10,
     lineHeight: 14,
   },
+  reasonRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5,
+  },
+  reasonChip: {
+    backgroundColor: Teumta.greenLight,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  reasonChipLabel: {
+    color: Teumta.greenDark,
+    fontSize: 9,
+    fontWeight: '700',
+    lineHeight: 12,
+  },
   radioOn: {
     backgroundColor: Teumta.green,
     borderColor: Teumta.surface,
@@ -615,6 +662,21 @@ const styles = StyleSheet.create({
   },
   attribution: {
     marginTop: 2,
+  },
+  secondaryButton: {
+    alignItems: 'center',
+    backgroundColor: Teumta.surface,
+    borderColor: Teumta.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    height: 46,
+    justifyContent: 'center',
+  },
+  secondaryButtonLabel: {
+    color: Teumta.greenDark,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 18,
   },
   ctaButton: {
     alignItems: 'center',

@@ -10,9 +10,10 @@ import type { CourseGenerationResult, DestinationIdentifier } from '@/types/cour
 export async function fetchCourses(
   identifier: DestinationIdentifier,
   availableMinutes: number,
+  variant = 0,
 ): Promise<CourseGenerationResult> {
   const response = await apiClient.get<{ data: CourseGenerationResult }>('/courses', {
-    params: { ...identifier, availableMinutes },
+    params: { ...identifier, availableMinutes, variant },
   });
   return response.data.data;
 }

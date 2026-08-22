@@ -47,6 +47,10 @@ export interface TourApiPlaceItem {
   dist?: string;
   createdtime?: string;
   modifiedtime?: string;
+  /** searchFestival2 응답 전용. 행사 시작일(YYYYMMDD). */
+  eventstartdate?: string;
+  /** searchFestival2 응답 전용. 행사 종료일(YYYYMMDD). */
+  eventenddate?: string;
   /** 법정동 시도 코드. */
   lDongRegnCd?: string;
   /** 법정동 시군구 코드. */
