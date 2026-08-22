@@ -4,7 +4,7 @@
 > 수요 분산(우회 코스) → 원 관광지 복귀.
 > 문서: [service-overview](./service-overview.md) · [api-spec](./api-spec.md) · [collaboration](./collaboration.md) ·
 > [congestion-rules](./congestion-rules.md) · [route-data-rules](./route-data-rules.md) ·
-> [location-privacy](./location-privacy.md)
+> [location-privacy](./location-privacy.md) · [collaboration](./collaboration.md)
 >
 > **서버**: `https://port-0-teumta-server-msh476v8e47b3c7e.sel3.cloudtype.app`
 > **관리자 웹**: `https://port-0-teumta-admin-web-msh476v8e47b3c7e.sel3.cloudtype.app` (비밀번호는 B에게 문의 —
@@ -174,9 +174,9 @@ Route/Trip 조회·방문 API(3.5~3.9) · `tag` 필터 · 쿼리 검증 응답 `
 
 ## 📊 데이터로직 담당
 
-판단 기준 문서 3건 머지 완료 — [congestion-rules](./congestion-rules.md)(우회 트리거 `CROWDED` 이상,
-KTO/SK 역할 구분, 30/60/90분 계산), [route-data-rules](./route-data-rules.md),
-[kto-concentration-data-flow](./kto-concentration-data-flow.md).
+판단 기준 문서 정리 완료 — [congestion-rules](./congestion-rules.md)(우회 트리거 `CROWDED` 이상,
+KTO/SK 역할 구분, KTO 적재 규칙), [route-data-rules](./route-data-rules.md)(코스 구성·체류시간·예외 처리).
+`kto-concentration-data-flow`는 내용이 코드·테스트와 중복되어 congestion-rules §6으로 흡수했다.
 
 ### 1. 분산 효과 지표 — 공급 지표로 확정
 
