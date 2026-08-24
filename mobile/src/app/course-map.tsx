@@ -303,11 +303,15 @@ const styles = StyleSheet.create({
     width: 44,
   },
   sheetHeader: {
+    alignItems: 'flex-start',
     flexDirection: 'row',
+    gap: 10,
     justifyContent: 'space-between',
   },
   sheetTitleTexts: {
+    flex: 1,
     gap: 2,
+    minWidth: 0,
   },
   sheetTitle: {
     color: Teumta.textPrimary,
@@ -324,6 +328,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     backgroundColor: Teumta.greenLight,
     borderRadius: 11,
+    flexShrink: 0,
+    minWidth: 64,
     paddingHorizontal: 10,
     paddingVertical: 7,
   },
