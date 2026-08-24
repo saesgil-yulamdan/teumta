@@ -36,6 +36,16 @@ const rawResponse = {
   },
 };
 
+function rawResponseWithLevel(level: number) {
+  return {
+    ...rawResponse,
+    contents: {
+      ...rawResponse.contents,
+      rltm: [{ datetime: '20260806125000', congestion: 0.003, congestionLevel: level, type: 1 }],
+    },
+  };
+}
+
 beforeEach(() => {
   vi.useFakeTimers();
   clearRealtimeCongestionCache();
@@ -57,6 +67,31 @@ describe('getRealtimeCongestion', () => {
       source: 'SK_PUZZLE',
       isRealtime: true,
     });
+    expect(view.detourPrompt).toBeNull();
+  });
+
+  it('CROWDED 이상이면 우회 제안 팝업 메타를 포함한다', async () => {
+    fetchRealtimeCongestionMock.mockResolvedValue(rawResponseWithLevel(3));
+
+    const view = await getRealtimeCongestion('362105');
+
+    expect(view.level).toBe(CongestionLevel.CROWDED);
+    expect(view.detourPrompt).toEqual({
+      shouldPrompt: true,
+      reason: 'REALTIME_CROWDED',
+      title: '잠깐!',
+      body: '붐비는 장소예요\n틈타 코스를 이용해보시겠어요?',
+      actionLabel: '틈타 코스 보기',
+    });
+  });
+
+  it('VERY_CROWDED도 우회 제안 팝업 메타를 포함한다', async () => {
+    fetchRealtimeCongestionMock.mockResolvedValue(rawResponseWithLevel(4));
+
+    const view = await getRealtimeCongestion('362105');
+
+    expect(view.level).toBe(CongestionLevel.VERY_CROWDED);
+    expect(view.detourPrompt?.shouldPrompt).toBe(true);
   });
 
   it('TTL 내 재호출은 캐시를 사용한다(외부 호출 1회)', async () => {
