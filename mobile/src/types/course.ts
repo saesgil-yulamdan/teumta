@@ -3,6 +3,8 @@
 import type { Coordinate } from './place';
 
 export type CourseStop = {
+  /** LOCAL_PLACE=상설 로컬, FESTIVAL=한시 행사·축제. 구버전 스냅샷은 undefined. */
+  kind?: 'LOCAL_PLACE' | 'FESTIVAL';
   name: string;
   address: string | null;
   latitude: number;
@@ -18,6 +20,8 @@ export type CourseStop = {
    */
   pathFromPrevious?: Coordinate[] | null;
   stayMinutes: number;
+  eventStartDate?: string | null;
+  eventEndDate?: string | null;
 };
 
 export type GeneratedCourse = {
@@ -29,6 +33,8 @@ export type GeneratedCourse = {
   returnPath?: Coordinate[] | null;
   /** 정류지 사이 구간이 TMAP 실측이면 true, 추정이면 false. */
   verified: boolean;
+  /** 서버가 계산한 코스 추천 근거 태그. 구버전 저장 스냅샷은 undefined. */
+  recommendationTags?: string[];
   stops: CourseStop[];
 };
 

@@ -117,6 +117,18 @@ export function mapNearbyCandidateList(response: TourApiListResponse): NearbyLoc
   return candidates;
 }
 
+/** searchFestival2 → 행사 후보[]. 좌표·날짜가 없는 항목은 제외. */
+export function mapFestivalCandidateList(response: TourApiListResponse): NearbyLocalPlaceCandidate[] {
+  const candidates: NearbyLocalPlaceCandidate[] = [];
+  for (const item of extractItems(response)) {
+    const candidate = mapFestivalCandidate(item);
+    if (candidate) {
+      candidates.push(candidate);
+    }
+  }
+  return candidates;
+}
+
 /** 단일 목록 항목 → 후보. 좌표가 유효하지 않으면 null. */
 export function mapNearbyCandidate(item: TourApiPlaceItem): NearbyLocalPlaceCandidate | null {
   const latitude = safeCoordinate(item.mapy);
@@ -126,6 +138,7 @@ export function mapNearbyCandidate(item: TourApiPlaceItem): NearbyLocalPlaceCand
   }
   const tourDistance = Number(item.dist);
   return {
+    kind: 'LOCAL_PLACE',
     tourApiContentId: String(item.contentid),
     contentTypeId: item.contenttypeid === undefined ? null : String(item.contenttypeid),
     categoryCode: item.cat3 ? String(item.cat3) : null,
@@ -135,6 +148,34 @@ export function mapNearbyCandidate(item: TourApiPlaceItem): NearbyLocalPlaceCand
     longitude,
     imageUrl: toSecureImageUrl(item.firstimage || item.firstimage2),
     tourDistanceMeters: Number.isFinite(tourDistance) ? tourDistance : null,
+    eventStartDate: null,
+    eventEndDate: null,
+  };
+}
+
+/** 단일 행사 목록 항목 → 후보. 좌표와 유효 날짜가 없으면 null. */
+export function mapFestivalCandidate(item: TourApiPlaceItem): NearbyLocalPlaceCandidate | null {
+  const latitude = safeCoordinate(item.mapy);
+  const longitude = safeCoordinate(item.mapx);
+  const eventStartDate = normalizeYmd(item.eventstartdate);
+  const eventEndDate = normalizeYmd(item.eventenddate);
+  if (latitude === null || longitude === null || eventStartDate === null || eventEndDate === null) {
+    return null;
+  }
+
+  return {
+    kind: 'FESTIVAL',
+    tourApiContentId: String(item.contentid),
+    contentTypeId: item.contenttypeid === undefined ? '15' : String(item.contenttypeid),
+    categoryCode: item.cat3 ? String(item.cat3) : null,
+    name: item.title,
+    address: buildAddress(item.addr1, item.addr2),
+    latitude,
+    longitude,
+    imageUrl: toSecureImageUrl(item.firstimage || item.firstimage2),
+    tourDistanceMeters: null,
+    eventStartDate,
+    eventEndDate,
   };
 }
 
@@ -316,6 +357,11 @@ function buildAddress(addr1?: string, addr2?: string): string | null {
     .filter((part) => part.length > 0)
     .join(' ');
   return full.length > 0 ? full : null;
+}
+
+function normalizeYmd(value: string | undefined): string | null {
+  const trimmed = (value ?? '').trim();
+  return /^\d{8}$/.test(trimmed) ? trimmed : null;
 }
 
 /** 좌표 문자열 → number. TourAPI가 빈 값을 ""로 주므로 0·NaN은 무효 좌표. */

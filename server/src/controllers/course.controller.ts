@@ -11,6 +11,8 @@ import {
  * 좌표를 입력으로 받지 않는다(privacy — 서버가 식별자를 좌표로 해석).
  */
 
+const MAX_COURSE_VARIANT = 1000;
+
 function nonEmptyString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 }
@@ -53,10 +55,26 @@ export const generateCoursesController: RequestHandler = async (req, res, next) 
       return;
     }
 
+    const rawVariant = req.query.variant;
+    const variant = rawVariant === undefined ? 0 : Number(rawVariant);
+    if (
+      !Number.isInteger(variant) ||
+      variant < 0 ||
+      variant > MAX_COURSE_VARIANT
+    ) {
+      badRequest(
+        res,
+        'INVALID_VARIANT',
+        `variant는 0~${MAX_COURSE_VARIANT} 사이의 정수여야 합니다.`,
+      );
+      return;
+    }
+
     const result = await generateCourses({
       ...(contentId !== null ? { contentId } : {}),
       ...(poiId !== null ? { poiId } : {}),
       availableMinutes,
+      variant,
     });
 
     if (result.status === 'DESTINATION_NOT_FOUND') {

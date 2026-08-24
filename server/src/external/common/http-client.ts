@@ -11,6 +11,7 @@ import {
   looksLikeXml,
   parsePublicDataXmlError,
 } from './public-data';
+import { logExternalApiIssue } from '../../utils/structured-log';
 
 /**
  * 외부 API 클라이언트 공용 fetch 래퍼.
@@ -64,19 +65,33 @@ export async function requestJson<T = unknown>(options: RequestJsonOptions): Pro
     });
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new ExternalApiTimeoutError(service, { cause: error });
+      throw logAndReturn(
+        new ExternalApiTimeoutError(service, { cause: error }),
+        service,
+        'request_timeout',
+        { url, method },
+      );
     }
     // 네트워크 오류 등 — 원본 메시지에 민감정보 가능성, 그대로 노출 금지
-    throw new ExternalApiError(service, `Request to "${service}" failed`, {
-      code: 'NETWORK_ERROR',
-      cause: error,
-    });
+    throw logAndReturn(
+      new ExternalApiError(service, `Request to "${service}" failed`, {
+        code: 'NETWORK_ERROR',
+        cause: error,
+      }),
+      service,
+      'network_error',
+      { url, method },
+    );
   } finally {
     clearTimeout(timer);
   }
 
   if (!response.ok && !(options.acceptStatuses ?? []).includes(response.status)) {
-    throw classifyHttpError(service, response.status);
+    throw logAndReturn(classifyHttpError(service, response.status), service, 'http_status', {
+      url,
+      method,
+      status: response.status,
+    });
   }
 
   // 본문은 정확히 한 번만 읽기 — 공공데이터포털은 _type=json 요청에도
@@ -85,31 +100,69 @@ export async function requestJson<T = unknown>(options: RequestJsonOptions): Pro
   try {
     bodyText = await response.text();
   } catch (error) {
-    throw new ExternalApiResponseError(service, 'Failed to read response body', {
-      status: response.status,
-      cause: error,
-    });
+    throw logAndReturn(
+      new ExternalApiResponseError(service, 'Failed to read response body', {
+        status: response.status,
+        cause: error,
+      }),
+      service,
+      'read_body',
+      { url, method, status: response.status },
+    );
   }
 
   if (looksLikeXml(response.headers.get('content-type'), bodyText)) {
     const envelope = parsePublicDataXmlError(bodyText);
     if (envelope) {
-      throw classifyPublicDataResultCode(service, envelope.resultCode, envelope.resultMsg);
+      throw logAndReturn(
+        classifyPublicDataResultCode(service, envelope.resultCode, envelope.resultMsg),
+        service,
+        'public_data_xml_error',
+        { url, method, status: response.status, detailCode: envelope.resultCode },
+      );
     }
     // 오류 봉투도 아닌 XML — 원문은 message에 넣지 않음(민감정보 방지)
-    throw new ExternalApiResponseError(service, 'Received unexpected XML response', {
-      status: response.status,
-    });
+    throw logAndReturn(
+      new ExternalApiResponseError(service, 'Received unexpected XML response', {
+        status: response.status,
+      }),
+      service,
+      'xml_response',
+      { url, method, status: response.status },
+    );
   }
 
   try {
     return JSON.parse(bodyText) as T;
   } catch (error) {
-    throw new ExternalApiResponseError(service, 'Failed to parse response body as JSON', {
-      status: response.status,
-      cause: error,
-    });
+    throw logAndReturn(
+      new ExternalApiResponseError(service, 'Failed to parse response body as JSON', {
+        status: response.status,
+        cause: error,
+      }),
+      service,
+      'parse_json',
+      { url, method, status: response.status },
+    );
   }
+}
+
+function logAndReturn(
+  error: ExternalApiError,
+  service: string,
+  phase: string,
+  context: { url: string; method?: string; status?: number; detailCode?: string },
+): ExternalApiError {
+  logExternalApiIssue({
+    service,
+    phase,
+    error,
+    status: context.status,
+    url: context.url,
+    method: context.method,
+    detailCode: context.detailCode,
+  });
+  return error;
 }
 
 /** HTTP 상태 코드 → 상황별 ExternalApiError. */

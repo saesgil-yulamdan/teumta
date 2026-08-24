@@ -5,10 +5,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   resolveDestinationByContentIdMock,
   measureNearbyLocalPlacesMock,
+  measureNearbyFestivalsMock,
   fetchPedestrianRouteMock,
 } = vi.hoisted(() => ({
   resolveDestinationByContentIdMock: vi.fn(),
   measureNearbyLocalPlacesMock: vi.fn(),
+  measureNearbyFestivalsMock: vi.fn(),
   fetchPedestrianRouteMock: vi.fn(),
 }));
 
@@ -24,6 +26,11 @@ vi.mock('./nearby-local-place.service', async (importOriginal) => {
 vi.mock('../external/tmap', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../external/tmap')>();
   return { ...actual, fetchPedestrianRoute: fetchPedestrianRouteMock };
+});
+
+vi.mock('./nearby-festival.service', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./nearby-festival.service')>();
+  return { ...actual, measureNearbyFestivals: measureNearbyFestivalsMock };
 });
 
 import {
@@ -76,6 +83,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resolveDestinationByContentIdMock.mockResolvedValue(DESTINATION);
   measureNearbyLocalPlacesMock.mockResolvedValue([]);
+  measureNearbyFestivalsMock.mockResolvedValue([]);
   // 실측 검증 구간은 추정과 같은 값이 나오도록 기본값을 둔다.
   fetchPedestrianRouteMock.mockResolvedValue({
     features: [
@@ -133,17 +141,57 @@ describe('planCourses', () => {
     expect(plans[0].totalMinutes).toBe(60);
   });
 
-  it('남는 시간이 적은 코스를 먼저 제안한다', () => {
+  it('시간을 조금 남기더라도 같은 분류 반복보다 다양한 구성을 먼저 제안한다', () => {
     const plans = planCourses(
-      [measured('가까운쇼핑', 5, '38'), measured('먼쇼핑', 12, '38', 1)],
-      60,
+      [
+        measured('식당1', 5, '39'),
+        measured('식당2', 6, '39', 1),
+        measured('쇼핑', 7, '38', 2),
+        measured('미술관', 8, '14', 3),
+      ],
+      120,
     );
-    const slack = plans.map((plan) => 60 - plan.totalMinutes);
-    expect(slack).toEqual([...slack].sort((a, b) => a - b));
 
-    // 1정류지끼리 비교하면 더 멀리 가는(=시간을 더 쓰는) 쪽이 앞선다.
-    const single = plans.filter((plan) => plan.stops.length === 1);
-    expect(single[0].stops[0].candidate.name).toBe('먼쇼핑');
+    const topCategories = plans[0].stops.map((stop) => stop.candidate.contentTypeId);
+    expect(new Set(topCategories).size).toBe(topCategories.length);
+    expect(topCategories).not.toEqual(['39', '39']);
+  });
+
+  it('가까운 같은 분류 후보가 많아도 다른 분류 후보를 풀에 남긴다', () => {
+    const restaurants = Array.from({ length: 10 }, (_, index) =>
+      measured(`식당${index + 1}`, 4 + index, '39', index),
+    );
+    const festival = {
+      ...measured('동네축제', 14, '15', 11),
+      candidate: {
+        ...measured('동네축제', 14, '15', 11).candidate,
+        kind: 'FESTIVAL' as const,
+        eventStartDate: '20260801',
+        eventEndDate: '20260831',
+      },
+    };
+
+    const plans = planCourses([...restaurants, festival], 90);
+
+    expect(
+      plans.some((plan) => plan.stops.some((stop) => stop.candidate.kind === 'FESTIVAL')),
+    ).toBe(true);
+  });
+
+  it('diversitySeed가 바뀌면 동점 후보 순위가 달라질 수 있다', () => {
+    const candidates = [
+      measured('카페1', 5, '39', 1),
+      measured('카페2', 5, '39', 2),
+      measured('카페3', 5, '39', 3),
+      measured('카페4', 5, '39', 4),
+    ];
+
+    const first = planCourses(candidates, 60, { diversitySeed: 'variant:0' })[0]
+      .stops[0].candidate.name;
+    const second = planCourses(candidates, 60, { diversitySeed: 'variant:1' })[0]
+      .stops[0].candidate.name;
+
+    expect(first).not.toBe(second);
   });
 
   it('시간이 빠듯하면 체류시간을 줄여서라도 코스를 만든다', () => {
@@ -182,6 +230,7 @@ describe('generateCourses', () => {
 
     expect(result.status).toBe('DESTINATION_NOT_FOUND');
     expect(measureNearbyLocalPlacesMock).not.toHaveBeenCalled();
+    expect(measureNearbyFestivalsMock).not.toHaveBeenCalled();
   });
 
   it('주변 후보가 없으면 빈 코스 목록으로 성공한다', async () => {
@@ -191,6 +240,7 @@ describe('generateCourses', () => {
       status: 'SUCCESS',
       result: { destination: { name: '경복궁' }, availableMinutes: 60, courses: [] },
     });
+    expect(measureNearbyFestivalsMock).toHaveBeenCalled();
   });
 
   it('코스 구성과 복귀 구간을 함께 반환한다', async () => {
@@ -204,6 +254,7 @@ describe('generateCourses', () => {
     const [course] = result.result.courses;
     expect(course.stops).toHaveLength(1);
     expect(course.stops[0]).toMatchObject({
+      kind: 'LOCAL_PLACE',
       name: '통인시장',
       travelMinutesFromPrevious: 10,
       stayMinutes: 30,
@@ -212,6 +263,7 @@ describe('generateCourses', () => {
         { latitude: 37.58, longitude: 126.97 },
       ],
     });
+    expect(course.recommendationTags).toEqual(expect.arrayContaining(['혼잡 우회', '짧은 산책']));
     expect(course.returnTravelMinutes).toBe(10);
     expect(course.returnPath).toEqual([
       { latitude: 37.58, longitude: 126.97 },
@@ -220,6 +272,51 @@ describe('generateCourses', () => {
     expect(course.totalMinutes).toBe(50);
     // 정류지가 1곳이면 TMAP 추가 호출이 필요 없다.
     expect(fetchPedestrianRouteMock).not.toHaveBeenCalled();
+  });
+
+  it('행사 후보도 코스 후보에 합쳐 반환한다', async () => {
+    measureNearbyFestivalsMock.mockResolvedValue([
+      {
+        ...measured('궁중문화축전', 8, '15'),
+        candidate: {
+          ...measured('궁중문화축전', 8, '15').candidate,
+          kind: 'FESTIVAL',
+          eventStartDate: '20260801',
+          eventEndDate: '20260831',
+        },
+      },
+    ]);
+
+    const result = await generateCourses({ contentId: '126508', availableMinutes: 60 });
+    if (result.status !== 'SUCCESS') {
+      throw new Error('expected success');
+    }
+
+    const festivalCourse = result.result.courses.find((course) =>
+      course.stops.some((stop) => stop.kind === 'FESTIVAL'),
+    );
+    expect(festivalCourse?.stops[0]).toMatchObject({
+      kind: 'FESTIVAL',
+      name: '궁중문화축전',
+      eventStartDate: '20260801',
+      eventEndDate: '20260831',
+    });
+    expect(festivalCourse?.recommendationTags).toEqual(
+      expect.arrayContaining(['혼잡 우회', '행사 포함']),
+    );
+  });
+
+  it('음식점 후보가 있으면 식사 포함 태그를 반환한다', async () => {
+    measureNearbyLocalPlacesMock.mockResolvedValue([measured('로컬식당', 8, '39')]);
+
+    const result = await generateCourses({ contentId: '126508', availableMinutes: 60 });
+    if (result.status !== 'SUCCESS') {
+      throw new Error('expected success');
+    }
+
+    expect(result.result.courses[0].recommendationTags).toEqual(
+      expect.arrayContaining(['혼잡 우회', '식사 포함', '짧은 산책']),
+    );
   });
 
   it('정류지가 2곳 이상이면 사이 구간만 TMAP으로 실측한다', async () => {

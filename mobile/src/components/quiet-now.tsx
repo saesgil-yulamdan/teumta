@@ -16,9 +16,10 @@ import type { RealtimeCongestion } from '@/types/place';
  * 화면에 보이는 단계는 전부 실제 응답값이라 플래그가 낡아도 거짓말이 되지 않는다.
  * 서버가 장소별 5분 캐시를 두므로 홈 진입마다 조회해도 외부 호출은 거의 늘지 않는다.
  */
-const CANDIDATES = FEATURED_DESTINATIONS.filter(
+const REALTIME_CANDIDATES = FEATURED_DESTINATIONS.filter(
   (destination) => destination.hasRealtimeCongestion,
-).slice(0, 4);
+);
+const QUIET_NOW_CANDIDATE_COUNT = 8;
 
 /** 여유로운 곳이 먼저 보이도록 정렬. */
 const LEVEL_ORDER: Record<RealtimeCongestion['level'], number> = {
@@ -50,9 +51,10 @@ export function QuietNow({ refreshSignal = 0, onRefreshed }: QuietNowProps) {
 
   const load = useCallback((onDone?: () => void) => {
     let ignored = false;
+    const candidates = selectQuietNowCandidates(refreshSignal);
 
     void Promise.allSettled(
-      CANDIDATES.map((destination) =>
+      candidates.map((destination) =>
         getRealtimeCongestion({ contentId: destination.tourApiContentId }).then(
           (congestion): QuietNowEntry => ({ destination, congestion }),
         ),
@@ -82,7 +84,7 @@ export function QuietNow({ refreshSignal = 0, onRefreshed }: QuietNowProps) {
     return () => {
       ignored = true;
     };
-  }, []);
+  }, [refreshSignal]);
 
   useFocusEffect(
     useCallback(() => {
@@ -177,6 +179,33 @@ export function QuietNow({ refreshSignal = 0, onRefreshed }: QuietNowProps) {
       )}
     </View>
   );
+}
+
+function selectQuietNowCandidates(refreshSignal: number): FeaturedDestination[] {
+  if (REALTIME_CANDIDATES.length <= QUIET_NOW_CANDIDATE_COUNT) {
+    return REALTIME_CANDIDATES;
+  }
+
+  const seed = `${todayKstDate()}:${refreshSignal}`;
+  const start = stableModulo(seed, REALTIME_CANDIDATES.length);
+  return Array.from({ length: QUIET_NOW_CANDIDATE_COUNT }, (_, index) => {
+    const candidateIndex = (start + index) % REALTIME_CANDIDATES.length;
+    return REALTIME_CANDIDATES[candidateIndex];
+  });
+}
+
+function todayKstDate(): string {
+  const now = new Date();
+  return new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function stableModulo(value: string, modulo: number): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) % modulo;
 }
 
 const styles = StyleSheet.create({

@@ -325,6 +325,45 @@ GET /api/local-places/detail?contentId=2871024
   **스키마 변경 없이** 실시간 조회로 다루는 방식이다 — 판단은 사용자에게, 데이터는 화면에.
 - `400 INVALID_CONTENT_ID` — contentId 누락/공백 · `404 LOCAL_PLACE_NOT_FOUND` — TourAPI에 항목 없음.
 
+### 3.3d 주변 행사·축제 조회 — [B] (실시간 TourAPI, 구현됨)
+```
+GET /api/festivals/nearby?contentId=126508&radius=3000
+GET /api/festivals/nearby?poiId=10817049&radius=3000
+```
+목적지 기준 "요즘 근처 행사" 섹션과 우회 코스 후보 확장을 위한 조회 API. DB 저장 없이
+TourAPI `searchFestival2`를 요청 시점에 호출하고, 서버에서 목적지와의 거리 필터를 적용한다.
+
+- `contentId`/`poiId` 중 **정확히 하나**(위반 시 `400 INVALID_IDENTIFIER`).
+- 좌표는 API 입력으로 받지 않는다 — 서버가 TourAPI contentId 또는 TMAP poiId를 좌표로 해석한다.
+- `radius`: 기본 3000m, 최대 20000m.
+- 조회 기준: 오늘(KST) 이후 진행 중/예정 행사. TourAPI 날짜 범위 조회 후 pageNo 1~3까지 얕게 페이지네이션한다.
+- 응답 행사 좌표가 있으면 TMAP 보행거리로 목적지와의 거리를 계산하고, 반경 안 행사만
+  `distanceMeters` 오름차순으로 반환한다. 일부 TMAP 실패는 해당 행사만 제외하고, 전부 실패하면 502.
+- 짧은 인메모리 캐시만 사용하며 DB에 저장하지 않는다.
+
+```jsonc
+{
+  "success": true,
+  "data": [
+    {
+      "kind": "FESTIVAL",
+      "tourApiContentId": "3359086",
+      "name": "궁중문화축전",
+      "address": "서울 종로구 ...",
+      "latitude": 37.57,
+      "longitude": 126.97,
+      "imageUrl": "https://...",
+      "distanceMeters": 920,
+      "travelTimeMinutes": 14,
+      "eventStartDate": "20260820",
+      "eventEndDate": "20260901"
+    }
+  ],
+  "error": null
+}
+```
+- `404 DESTINATION_NOT_FOUND` — 목적지를 좌표로 해석하지 못함.
+
 ---
 
 ### 3.4 장소 혼잡도 — [B]
@@ -477,13 +516,17 @@ KTO 집중률은 전국 시군구를 커버하므로, 목적지의 지역 코드
 ```
 GET /api/courses?contentId=126508&availableMinutes=60
 GET /api/courses?poiId=10817049&availableMinutes=30
+GET /api/courses?contentId=126508&availableMinutes=60&variant=2
 ```
 저장형 Route(3.5/3.6)는 내부 Place만 참조할 수 있어 적재 지역에서만 코스가 나온다.
 이 API는 주변 로컬 장소 조회(3.3b)가 이미 구한 **TMAP 실측 보행거리**를 재활용해
-사용자의 가용 시간 안에 다녀올 수 있는 조합을 즉석에서 만든다. **저장하지 않는다.**
+사용자의 가용 시간 안에 다녀올 수 있는 조합을 즉석에서 만든다. 주변 행사·축제(3.3d)도
+후보에 포함할 수 있으며, **저장하지 않는다.**
 
 - `contentId`/`poiId` 중 **정확히 하나**(3.3b와 같은 규칙, 위반 시 `400 INVALID_IDENTIFIER`).
 - `availableMinutes`: 10~240 정수(앱은 30/60/90을 쓴다). 범위 밖 → `400 INVALID_AVAILABLE_MINUTES`.
+- `variant`: 0~1000 정수, optional. 같은 날·같은 목적지·같은 가용 시간에서도 다른 추천 조합을
+  요청하기 위한 다양화 seed(앱의 "다른 코스 보기").
 - `404 DESTINATION_NOT_FOUND` — 목적지를 좌표로 해석하지 못함.
 
 ```jsonc
@@ -495,16 +538,27 @@ GET /api/courses?poiId=10817049&availableMinutes=30
     "courses": [
       {
         "totalMinutes": 60,          // 이동 + 체류 + 복귀
-    "returnTravelMinutes": 7,    // 마지막 정류지 → 목적지
-    "returnDistanceMeters": 520,
-    "returnPath": [{ "latitude": 37.57, "longitude": 126.97 }, { "latitude": 37.5796, "longitude": 126.977 }],
-    "verified": true,            // 정류지 사이 구간이 TMAP 실측이면 true(추정이면 false)
-    "stops": [
-    { "name": "대한민국역사박물관", "address": "...",     "latitude": 37.57, "longitude": 126.97,
-    "imageUrl": null, "travelMinutesFromPrevious": 5, "distanceMetersFromPrevious": 380,
-    "pathFromPrevious": [{ "latitude": 37.5796, "longitude": 126.977 }, { "latitude": 37.57, "longitude": 126.97 }],
-    "stayMinutes": 20 }
-]
+        "returnTravelMinutes": 7,    // 마지막 정류지 → 목적지
+        "returnDistanceMeters": 520,
+        "returnPath": [{ "latitude": 37.57, "longitude": 126.97 }, { "latitude": 37.5796, "longitude": 126.977 }],
+        "verified": true,            // 정류지 사이 구간이 TMAP 실측이면 true(추정이면 false)
+        "recommendationTags": ["혼잡 우회", "행사 포함", "식사 포함"],
+        "stops": [
+          {
+            "kind": "LOCAL_PLACE",    // LOCAL_PLACE | FESTIVAL
+            "name": "대한민국역사박물관",
+            "address": "...",
+            "latitude": 37.57,
+            "longitude": 126.97,
+            "imageUrl": null,
+            "travelMinutesFromPrevious": 5,
+            "distanceMetersFromPrevious": 380,
+            "pathFromPrevious": [{ "latitude": 37.5796, "longitude": 126.977 }, { "latitude": 37.57, "longitude": 126.97 }],
+            "stayMinutes": 20,
+            "eventStartDate": null,
+            "eventEndDate": null
+          }
+        ]
       }
     ]
   },
@@ -515,7 +569,7 @@ GET /api/courses?poiId=10817049&availableMinutes=30
 - `returnPath`: 마지막 정류지 → 목적지 복귀 보행 경로 좌표.
 
 **계산 구조:** 목적지 → 정류지1 → … → 정류지N → 목적지(복귀). 정류지 최대 3곳, 코스 최대 3개.
-- 목적지↔정류지 구간은 3.3b가 구한 **TMAP 실측값**(복귀는 대칭으로 간주해 재사용).
+- 목적지↔정류지 구간은 3.3b/3.3d가 구한 **TMAP 실측값**(복귀는 대칭으로 간주해 재사용).
 - 정류지 사이 구간은 직선거리 × 1.3 ÷ 67m/분으로 **추정해 후보를 좁힌 뒤**, 반환할 코스에 한해
   TMAP으로 실측한다(호출량 절약). 실측 후 가용 시간을 넘기면 그 코스는 뺀다.
 - **체류시간은 가용 시간에 맞춰 조정한다.** 분류별 기본값(14 문화시설 40분 / 38 쇼핑 30분 /
@@ -523,9 +577,14 @@ GET /api/courses?poiId=10817049&availableMinutes=30
   만들어지지 않는다(걷는 시간만 더해도 초과). 같은 장소라도 코스 제한시간에 따라 체류시간을 달리 두는 것은
   [route-data-rules §6](./route-data-rules.md)이 정한 방식이다.
 - ⚠️ 분류별 기본 체류시간은 **공식 통계가 없는 팀 합의값**이다. 방문 로그가 쌓이면 실측으로 보정한다.
-- 정렬: 가용 시간을 알차게 쓰는 순(남는 시간이 적은 순) → 같으면 정류지가 많은 순(분산 효과).
+- 다양화: 날짜(KST) + 목적지 + 가용 시간 + `variant`를 seed로 써서 같은 조건의 반복 추천이
+  고정 코스 하나로 굳지 않게 한다.
+- 정렬: 가용 시간을 알차게 쓰는 순(남는 시간이 적은 순) → 같으면 정류지가 많은 순(분산 효과) →
+  같은 카테고리 반복 패널티. `recommendationTags`는 행사 포함, 혼잡 우회, 식사 포함, 짧은 산책,
+  구성 다양 같은 선택 이유를 프론트가 바로 표시하기 위한 서버 계산값이다.
 
-**호출량:** 목적지 해석 1 + TourAPI 목록 3 + TMAP 보행자 최대 10(3.3b와 동일) + 검증 최대 6.
+**호출량:** 목적지 해석 1 + TourAPI 로컬 목록 3 + TourAPI 행사 목록 최대 3페이지 +
+TMAP 보행자 최대 10(3.3b/3.3d 선별) + 검증 최대 6.
 
 ---
 
@@ -581,10 +640,30 @@ GET /api/trips/:tripId
 
 ## 4. 외부 API 실패 처리 규약 (B)
 
-- 외부 API(TourAPI/SK/TMAP) 호출은 **타임아웃 + 재시도(backoff)** 를 B 연동 계층에서 처리한다.
+- 외부 API(TourAPI/SK/TMAP/KTO 집중률) 호출은 공용 timeout(`EXTERNAL_API_TIMEOUT_MS`)과
+  `ExternalApiError` 계층으로 분류한다.
 - 실시간성 데이터(혼잡도 realtime, 이동시간)는 실패 시 **해당 필드만 null/생략하여 부분 성공**으로 응답하고, 전체 요청을 500으로 실패시키지 않는다.
 - 저장형 데이터(TourAPI 장소, 예측 혼잡도)는 **동기화 작업**에서 적재하며, 조회 API는 항상 DB만 바라본다(외부 API에 직접 의존하지 않음).
 - 외부 API가 필수 경로에서 완전히 불가한 경우에만 `502`/`503` + `error.code = EXTERNAL_API_UNAVAILABLE`.
+- 외부 API 실패와 SK 미커버는 구조화 로그로 남긴다. 로그 이벤트는 `external_api_issue`이며
+  `service`, `code`, `phase`, `status`, `host`, `path`, `detailCode`를 포함한다.
+  URL query·헤더·응답 원문은 API key 유출 방지를 위해 기록하지 않는다.
+
+예시:
+```jsonc
+{
+  "level": "warn",
+  "event": "external_api_issue",
+  "service": "tour",
+  "code": "INVALID_RESPONSE",
+  "phase": "http_status",
+  "status": 500,
+  "host": "apis.data.go.kr",
+  "path": "/B551011/KorService2/searchFestival2",
+  "timestamp": "2026-08-22T12:00:00.000Z"
+}
+```
+SK 퍼즐 커버리지 밖(`CONGESTION_DATA_NOT_FOUND`)은 장애성 warn이 아니라 `level: "info"`로 남긴다.
 
 ---
 

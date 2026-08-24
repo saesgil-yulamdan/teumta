@@ -7,6 +7,7 @@ import {
   normalizeServiceKey,
   requestJson,
 } from '../common';
+import { logExternalApiIssue } from '../../utils/structured-log';
 import type { ConcentrationForecastListResponse } from './prediction.dto';
 
 /**
@@ -89,7 +90,14 @@ export function normalizeForecastResponse(
       },
     };
   }
-  throw classifyPublicDataResultCode(SERVICE, rawCode, header?.resultMsg ?? 'Unknown error');
+  const error = classifyPublicDataResultCode(SERVICE, rawCode, header?.resultMsg ?? 'Unknown error');
+  logExternalApiIssue({
+    service: SERVICE,
+    phase: 'public_data_json_error',
+    error,
+    detailCode: rawCode,
+  });
+  throw error;
 }
 
 /** 공통 파라미터(serviceKey·MobileOS·MobileApp·_type) + 개별 파라미터 → 요청 URL. */

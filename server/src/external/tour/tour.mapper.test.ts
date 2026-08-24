@@ -6,6 +6,7 @@ import type { TourApiListResponse, TourApiPlaceItem } from './tour.dto';
 import {
   extractItems,
   mapContentTypeIdToPlaceType,
+  mapFestivalCandidateList,
   mapLocalPlaceDetail,
   mapNearbyCandidateList,
   mapTourPlaceList,
@@ -221,6 +222,51 @@ describe('mapLocalPlaceDetail', () => {
 
   it('항목이 없으면 null', () => {
     expect(mapLocalPlaceDetail(detail(null))).toBeNull();
+  });
+});
+
+describe('mapFestivalCandidateList', () => {
+  const listResponse = (items: TourApiPlaceItem[]): TourApiListResponse => ({
+    response: {
+      header: { resultCode: '0000', resultMsg: 'OK' },
+      body: { items: { item: items }, numOfRows: items.length, pageNo: 1, totalCount: items.length },
+    },
+  });
+
+  it('행사 좌표와 기간을 후보로 매핑한다', () => {
+    const [candidate] = mapFestivalCandidateList(
+      listResponse([
+        makeItem({
+          contentid: '300',
+          contenttypeid: '15',
+          title: '궁중문화축전',
+          eventstartdate: '20260801',
+          eventenddate: '20260831',
+        }),
+      ]),
+    );
+
+    expect(candidate).toMatchObject({
+      kind: 'FESTIVAL',
+      tourApiContentId: '300',
+      contentTypeId: '15',
+      name: '궁중문화축전',
+      eventStartDate: '20260801',
+      eventEndDate: '20260831',
+    });
+  });
+
+  it('좌표나 행사 기간이 없는 항목은 제외한다', () => {
+    const result = mapFestivalCandidateList(
+      listResponse([
+        makeItem({ contentid: '1', eventstartdate: '20260801', eventenddate: '20260831' }),
+        makeItem({ contentid: '2', mapx: '', eventstartdate: '20260801', eventenddate: '20260831' }),
+        makeItem({ contentid: '3', eventstartdate: '', eventenddate: '20260831' }),
+        makeItem({ contentid: '4', eventstartdate: '20260801' }),
+      ]),
+    );
+
+    expect(result.map((candidate) => candidate.tourApiContentId)).toEqual(['1']);
   });
 });
 

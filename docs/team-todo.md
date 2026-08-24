@@ -4,7 +4,7 @@
 > 수요 분산(우회 코스) → 원 관광지 복귀.
 > 문서: [service-overview](./service-overview.md) · [api-spec](./api-spec.md) · [collaboration](./collaboration.md) ·
 > [congestion-rules](./congestion-rules.md) · [route-data-rules](./route-data-rules.md) ·
-> [location-privacy](./location-privacy.md) · [collaboration](./collaboration.md)
+> [location-privacy](./location-privacy.md)
 >
 > **서버**: `https://port-0-teumta-server-msh476v8e47b3c7e.sel3.cloudtype.app`
 > **관리자 웹**: `https://port-0-teumta-admin-web-msh476v8e47b3c7e.sel3.cloudtype.app` (비밀번호는 B에게 문의 —
@@ -32,8 +32,8 @@
 
 ## 현재 상태 한 줄 요약
 
-**백엔드 API는 전부 준비됐고 앱 화면도 대부분 붙었다. 프론트 잔여 항목은 전부 정리됐고,
-남은 병목은 ① 관리자 웹 코스 데이터 입력(성과 분석용) ② 제출물(기능설명서·스토어 등록).**
+**실시간 검색·혼잡도·집중률·주변 로컬·행사·즉석 우회 코스 API와 앱 화면은 붙었다.
+남은 병목은 ① 제출물(기능설명서·스토어 등록) ② 실기기/실키 기반 시연 점검 ③ 운영 데이터 리포트다.**
 
 ---
 
@@ -80,7 +80,7 @@
 ## 📱 프론트 담당 — 남은 0건 (2026-08-22 기준)
 
 앞선 항목(TOUR 목적지 실시간 혼잡도, `404 CONGESTION_DATA_NOT_FOUND` 안내, 집중률 예측 화면,
-출처 표기 범위 확대)은 코드에서 반영 확인됨.
+출처 표기 범위 확대, 주변 행사 섹션, 즉석 우회 코스, 다른 코스 보기, 코스 추천 태그)은 코드에서 반영 확인됨.
 
 ### 1. 우회 제안 강조 기준 — 완료 (2026-08-22)
 
@@ -113,12 +113,20 @@
   **성과 분석 화면의 공급 지표**(데이터로직 담당 표의 "코스 보유 관광지 수" 등)로 바뀌었다 —
   모바일 코스 화면과는 무관해졌으니 "코스 입력 후 재확인" 자체가 불필요
 
+### 4. 실키 기반 시연 점검 — 남은 확인
+
+대표 목적지 5곳 이상에서 행사 포함/미포함, `variant` 변경, `stops[].pathFromPrevious`,
+`returnPath`가 화면과 지도에서 맞게 보이는지 확인한다. 구조상 프론트 구현 TODO는 아니고,
+외부 API 키·쿼터·실기기 지도 SDK 렌더링 점검이다.
+
 ### 상시 원칙
 
 - 사용자 GPS를 서버로 보내지 않는다(서버 API에 좌표 파라미터 자체가 없음)
 - **Trip/TripEvent API를 호출하지 않는다**(위 확정 정책)
 - 검색 자동완성 금지(버튼 또는 500ms+ debounce) — 외부 API 쿼터
 - "한국관광공사"·"KTO"는 출처 표기 외 용도로 쓰지 않는다(요강 규정)
+- 모바일 순수 함수 테스트는 `npm test`로 확인한다. 현재 최소 범위:
+  `forecast`, `course-path`, 검색 stale request guard, 코스 구성 라벨.
 
 ---
 
@@ -143,6 +151,16 @@
 
 org main 머지 → Cloudtype "배포하기" **서버·관리자 웹 각각** · DB 백업 모니터링 ·
 집중률 일일 적재(05시 KST) 확인, 신규 미매칭은 매칭 화면에서 alias 처리.
+외부 API 문제는 `external_api_issue` 구조화 로그로 TourAPI/TMAP/SK/KTO별 `code`·`phase`를 집계한다.
+SK 커버리지 drift는 `npm run measure:congestion -- --json` 리포트의 `mismatches`를 본다.
+
+### 완료 (2026-08-22)
+
+주변 행사·축제 API(`/api/festivals/nearby`, TourAPI `searchFestival2` shallow pagination + 서버 거리 필터) ·
+목적지 상세 "요즘 근처 행사" 섹션 · 즉석 코스 행사 반영 · 날짜/variant 기반 코스 다양화 ·
+코스 추천 태그(`recommendationTags`) · "다른 코스 보기" · 검색/코스 stale response guard ·
+혼잡도 커버리지 JSON 리포트 · 외부 API 구조화 로그 · 모바일 순수 함수 테스트 보강 ·
+`api-spec.md` 구현 싱크 반영
 
 ### 완료 (2026-08-15)
 

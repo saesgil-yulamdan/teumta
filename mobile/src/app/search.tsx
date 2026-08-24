@@ -64,6 +64,7 @@ export default function SearchScreen() {
 
   function handleChangeKeyword(text: string) {
     setKeyword(text);
+    setStatus('idle');
     setHasSearched(false);
     // hasSearched=false인데 이전 검색어의 results가 남아있으면 화면이 다른 검색어를 가리킨다 —
     // 진행 중이던 요청도 함께 무효화해, 늦게 도착한 응답이 지금 입력값을 덮어쓰지 않게 한다.

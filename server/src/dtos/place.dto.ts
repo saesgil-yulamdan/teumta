@@ -35,6 +35,8 @@ export interface PlaceData {
 
 /** 주변 로컬 장소 후보. 요청 스코프 전용 — DB 미저장(공모전 기준), 내부 id 없음. */
 export interface NearbyLocalPlaceCandidate {
+  /** 코스/화면 표시용 후보 종류. 기존 로컬 후보는 기본 LOCAL_PLACE. */
+  kind?: 'LOCAL_PLACE' | 'FESTIVAL';
   /** 중복 제거·자기 자신 제외용. 응답 미노출. */
   tourApiContentId: string;
   /** TourAPI 분류(14 문화시설 / 38 쇼핑 / 39 음식점). 코스 체류시간 기본값 산정용. */
@@ -48,6 +50,10 @@ export interface NearbyLocalPlaceCandidate {
   imageUrl: string | null;
   /** TourAPI dist(m). 선별용 전용, 응답에 미노출. */
   tourDistanceMeters: number | null;
+  /** 행사 시작일(YYYYMMDD). 행사 후보가 아니면 null. */
+  eventStartDate?: string | null;
+  /** 행사 종료일(YYYYMMDD). 행사 후보가 아니면 null. */
+  eventEndDate?: string | null;
 }
 
 /**
@@ -96,6 +102,8 @@ export interface LocalPlaceDetailData {
 
 /** 주변 로컬 장소 응답 항목. distanceMeters는 직선거리 아닌 TMAP 실측 보행거리. */
 export interface NearbyLocalPlaceDto {
+  /** LOCAL_PLACE=상설 로컬, FESTIVAL=한시 행사·축제. */
+  kind?: 'LOCAL_PLACE' | 'FESTIVAL';
   /**
    * TourAPI 콘텐츠 식별자. 상세 소개 조회(3.3c) 키.
    * 공공데이터 식별자이며 내부 id가 아니다 — 검색 응답(3.2)도 같은 값을 노출한다.
@@ -112,4 +120,8 @@ export interface NearbyLocalPlaceDto {
   distanceMeters: number;
   /** TMAP 보행시간(분, ceil). */
   travelTimeMinutes: number;
+  /** 행사 시작일(YYYYMMDD). 상설 로컬이면 null. */
+  eventStartDate?: string | null;
+  /** 행사 종료일(YYYYMMDD). 상설 로컬이면 null. */
+  eventEndDate?: string | null;
 }

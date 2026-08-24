@@ -8,6 +8,7 @@ import {
   requestJson,
 } from '../common';
 import { TtlCache } from '../../utils/ttl-cache';
+import { logExternalApiIssue } from '../../utils/structured-log';
 import type { TourApiDetailResponse, TourApiListResponse } from './tour.dto';
 
 /**
@@ -167,6 +168,52 @@ export async function fetchTourPlacesByKeyword(
   return requestTourList(buildTourUrl('searchKeyword2', buildKeywordSearchQuery(params)));
 }
 
+/** 행사정보 조회(searchFestival2) 파라미터. */
+export interface TourFestivalSearchParams {
+  /** 행사 시작 검색일(YYYYMMDD). TourAPI 필수 파라미터. */
+  eventStartDate: string;
+  /** 행사 종료 검색일(YYYYMMDD). */
+  eventEndDate?: string;
+  lDongRegnCd?: string | number;
+  lDongSignguCd?: string | number;
+  pageNo?: number;
+  numOfRows?: number;
+  arrange?: string;
+}
+
+/** searchFestival2 요청 쿼리(공통 파라미터 제외). */
+export function buildFestivalSearchQuery(
+  params: TourFestivalSearchParams,
+): Record<string, string> {
+  const eventStartDate = params.eventStartDate.trim();
+  if (!/^\d{8}$/.test(eventStartDate)) {
+    throw new ExternalApiError(SERVICE, 'eventStartDate must be YYYYMMDD', {
+      code: 'INVALID_PARAM',
+    });
+  }
+  if (params.eventEndDate !== undefined && !/^\d{8}$/.test(params.eventEndDate.trim())) {
+    throw new ExternalApiError(SERVICE, 'eventEndDate must be YYYYMMDD', {
+      code: 'INVALID_PARAM',
+    });
+  }
+  return {
+    eventStartDate,
+    ...optionalParam('eventEndDate', params.eventEndDate?.trim()),
+    ...optionalParam('lDongRegnCd', params.lDongRegnCd),
+    ...optionalParam('lDongSignguCd', params.lDongSignguCd),
+    numOfRows: String(params.numOfRows ?? 100),
+    pageNo: String(params.pageNo ?? 1),
+    arrange: params.arrange ?? 'D',
+  };
+}
+
+/** 행사정보 조회(searchFestival2). 주변 행사·축제 추천 흐름의 진입점. */
+export async function fetchTourFestivals(
+  params: TourFestivalSearchParams,
+): Promise<TourApiListResponse> {
+  return requestTourList(buildTourUrl('searchFestival2', buildFestivalSearchQuery(params)));
+}
+
 /**
  * 상세 응답 캐시.
  *
@@ -278,11 +325,18 @@ function assertTourApiOk(response: TourApiListResponse | TourApiDetailResponse):
   if (header && normalizeResultCode(header.resultCode) === NODATA_RESULT_CODE) {
     return;
   }
-  throw classifyPublicDataResultCode(
+  const error = classifyPublicDataResultCode(
     SERVICE,
     header?.resultCode ?? 'UNKNOWN',
     header?.resultMsg ?? 'Unknown error',
   );
+  logExternalApiIssue({
+    service: SERVICE,
+    phase: 'public_data_json_error',
+    error,
+    detailCode: header?.resultCode,
+  });
+  throw error;
 }
 
 function optionalParam(key: string, value: string | number | undefined): Record<string, string> {
