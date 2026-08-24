@@ -1,4 +1,4 @@
-import { CongestionType, type CongestionLevel } from '@prisma/client';
+import { CongestionLevel, CongestionType } from '@prisma/client';
 
 import { KTO_CONCENTRATION_FORECAST_SOURCE } from '../dtos';
 import { ExternalApiNotFoundError } from '../external/common';
@@ -93,6 +93,19 @@ export interface RealtimeCongestionView {
   /** 서버가 가져온 시각 — 캐시 히트면 과거 값. */
   fetchedAt: Date;
   isRealtime: true;
+  /**
+   * 실시간 혼잡도가 우회 트리거 단계(CROWDED 이상)일 때만 내려주는 제안 메타.
+   * 프론트 팝업/CTA 문구가 서버 판단 기준과 어긋나지 않게 한다.
+   */
+  detourPrompt: RealtimeDetourPrompt | null;
+}
+
+export interface RealtimeDetourPrompt {
+  shouldPrompt: true;
+  reason: 'REALTIME_CROWDED';
+  title: string;
+  body: string;
+  actionLabel: string;
 }
 
 /** 상한은 실시간 혼잡도를 실제로 조회할 만한 POI 수보다 넉넉하게. */
@@ -125,8 +138,23 @@ export async function getRealtimeCongestion(poiId: string): Promise<RealtimeCong
       measuredAt: data.measuredAt,
       fetchedAt: new Date(),
       isRealtime: true,
+      detourPrompt: detourPromptForLevel(data.level),
     };
   });
+}
+
+function detourPromptForLevel(level: CongestionLevel): RealtimeDetourPrompt | null {
+  if (level !== CongestionLevel.CROWDED && level !== CongestionLevel.VERY_CROWDED) {
+    return null;
+  }
+
+  return {
+    shouldPrompt: true,
+    reason: 'REALTIME_CROWDED',
+    title: '잠깐!',
+    body: '붐비는 장소예요\n틈타 코스를 이용해보시겠어요?',
+    actionLabel: '틈타 코스 보기',
+  };
 }
 
 /**

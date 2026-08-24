@@ -30,6 +30,7 @@ import type {
   NearbyLocalPlaceResult,
   RealtimeCongestion,
 } from '@/types/place';
+import { shouldShowDetourPrompt } from '@/utils/congestion-prompt';
 import {
   chartRatio,
   forecastDayLabel,
@@ -230,7 +231,7 @@ export default function PlaceDetailScreen() {
   useEffect(() => {
     if (!congestion) return;
     const level = REALTIME_LEVEL_TO_CONGESTION_LEVEL[congestion.level];
-    if (level !== 'high' && level !== 'veryHigh') return;
+    if (!shouldShowDetourPrompt(congestion, level)) return;
 
     const showTimer = setTimeout(() => setShowCrowdedAlert(true), 0);
     const hideTimer = setTimeout(() => setShowCrowdedAlert(false), 5000);
@@ -255,8 +256,7 @@ export default function PlaceDetailScreen() {
   // 우회 트리거(congestion-rules §5): CROWDED 이상일 때만 CTA 강조.
   // 그 미만·미제공(404)·조회 실패는 기존 모양 유지 — 예측값으로 대체 판단하지 않는다.
   const crowdedNow =
-    congestionStatus === 'idle' &&
-    (congestionLevel === 'high' || congestionLevel === 'veryHigh');
+    congestionStatus === 'idle' && shouldShowDetourPrompt(congestion ?? null, congestionLevel);
 
   function goToDetours() {
     router.push({
@@ -610,9 +610,9 @@ export default function PlaceDetailScreen() {
         onRequestClose={() => setShowCrowdedAlert(false)}>
         <Pressable style={styles.alertBackdrop} onPress={() => setShowCrowdedAlert(false)}>
           <Pressable style={styles.alertCard} onPress={() => {}}>
-            <Text style={styles.alertTitle}>잠깐!</Text>
+            <Text style={styles.alertTitle}>{congestion?.detourPrompt?.title ?? '잠깐!'}</Text>
             <Text style={styles.alertBody}>
-              붐비는 장소예요{'\n'}틈타 코스를 이용해보시겠어요?
+              {congestion?.detourPrompt?.body ?? '붐비는 장소예요\n틈타 코스를 이용해보시겠어요?'}
             </Text>
             <Pressable
               style={styles.alertButton}
@@ -620,7 +620,9 @@ export default function PlaceDetailScreen() {
                 setShowCrowdedAlert(false);
                 goToDetours();
               }}>
-              <Text style={styles.alertButtonLabel}>틈타 코스 보기</Text>
+              <Text style={styles.alertButtonLabel}>
+                {congestion?.detourPrompt?.actionLabel ?? '틈타 코스 보기'}
+              </Text>
             </Pressable>
           </Pressable>
         </Pressable>

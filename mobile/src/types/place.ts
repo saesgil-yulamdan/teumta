@@ -53,6 +53,14 @@ export type RealtimeCongestion = {
   measuredAt: string | null;
   fetchedAt: string;
   isRealtime: boolean;
+  /** CROWDED 이상이면 서버가 내려주는 우회 제안 팝업 메타. 구서버 응답은 undefined. */
+  detourPrompt?: {
+    shouldPrompt: true;
+    reason: 'REALTIME_CROWDED';
+    title: string;
+    body: string;
+    actionLabel: string;
+  } | null;
 };
 
 /** GET /api/local-places 응답 항목. DB 미저장 — 내부 id 없이 name+좌표로 구분. */

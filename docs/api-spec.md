@@ -430,9 +430,21 @@ SK 지오비전 퍼즐 "실시간 장소 혼잡도". 서버 5분 캐시(해커�
     "source": "SK_PUZZLE",
     "measuredAt": "2026-08-06T03:50:00.000Z",
     "fetchedAt": "2026-08-06T03:52:10.000Z",  // 캐시 히트면 과거 값
-    "isRealtime": true
+    "isRealtime": true,
+    "detourPrompt": null        // CROWDED 이상이면 아래 형태의 우회 제안 메타
   },
   "error": null
+}
+```
+- `detourPrompt`: `level`이 `CROWDED` 또는 `VERY_CROWDED`일 때만 객체로 내려준다.
+  프론트는 이 값을 팝업/CTA 강조 기준으로 우선 사용하고, 없으면 기존 level 기준으로 폴백한다.
+```jsonc
+{
+  "shouldPrompt": true,
+  "reason": "REALTIME_CROWDED",
+  "title": "잠깐!",
+  "body": "붐비는 장소예요\n틈타 코스를 이용해보시겠어요?",
+  "actionLabel": "틈타 코스 보기"
 }
 ```
 - `400` — poiId 누락.
