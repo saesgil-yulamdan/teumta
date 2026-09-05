@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getLocalPlaceDetail } from '@/api/places';
 import { PlaceThumbnail } from '@/components/place-thumbnail';
+import { ReportModal } from '@/components/report-modal';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
 import { Teumta } from '@/constants/theme';
 import type { LocalPlaceDetail } from '@/types/place';
@@ -52,6 +53,7 @@ export default function LocalPlaceDetailScreen() {
   const hasCoordinate = Number.isFinite(latitude) && Number.isFinite(longitude);
 
   const [detail, setDetail] = useState<LocalPlaceDetail | null>(null);
+  const [showReport, setShowReport] = useState(false);
 
   // 소개문은 목록에 없다. 화면에 실제로 들어온 1곳만 상세로 조회한다(외부 API 쿼터).
   const contentId = params.contentId;
@@ -189,6 +191,14 @@ export default function LocalPlaceDetailScreen() {
             <Text style={styles.secondaryButtonLabel}>네이버지도에서 사진·리뷰 보기</Text>
           </Pressable>
 
+          <Pressable
+            accessibilityRole="button"
+            hitSlop={6}
+            onPress={() => setShowReport(true)}
+            style={styles.reportLink}>
+            <Text style={styles.reportLinkLabel}>정보가 다른가요? 제보하기</Text>
+          </Pressable>
+
           <TourApiAttribution style={styles.attribution} />
         </View>
       </ScrollView>
@@ -214,6 +224,18 @@ export default function LocalPlaceDetailScreen() {
           </Pressable>
         </View>
       </View>
+
+      <ReportModal
+        visible={showReport}
+        onClose={() => setShowReport(false)}
+        kind="place"
+        place={{
+          name: params.name,
+          source: '한국관광공사',
+          ...(contentId ? { id: contentId } : {}),
+          ...(params.address ? { address: params.address } : {}),
+        }}
+      />
     </View>
   );
 }
@@ -395,6 +417,17 @@ const styles = StyleSheet.create({
     color: Teumta.textSecondary,
     fontSize: 14,
     fontWeight: '700',
+  },
+  reportLink: {
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  reportLinkLabel: {
+    color: Teumta.textSecondary,
+    fontSize: 11,
+    fontWeight: '600',
+    lineHeight: 15,
+    textDecorationLine: 'underline',
   },
   courseList: {
     gap: 8,

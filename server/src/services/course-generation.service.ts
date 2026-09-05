@@ -66,6 +66,8 @@ const SHORT_WALK_DISTANCE_METERS = 1500;
 
 export interface CourseStop {
   kind: 'LOCAL_PLACE' | 'FESTIVAL';
+  /** TourAPI 상세·운영정보 조회 키. */
+  tourApiContentId: string;
   name: string;
   address: string | null;
   latitude: number;
@@ -390,6 +392,7 @@ async function verifyPlan(plan: CoursePlan): Promise<CoursePlan> {
 function toGeneratedCourse(plan: CoursePlan): GeneratedCourse {
   const stops: CourseStop[] = plan.stops.map((stop, index) => ({
     kind: stop.candidate.kind ?? 'LOCAL_PLACE',
+    tourApiContentId: stop.candidate.tourApiContentId,
     name: stop.candidate.name,
     address: stop.candidate.address,
     latitude: stop.candidate.latitude,
@@ -414,6 +417,136 @@ function toGeneratedCourse(plan: CoursePlan): GeneratedCourse {
     stops,
     verified: plan.verified,
     recommendationTags: recommendationTagsFor(plan),
+  };
+}
+
+export interface GenerateCourseAlternativesParams {
+  /** 사용자가 도착해 있는 정류지. 사용자 GPS 대신 공개 장소 좌표를 해석한다. */
+  originContentId: string;
+  contentId?: string;
+  poiId?: string;
+  availableMinutes: number;
+  excludeContentIds?: string[];
+}
+
+export interface CourseAlternativesResult {
+  origin: { name: string; latitude: number; longitude: number };
+  destination: { name: string; latitude: number; longitude: number };
+  availableMinutes: number;
+  alternatives: GeneratedCourse[];
+}
+
+export type CourseAlternativesLookup =
+  | { status: 'ORIGIN_NOT_FOUND' }
+  | { status: 'DESTINATION_NOT_FOUND' }
+  | { status: 'SUCCESS'; result: CourseAlternativesResult };
+
+const MAX_REPLAN_CANDIDATES = 6;
+const MAX_ALTERNATIVES = 3;
+
+/**
+ * 도착한 정류지 → 대체 장소 1곳 → 원 목적지 복귀 코스.
+ * 출발점은 TourAPI 장소 식별자로만 받아 사용자 현재 위치를 서버에 보내지 않는다.
+ */
+export async function generateCourseAlternatives(
+  params: GenerateCourseAlternativesParams,
+): Promise<CourseAlternativesLookup> {
+  const origin = await resolveDestinationByContentId(params.originContentId);
+  if (!origin) {
+    return { status: 'ORIGIN_NOT_FOUND' };
+  }
+  const destination = await resolveDestination(params);
+  if (!destination) {
+    return { status: 'DESTINATION_NOT_FOUND' };
+  }
+
+  const localMeasured = await measureNearbyLocalPlaces(origin, DEFAULT_RADIUS_METERS);
+  const festivalMeasured = await measureNearbyFestivals(origin, DEFAULT_RADIUS_METERS).catch(
+    () => [],
+  );
+  const excluded = new Set([
+    params.originContentId,
+    ...(params.excludeContentIds ?? []),
+    ...(params.contentId ? [params.contentId] : []),
+  ]);
+  const candidates = [...localMeasured, ...festivalMeasured]
+    .filter((entry) => !excluded.has(entry.candidate.tourApiContentId))
+    .sort((first, second) => first.distanceMeters - second.distanceMeters)
+    .slice(0, MAX_REPLAN_CANDIDATES);
+
+  const measuredAlternatives = await mapWithConcurrency(
+    candidates,
+    TMAP_CONCURRENCY,
+    async (entry): Promise<GeneratedCourse | null> => {
+      const returnRoute = await fetchPedestrianRoute({
+        start: {
+          latitude: entry.candidate.latitude,
+          longitude: entry.candidate.longitude,
+        },
+        end: { latitude: destination.latitude, longitude: destination.longitude },
+        startName: entry.candidate.name,
+        endName: destination.name,
+      });
+      const returnTotals = extractRouteTotals(returnRoute);
+      const returnTravelMinutes = Math.ceil(returnTotals.totalSeconds / 60);
+      const travelMinutes = entry.travelMinutes + returnTravelMinutes;
+      const fittedStay = fitStayMinutes([entry], travelMinutes, params.availableMinutes);
+      if (fittedStay === null) {
+        return null;
+      }
+
+      const stayMinutes = fittedStay[0];
+      const totalMinutes = travelMinutes + stayMinutes;
+      const totalWalkingMeters = entry.distanceMeters + returnTotals.distanceMeters;
+      return {
+        totalMinutes,
+        returnTravelMinutes,
+        returnDistanceMeters: returnTotals.distanceMeters,
+        returnPath: extractRoutePath(returnRoute),
+        verified: true,
+        recommendationTags: [
+          '대체 코스',
+          ...(entry.candidate.kind === 'FESTIVAL' ? ['행사 포함'] : []),
+          ...(totalWalkingMeters <= SHORT_WALK_DISTANCE_METERS ? ['짧은 산책'] : []),
+        ],
+        stops: [
+          {
+            kind: entry.candidate.kind ?? 'LOCAL_PLACE',
+            tourApiContentId: entry.candidate.tourApiContentId,
+            name: entry.candidate.name,
+            address: entry.candidate.address,
+            latitude: entry.candidate.latitude,
+            longitude: entry.candidate.longitude,
+            imageUrl: entry.candidate.imageUrl,
+            travelMinutesFromPrevious: entry.travelMinutes,
+            distanceMetersFromPrevious: entry.distanceMeters,
+            pathFromPrevious: entry.path,
+            stayMinutes,
+            eventStartDate: entry.candidate.eventStartDate ?? null,
+            eventEndDate: entry.candidate.eventEndDate ?? null,
+          },
+        ],
+      };
+    },
+  );
+
+  const alternatives = measuredAlternatives
+    .filter((course): course is GeneratedCourse => course !== null)
+    .sort((first, second) => second.totalMinutes - first.totalMinutes)
+    .slice(0, MAX_ALTERNATIVES);
+
+  return {
+    status: 'SUCCESS',
+    result: {
+      origin: { name: origin.name, latitude: origin.latitude, longitude: origin.longitude },
+      destination: {
+        name: destination.name,
+        latitude: destination.latitude,
+        longitude: destination.longitude,
+      },
+      availableMinutes: params.availableMinutes,
+      alternatives,
+    },
   };
 }
 

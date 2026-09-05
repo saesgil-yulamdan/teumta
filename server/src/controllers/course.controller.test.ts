@@ -1,7 +1,8 @@
 import type { Request, Response } from 'express';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { generateCoursesMock } = vi.hoisted(() => ({
+const { generateCourseAlternativesMock, generateCoursesMock } = vi.hoisted(() => ({
+  generateCourseAlternativesMock: vi.fn(),
   generateCoursesMock: vi.fn(),
 }));
 
@@ -9,11 +10,15 @@ vi.mock('../services/course-generation.service', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../services/course-generation.service')>();
   return {
     ...actual,
+    generateCourseAlternatives: generateCourseAlternativesMock,
     generateCourses: generateCoursesMock,
   };
 });
 
-import { generateCoursesController } from './course.controller';
+import {
+  generateCourseAlternativesController,
+  generateCoursesController,
+} from './course.controller';
 
 interface FakeResponse {
   statusCode: number;
@@ -49,8 +54,16 @@ async function run(query: Record<string, string>) {
   return { res, next };
 }
 
+async function runAlternatives(query: Record<string, string>) {
+  const res = makeRes();
+  const next = vi.fn();
+  await generateCourseAlternativesController(makeReq(query), res as unknown as Response, next);
+  return { res, next };
+}
+
 beforeEach(() => {
   generateCoursesMock.mockReset();
+  generateCourseAlternativesMock.mockReset();
   generateCoursesMock.mockResolvedValue({
     status: 'SUCCESS',
     result: {
@@ -58,6 +71,42 @@ beforeEach(() => {
       availableMinutes: 60,
       courses: [],
     },
+  });
+  generateCourseAlternativesMock.mockResolvedValue({
+    status: 'SUCCESS',
+    result: {
+      origin: { name: '통인시장', latitude: 37.58, longitude: 126.97 },
+      destination: { name: '경복궁', latitude: 37.5788, longitude: 126.977 },
+      availableMinutes: 30,
+      alternatives: [],
+    },
+  });
+});
+
+describe('generateCourseAlternativesController', () => {
+  it('공개 장소 식별자와 제외 목록만 서비스에 전달한다', async () => {
+    const { res } = await runAlternatives({
+      originContentId: '100',
+      contentId: '126508',
+      availableMinutes: '30',
+      excludeContentIds: '100,200',
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(generateCourseAlternativesMock).toHaveBeenCalledWith({
+      originContentId: '100',
+      contentId: '126508',
+      availableMinutes: 30,
+      excludeContentIds: ['100', '200'],
+    });
+  });
+
+  it('출발 정류지가 없으면 400', async () => {
+    const { res } = await runAlternatives({ contentId: '126508', availableMinutes: '30' });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toMatchObject({ error: { code: 'INVALID_ORIGIN' } });
+    expect(generateCourseAlternativesMock).not.toHaveBeenCalled();
   });
 });
 

@@ -1,12 +1,16 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useReducer } from 'react';
 
 import { ARRIVAL_RADIUS_METERS } from '@/constants/location';
 import type { Coordinate } from '@/types/place';
 import { hasArrived } from '@/utils/arrival';
+import {
+  courseProgressReducer,
+  INITIAL_COURSE_PROGRESS,
+  type CourseStop,
+} from '@/utils/course-progress-state';
 import { distanceInMeters } from '@/utils/distance';
 
-export type CourseStop = Coordinate & { id: string; name: string };
-export type ProgressPhase = 'not_started' | 'in_progress' | 'completed';
+export type { CourseStop } from '@/utils/course-progress-state';
 
 /**
  * 도착 반경보다 넉넉히 벗어나야 "체류 끝"으로 본다.
@@ -23,32 +27,27 @@ const STAY_LEAVE_RADIUS_METERS = ARRIVAL_RADIUS_METERS * 1.5;
  *  - 서버에는 사용자가 특정 시각 특정 장소에 있었다는 정보가 남지 않는다.
  */
 export function useCourseProgress(stops: CourseStop[]) {
-  const [phase, setPhase] = useState<ProgressPhase>('not_started');
-  const [currentIndex, setCurrentIndex] = useState(0);
-  // 방금 도착해 머무는 중인 정류지. 반경을 벗어나면 자동으로 풀린다.
-  const [stayingAt, setStayingAt] = useState<CourseStop | null>(null);
+  const [state, dispatch] = useReducer(courseProgressReducer, INITIAL_COURSE_PROGRESS);
+  const { phase, currentIndex, stayingAt, stayingSince, startedAt, outcomes } = state;
 
   const nextStop: CourseStop | null = stops[currentIndex] ?? null;
 
-  const start = useCallback(() => setPhase('in_progress'), []);
+  const start = useCallback(() => dispatch({ type: 'start', at: Date.now() }), []);
 
-  const reset = useCallback(() => {
-    setPhase('not_started');
-    setCurrentIndex(0);
-    setStayingAt(null);
-  }, []);
+  const reset = useCallback(() => dispatch({ type: 'reset' }), []);
 
   /**
    * 다음 정류지를 방문 처리 없이 넘긴다(가게가 닫혀 있는 등).
    * 마지막 지점(복귀)은 건너뛸 수 없다 — 코스를 끝내는 건 "코스 종료"의 몫.
    */
-  const skipCurrent = useCallback(() => {
-    if (phase !== 'in_progress' || currentIndex >= stops.length - 1) {
+  const skipCurrent = useCallback((outcome: 'skipped' | 'unavailable' = 'skipped') => {
+    if (phase !== 'in_progress' || currentIndex >= stops.length - 1 || !nextStop) {
       return;
     }
-    setStayingAt(null);
-    setCurrentIndex((index) => index + 1);
-  }, [phase, currentIndex, stops.length]);
+    dispatch({ type: 'skip', stop: nextStop, outcome });
+  }, [phase, currentIndex, stops.length, nextStop]);
+
+  const finishCurrentStay = useCallback(() => dispatch({ type: 'finish_stay' }), []);
 
   /** foreground GPS 갱신 시 호출. 도착·체류 이탈을 판정한다(전부 로컬). */
   const updateWithLocation = useCallback(
@@ -56,24 +55,35 @@ export function useCourseProgress(stops: CourseStop[]) {
       if (phase !== 'in_progress') {
         return;
       }
-      if (stayingAt && distanceInMeters(current, stayingAt) > STAY_LEAVE_RADIUS_METERS) {
-        setStayingAt(null);
+      if (stayingAt) {
+        if (distanceInMeters(current, stayingAt) > STAY_LEAVE_RADIUS_METERS) {
+          dispatch({ type: 'leave' });
+        }
+        return;
       }
       if (!nextStop) {
         return;
       }
       if (hasArrived(current, nextStop, ARRIVAL_RADIUS_METERS)) {
         const isFinal = currentIndex + 1 >= stops.length;
-        // 마지막 지점은 복귀 완료라 체류 개념이 없다.
-        setStayingAt(isFinal ? null : nextStop);
-        setCurrentIndex((index) => index + 1);
-        if (isFinal) {
-          setPhase('completed');
-        }
+        dispatch({ type: 'arrive', stop: nextStop, at: Date.now(), isReturn: isFinal });
       }
     },
     [phase, stayingAt, nextStop, currentIndex, stops.length],
   );
 
-  return { phase, currentIndex, nextStop, stayingAt, start, reset, skipCurrent, updateWithLocation };
+  return {
+    phase,
+    currentIndex,
+    nextStop,
+    stayingAt,
+    stayingSince,
+    startedAt,
+    outcomes,
+    start,
+    reset,
+    skipCurrent,
+    finishCurrentStay,
+    updateWithLocation,
+  };
 }

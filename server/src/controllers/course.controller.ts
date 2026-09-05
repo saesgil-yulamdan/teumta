@@ -3,6 +3,7 @@ import type { RequestHandler } from 'express';
 import {
   MAX_AVAILABLE_MINUTES,
   MIN_AVAILABLE_MINUTES,
+  generateCourseAlternatives,
   generateCourses,
 } from '../services/course-generation.service';
 
@@ -84,6 +85,74 @@ export const generateCoursesController: RequestHandler = async (req, res, next) 
         error: {
           code: 'DESTINATION_NOT_FOUND',
           message: '목적지를 찾을 수 없거나 좌표가 없습니다.',
+        },
+      });
+      return;
+    }
+
+    res.status(200).json({ success: true, data: result.result, error: null });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** 도착한 정류지 기준 대체 장소 → 원 목적지 복귀 코스. 사용자 좌표는 받지 않는다. */
+export const generateCourseAlternativesController: RequestHandler = async (req, res, next) => {
+  try {
+    const originContentId = nonEmptyString(req.query.originContentId);
+    const contentId = nonEmptyString(req.query.contentId);
+    const poiId = nonEmptyString(req.query.poiId);
+    if (originContentId === null) {
+      badRequest(res, 'INVALID_ORIGIN', 'originContentId는 필수입니다.');
+      return;
+    }
+    if ((contentId === null) === (poiId === null)) {
+      badRequest(
+        res,
+        'INVALID_IDENTIFIER',
+        'contentId 또는 poiId 중 정확히 하나를 전달해야 합니다.',
+      );
+      return;
+    }
+
+    const availableMinutes = Number(req.query.availableMinutes);
+    if (
+      typeof req.query.availableMinutes !== 'string' ||
+      !Number.isInteger(availableMinutes) ||
+      availableMinutes < MIN_AVAILABLE_MINUTES ||
+      availableMinutes > MAX_AVAILABLE_MINUTES
+    ) {
+      badRequest(
+        res,
+        'INVALID_AVAILABLE_MINUTES',
+        `availableMinutes는 ${MIN_AVAILABLE_MINUTES}~${MAX_AVAILABLE_MINUTES} 사이의 정수여야 합니다.`,
+      );
+      return;
+    }
+
+    const excludeContentIds = nonEmptyString(req.query.excludeContentIds)
+      ?.split(',')
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .slice(0, 20) ?? [];
+    const result = await generateCourseAlternatives({
+      originContentId,
+      ...(contentId !== null ? { contentId } : {}),
+      ...(poiId !== null ? { poiId } : {}),
+      availableMinutes,
+      excludeContentIds,
+    });
+
+    if (result.status !== 'SUCCESS') {
+      res.status(404).json({
+        success: false,
+        data: null,
+        error: {
+          code: result.status,
+          message:
+            result.status === 'ORIGIN_NOT_FOUND'
+              ? '현재 정류지를 찾을 수 없거나 좌표가 없습니다.'
+              : '복귀할 목적지를 찾을 수 없거나 좌표가 없습니다.',
         },
       });
       return;

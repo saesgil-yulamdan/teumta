@@ -1,9 +1,11 @@
 import Constants from 'expo-constants';
 import { Link, useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PlaceThumbnail } from '@/components/place-thumbnail';
+import { ReportModal } from '@/components/report-modal';
 import { TeumtaTabBar } from '@/components/teumta-tab-bar';
 import { Teumta } from '@/constants/theme';
 import { useBookmarks } from '@/hooks/use-bookmarks';
@@ -20,6 +22,7 @@ export default function MyScreen() {
   const router = useRouter();
   const { places: savedPlaces, clearBookmarks } = useBookmarks();
   const { completedEntries, clearCourseLog } = useCourseLog();
+  const [showReport, setShowReport] = useState(false);
 
   const confirmClear = () => {
     Alert.alert('저장 데이터 삭제', '저장한 장소, 코스 기록, 최근 검색어가 모두 삭제됩니다.', [
@@ -195,6 +198,10 @@ export default function MyScreen() {
             <Text style={styles.infoRowLabel}>데이터 출처</Text>
             <Text style={styles.infoRowValue}>한국관광공사 · SK open API · TMAP</Text>
           </View>
+          <Pressable style={styles.infoRow} onPress={() => setShowReport(true)} hitSlop={4}>
+            <Text style={styles.infoRowLabel}>버그·의견 보내기</Text>
+            <Text style={styles.infoRowLink}>제보하기 ›</Text>
+          </Pressable>
           <Pressable
             style={styles.infoRow}
             onPress={() => void Linking.openURL(SUPPORT_URL)}
@@ -212,6 +219,11 @@ export default function MyScreen() {
         </View>
       </ScrollView>
 
+      <ReportModal
+        visible={showReport}
+        onClose={() => setShowReport(false)}
+        kind="app"
+      />
       <TeumtaTabBar active="my" />
     </SafeAreaView>
   );

@@ -1,7 +1,5 @@
 /** 라이트·다크 모드 색상. Expo 템플릿 기본값 — 틈타 화면은 아래 `Teumta` 토큰을 쓴다. */
 
-import '@/global.css';
-
 import { Platform } from 'react-native';
 
 export const Colors = {
