@@ -5,6 +5,8 @@ import type { Coordinate } from './place';
 export type CourseStop = {
   /** LOCAL_PLACE=상설 로컬, FESTIVAL=한시 행사·축제. 구버전 스냅샷은 undefined. */
   kind?: 'LOCAL_PLACE' | 'FESTIVAL';
+  /** TourAPI 상세·운영정보 조회 키. 구버전 저장 스냅샷은 undefined. */
+  tourApiContentId?: string;
   name: string;
   address: string | null;
   latitude: number;
@@ -48,6 +50,14 @@ export type CourseGenerationResult = {
   destination: CourseDestination;
   availableMinutes: number;
   courses: GeneratedCourse[];
+};
+
+/** 도착한 정류지에서 대체 장소 1곳을 거쳐 원 목적지로 복귀하는 재계획 결과. */
+export type CourseAlternativesResult = {
+  origin: CourseDestination;
+  destination: CourseDestination;
+  availableMinutes: number;
+  alternatives: GeneratedCourse[];
 };
 
 /** 목적지 식별자. contentId(TourAPI) 또는 poiId(TMAP) 중 하나만. */

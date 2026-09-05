@@ -558,6 +558,7 @@ GET /api/courses?contentId=126508&availableMinutes=60&variant=2
         "stops": [
           {
             "kind": "LOCAL_PLACE",    // LOCAL_PLACE | FESTIVAL
+            "tourApiContentId": "100", // 진행 중 상세·운영정보 재확인 키
             "name": "대한민국역사박물관",
             "address": "...",
             "latitude": 37.57,
@@ -597,6 +598,23 @@ GET /api/courses?contentId=126508&availableMinutes=60&variant=2
 
 **호출량:** 목적지 해석 1 + TourAPI 로컬 목록 3 + TourAPI 행사 목록 최대 3페이지 +
 TMAP 보행자 최대 10(3.3b/3.3d 선별) + 검증 최대 6.
+
+### 3.10a 진행 중 대체 코스 — [B] (구현됨)
+```
+GET /api/course-alternatives?originContentId=100&contentId=126508&availableMinutes=30&excludeContentIds=100,200
+```
+
+사용자가 도착한 정류지가 휴무·브레이크타임이면 **현재 정류지 → 대체 장소 1곳 → 원 목적지**
+경로를 다시 계산한다. `originContentId`와 목적지 식별자만 받고 사용자 GPS 좌표는 받지 않는다.
+
+- `originContentId`: 사용자가 도착한 TourAPI 정류지 식별자.
+- 목적지는 `contentId`/`poiId` 중 정확히 하나.
+- `availableMinutes`: 남은 제한시간, 10~240분.
+- `excludeContentIds`: 이미 방문했거나 건너뛴 장소를 쉼표로 연결한 선택값(최대 20개 사용).
+- 응답 `alternatives`는 최대 3개이며 각 항목은 3.10의 `GeneratedCourse`와 같은 구조다.
+- 앱은 대체 후보의 운영정보도 다시 확인해 명확한 휴무·브레이크타임 후보를 제안에서 제외한다.
+- 앱은 결과를 자동 적용하지 않고 변경된 소요시간·복귀시각을 보여준 뒤 사용자 승인을 받는다.
+- `404 ORIGIN_NOT_FOUND` / `DESTINATION_NOT_FOUND` — 공개 장소 식별자를 좌표로 해석하지 못함.
 
 ---
 

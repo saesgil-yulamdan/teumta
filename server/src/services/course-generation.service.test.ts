@@ -36,6 +36,7 @@ vi.mock('./nearby-festival.service', async (importOriginal) => {
 import {
   MIN_STAY_MINUTES,
   estimateWalkMinutes,
+  generateCourseAlternatives,
   generateCourses,
   planCourses,
   stayMinutesFor,
@@ -255,6 +256,7 @@ describe('generateCourses', () => {
     expect(course.stops).toHaveLength(1);
     expect(course.stops[0]).toMatchObject({
       kind: 'LOCAL_PLACE',
+      tourApiContentId: '통인시장',
       name: '통인시장',
       travelMinutesFromPrevious: 10,
       stayMinutes: 30,
@@ -358,5 +360,72 @@ describe('generateCourses', () => {
 
     expect(result.result.courses.every((course) => course.stops.length === 1)).toBe(true);
     expect(result.result.courses.every((course) => course.totalMinutes <= 60)).toBe(true);
+  });
+});
+
+describe('generateCourseAlternatives', () => {
+  it('현재 정류지의 공개 좌표에서 대체 장소를 거쳐 목적지로 복귀하는 코스를 만든다', async () => {
+    const origin = {
+      latitude: 37.58,
+      longitude: 126.97,
+      name: '문 닫은 가게',
+      contentId: 'closed',
+    };
+    resolveDestinationByContentIdMock
+      .mockResolvedValueOnce(origin)
+      .mockResolvedValueOnce(DESTINATION);
+    measureNearbyLocalPlacesMock.mockResolvedValue([measured('대체 카페', 5, '39')]);
+
+    const result = await generateCourseAlternatives({
+      originContentId: 'closed',
+      contentId: '126508',
+      availableMinutes: 60,
+      excludeContentIds: ['visited'],
+    });
+
+    expect(result.status).toBe('SUCCESS');
+    if (result.status !== 'SUCCESS') {
+      throw new Error('expected success');
+    }
+    expect(result.result.alternatives[0]).toMatchObject({
+      verified: true,
+      returnTravelMinutes: 3,
+      stops: [
+        {
+          tourApiContentId: '대체 카페',
+          name: '대체 카페',
+          travelMinutesFromPrevious: 5,
+        },
+      ],
+    });
+    expect(fetchPedestrianRouteMock).toHaveBeenCalledWith({
+      start: { latitude: 37.58, longitude: 126.97 },
+      end: { latitude: DESTINATION.latitude, longitude: DESTINATION.longitude },
+      startName: '대체 카페',
+      endName: '경복궁',
+    });
+  });
+
+  it('방문했거나 건너뛴 장소는 대체 후보에서 제외한다', async () => {
+    resolveDestinationByContentIdMock
+      .mockResolvedValueOnce({ ...DESTINATION, name: '현재 장소', contentId: 'origin' })
+      .mockResolvedValueOnce(DESTINATION);
+    measureNearbyLocalPlacesMock.mockResolvedValue([
+      measured('visited', 4, '39'),
+      measured('새 장소', 5, '38'),
+    ]);
+
+    const result = await generateCourseAlternatives({
+      originContentId: 'origin',
+      contentId: '126508',
+      availableMinutes: 60,
+      excludeContentIds: ['visited'],
+    });
+
+    if (result.status !== 'SUCCESS') {
+      throw new Error('expected success');
+    }
+    expect(result.result.alternatives.flatMap((course) => course.stops).map((stop) => stop.name))
+      .toEqual(['새 장소']);
   });
 });

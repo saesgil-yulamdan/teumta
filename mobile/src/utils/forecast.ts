@@ -11,8 +11,8 @@ import type { ConcentrationForecastEntry } from '@/types/place';
 /** 중앙값 대비 이 비율(%) 이상 벗어나면 "붐빔·한산", 그 사이는 "비슷". */
 const NOTABLE_DIFFERENCE_PERCENT = 15;
 
-/** 그래프 표시 일수. 30일 전부는 너무 촘촘함. */
-export const FORECAST_CHART_DAYS = 14;
+/** 관광지 집중률 API가 제공하는 공식 예측 기간. */
+export const FORECAST_PERIOD_DAYS = 30;
 
 export type ForecastTone = 'busy' | 'usual' | 'quiet';
 
@@ -23,9 +23,9 @@ export interface ForecastSummary {
   /** 중앙값 대비 오늘 차이(%). 양수면 평소보다 붐빔. */
   differenceFromMedian: number;
   tone: ForecastTone;
-  /** 그래프용 앞으로 N일. */
+  /** 향후 30일 예측. */
   upcoming: ConcentrationForecastEntry[];
-  /** upcoming 중 가장 한산한 날(오늘 제외). 오늘보다 낮을 때만. */
+  /** 향후 30일 중 가장 한산한 날(오늘 제외). 오늘보다 낮을 때만. */
   quietest: ConcentrationForecastEntry | null;
   /** quietest와 오늘의 차이(%). */
   quietestDropPercent: number;
@@ -47,8 +47,9 @@ export function summarizeForecast(
     return null;
   }
 
-  const today = forecasts[0];
-  const rates = forecasts.map((entry) => entry.concentrationRate);
+  const upcoming = forecasts.slice(0, FORECAST_PERIOD_DAYS);
+  const today = upcoming[0];
+  const rates = upcoming.map((entry) => entry.concentrationRate);
   const middle = median(rates);
 
   const differenceFromMedian =
@@ -61,7 +62,6 @@ export function summarizeForecast(
         ? 'quiet'
         : 'usual';
 
-  const upcoming = forecasts.slice(0, FORECAST_CHART_DAYS);
   const later = upcoming.slice(1);
   const lowest = later.reduce<ConcentrationForecastEntry | null>(
     (best, entry) => (best === null || entry.concentrationRate < best.concentrationRate ? entry : best),

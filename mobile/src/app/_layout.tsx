@@ -2,6 +2,7 @@ import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 
+import '@/global.css';
 import { Teumta } from '@/constants/theme';
 import { BookmarksProvider } from '@/hooks/use-bookmarks';
 import { CourseLogProvider } from '@/hooks/use-course-log';

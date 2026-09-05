@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -11,30 +11,59 @@ import { Teumta } from '@/constants/theme';
 import { useCourseLog } from '@/hooks/use-course-log';
 import { useCourseProgress, type CourseStop } from '@/hooks/use-course-progress';
 import { useCurrentLocation } from '@/hooks/use-current-location';
-import { getRealtimeCongestion } from '@/api/places';
-import { getSelectedCourse } from '@/stores/selected-course';
-import type { RealtimeCongestion } from '@/types/place';
+import { fetchCourseAlternatives } from '@/api/courses';
+import { getLocalPlaceDetail, getRealtimeCongestion } from '@/api/places';
+import { getSelectedCourse, setSelectedCourse } from '@/stores/selected-course';
+import type { GeneratedCourse } from '@/types/course';
+import type { LocalPlaceDetail, RealtimeCongestion } from '@/types/place';
 import { buildCourseRoutePath } from '@/utils/course-path';
 import { openDirections, openNaverMapPlace } from '@/utils/directions';
 import { distanceInMeters } from '@/utils/distance';
+import { evaluateOperatingStatus, type OperatingStatus } from '@/utils/operating-status';
 import {
-  cancelAllScheduledCourseNotifications,
   cancelScheduledCourseNotification,
   ensureNotificationPermission,
   presentCourseNotification,
   scheduleReturnReminder,
 } from '@/utils/notifications';
 import { withRoJosa } from '@/utils/text';
-import { timeLabelAfter } from '@/utils/time';
+import { timeLabelAt } from '@/utils/time';
+import {
+  courseReturningAfterCurrent,
+  courseWithAlternative,
+  remainingDeadlineMinutes,
+  remainingTripMinutes,
+} from '@/utils/trip-plan';
 
 const SHEET_OVERLAP = 26;
 const WALK_METERS_PER_MINUTE = 67;
 /** 서버 혼잡도 캐시가 5분 — 같은 주기면 폴링해도 외부 호출이 거의 늘지 않는다. */
 const CONGESTION_POLL_INTERVAL_MS = 5 * 60 * 1000;
+const CLOCK_TICK_MS = 30 * 1000;
 
 function formatDistance(meters: number) {
   return meters >= 1000 ? `${(meters / 1000).toFixed(1)}km` : `${Math.round(meters)}m`;
 }
+
+function courseStopId(stop: GeneratedCourse['stops'][number], index: number): string {
+  return `stop-${stop.tourApiContentId ?? `${index}-${stop.name}`}`;
+}
+
+type AdjustmentPrompt = {
+  outcome: 'skipped' | 'unavailable';
+  title: string;
+  body: string;
+};
+
+type AlternativeOption = {
+  course: GeneratedCourse;
+  operatingLabel: string | null;
+};
+
+type OperatingInfoState =
+  | { targetId: null; status: 'idle'; detail: null; availability: null }
+  | { targetId: string; status: 'ready'; detail: LocalPlaceDetail; availability: OperatingStatus }
+  | { targetId: string; status: 'unavailable'; detail: null; availability: OperatingStatus };
 
 
 export default function TripScreen() {
@@ -43,13 +72,33 @@ export default function TripScreen() {
   const selected = getSelectedCourse();
   const course = selected?.course;
   const destination = selected?.destination;
+  const [activeCourse, setActiveCourse] = useState<GeneratedCourse | null>(course ?? null);
+  const plannedCourse = activeCourse ?? course;
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [adjustmentPrompt, setAdjustmentPrompt] = useState<AdjustmentPrompt | null>(null);
+  const [alternatives, setAlternatives] = useState<AlternativeOption[]>([]);
+  const [alternativeStatus, setAlternativeStatus] = useState<
+    'idle' | 'loading' | 'ready' | 'error'
+  >('idle');
+  const [operatingInfo, setOperatingInfo] = useState<OperatingInfoState>({
+    targetId: null,
+    status: 'idle',
+    detail: null,
+    availability: null,
+  });
+  const warnedOperatingStops = useRef(new Set<string>());
+  const alternativeRequestId = useRef(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), CLOCK_TICK_MS);
+    return () => clearInterval(timer);
+  }, []);
 
   // 도착 판정 대상: 정류지들 + 마지막 목적지(복귀)
-  const courseStops: CourseStop[] =
-    course && destination
-      ? [
-          ...course.stops.map((stop, index) => ({
-            id: `stop-${index}`,
+  const courseStops: CourseStop[] = plannedCourse && destination
+    ? [
+          ...plannedCourse.stops.map((stop, index) => ({
+            id: courseStopId(stop, index),
             name: stop.name,
             latitude: stop.latitude,
             longitude: stop.longitude,
@@ -60,86 +109,170 @@ export default function TripScreen() {
             latitude: destination.latitude,
             longitude: destination.longitude,
           },
-        ]
-      : [];
+      ]
+    : [];
 
   const [congestion, setCongestion] = useState<RealtimeCongestion | null>(null);
 
   const { location, status, start: startLocation } = useCurrentLocation({ watch: true });
-  const { phase, currentIndex, nextStop, stayingAt, start, skipCurrent, updateWithLocation } =
-    useCourseProgress(courseStops);
+  const {
+    phase,
+    currentIndex,
+    nextStop,
+    stayingAt,
+    stayingSince,
+    startedAt,
+    outcomes,
+    start,
+    skipCurrent,
+    finishCurrentStay,
+    updateWithLocation,
+  } = useCourseProgress(courseStops);
   const { markCourseCompleted } = useCourseLog();
   // 완료 기록은 코스당 1회 — 기록이 상태를 바꾸고 상태가 다시 기록을 부르는 순환 방지.
   const completionLogged = useRef(false);
 
   const returnReminderId = useRef<string | null>(null);
   const notificationsGranted = useRef(false);
-  // 재예약(취소→예약)이 겹치면 고아 알림이 남는다 — 진행 중엔 건너뛰기를 무시.
-  const reschedulingReminder = useRef(false);
+  const notificationRevision = useRef(0);
+  const [notificationsReady, setNotificationsReady] = useState(false);
   const [returnAlarmSet, setReturnAlarmSet] = useState(false);
 
-  const routePath = useMemo(
-    () => (course && destination ? buildCourseRoutePath(destination, course) : []),
-    [course, destination],
-  );
+  const completed = phase === 'completed';
+  const currentCourseStop = plannedCourse?.stops[currentIndex] ?? null;
+  const distanceToNext = location && nextStop ? distanceInMeters(location, nextStop) : null;
+  const walkMinutes =
+    distanceToNext !== null
+      ? Math.max(1, Math.round(distanceToNext / WALK_METERS_PER_MINUTE))
+      : null;
+  const remainingMinutes = plannedCourse
+    ? completed
+      ? 0
+      : remainingTripMinutes({
+          course: plannedCourse,
+          currentIndex,
+          stayingSince,
+          now: nowMs,
+          currentWalkMinutes: walkMinutes,
+        })
+    : 0;
+  const deadlineMinutes = selected
+    ? remainingDeadlineMinutes(startedAt, selected.availableMinutes, nowMs)
+    : 0;
+  const slackMinutes = deadlineMinutes - remainingMinutes;
+  const expectedReturnAt = nowMs + remainingMinutes * 60_000;
+  const expectedReturnMinute = Math.round(expectedReturnAt / 60_000);
+  const returning =
+    Boolean(plannedCourse) && !completed && currentIndex === plannedCourse?.stops.length;
+  const reminderReturnWalkMinutes = returning
+    ? (walkMinutes ?? plannedCourse?.returnTravelMinutes ?? 0)
+    : (plannedCourse?.returnTravelMinutes ?? 0);
+
+  const routePath =
+    plannedCourse && destination ? buildCourseRoutePath(destination, plannedCourse) : [];
 
   const cancelReturnReminder = useCallback(() => {
+    notificationRevision.current += 1;
     if (returnReminderId.current) {
       void cancelScheduledCourseNotification(returnReminderId.current);
       returnReminderId.current = null;
     }
+    setReturnAlarmSet(false);
+  }, []);
+
+  const refreshClock = useCallback(() => {
+    setTimeout(() => setNowMs(Date.now()), 0);
   }, []);
 
   useEffect(() => {
-    if (!course || !destination) {
+    if (!plannedCourse || !destination) {
       return;
     }
     let cancelled = false;
 
-    // 복귀 임박 로컬 알림. 예약·발송 모두 단말 안 — 권한을 거부하면 화면 안내만으로 진행.
+    // 예약·발송 모두 단말 안 — 권한을 거부하면 화면 안내만으로 진행.
     void (async () => {
       const granted = await ensureNotificationPermission();
       if (!granted || cancelled) {
         return;
       }
       notificationsGranted.current = true;
+      setNotificationsReady(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [plannedCourse, destination]);
+
+  useEffect(() => {
+    if (
+      !notificationsReady ||
+      !destination ||
+      phase !== 'in_progress'
+    ) {
+      return;
+    }
+    const revision = ++notificationRevision.current;
+    void (async () => {
+      setReturnAlarmSet(false);
+      if (returnReminderId.current) {
+        await cancelScheduledCourseNotification(returnReminderId.current);
+        returnReminderId.current = null;
+      }
+      const totalMinutesUntilReturn = Math.max(
+        0,
+        expectedReturnMinute - Math.floor(Date.now() / 60_000),
+      );
       const id = await scheduleReturnReminder({
         destinationName: destination.name,
-        totalMinutes: course.totalMinutes,
-        returnWalkMinutes: course.returnTravelMinutes,
+        totalMinutes: totalMinutesUntilReturn,
+        returnWalkMinutes: reminderReturnWalkMinutes,
       });
-      if (cancelled) {
+      if (revision !== notificationRevision.current) {
         if (id) {
-          void cancelScheduledCourseNotification(id);
+          await cancelScheduledCourseNotification(id);
         }
         return;
       }
       returnReminderId.current = id;
       setReturnAlarmSet(id !== null);
     })();
+  }, [
+    notificationsReady,
+    destination,
+    phase,
+    expectedReturnMinute,
+    reminderReturnWalkMinutes,
+  ]);
 
-    return () => {
-      cancelled = true;
-      // 화면을 떠나면 코스 안내도 끝 — 유령 알림을 남기지 않는다.
+  useEffect(
+    () => () => {
+      notificationRevision.current += 1;
       if (returnReminderId.current) {
         void cancelScheduledCourseNotification(returnReminderId.current);
         returnReminderId.current = null;
       }
-    };
-  }, [course, destination]);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (phase !== 'completed') {
       return;
     }
     // 복귀를 마쳤으면 예약 알림은 필요 없다.
-    cancelReturnReminder();
+    notificationRevision.current += 1;
+    if (returnReminderId.current) {
+      void cancelScheduledCourseNotification(returnReminderId.current);
+      returnReminderId.current = null;
+    }
     // 마지막 복귀 지점 도착 판정이 나면 "다녀온 코스"로 기기에만 남긴다.
     if (selected && !completionLogged.current) {
       completionLogged.current = true;
       markCourseCompleted(selected, true);
     }
-  }, [phase, selected, markCourseCompleted, cancelReturnReminder]);
+  }, [phase, selected, markCourseCompleted]);
 
   useEffect(() => {
     start();
@@ -151,6 +284,48 @@ export default function TripScreen() {
       updateWithLocation(location);
     }
   }, [location, updateWithLocation]);
+
+  useEffect(() => {
+    const contentId = currentCourseStop?.tourApiContentId;
+    if (!currentCourseStop || !contentId || returning || completed) {
+      return;
+    }
+
+    let ignored = false;
+    getLocalPlaceDetail(contentId)
+      .then((detail) => {
+        if (ignored) {
+          return;
+        }
+        const availability = evaluateOperatingStatus(detail);
+        setOperatingInfo({ targetId: contentId, status: 'ready', detail, availability });
+        if (
+          (availability.state === 'closed' || availability.state === 'break') &&
+          !warnedOperatingStops.current.has(contentId)
+        ) {
+          warnedOperatingStops.current.add(contentId);
+          setAdjustmentPrompt((current) => current ?? {
+            outcome: 'unavailable',
+            title: `${currentCourseStop.name} 운영정보를 확인해 주세요`,
+            body: `${availability.label} 계속 방문하거나 건너뛴 뒤 일정을 다시 계산할 수 있어요.`,
+          });
+        }
+      })
+      .catch(() => {
+        if (!ignored) {
+          setOperatingInfo({
+            targetId: contentId,
+            status: 'unavailable',
+            detail: null,
+            availability: { state: 'unknown', label: '운영정보 확인 필요' },
+          });
+        }
+      });
+
+    return () => {
+      ignored = true;
+    };
+  }, [currentCourseStop, returning, completed]);
 
   const destinationParams = selected?.destinationParams;
   const lastCongestionLevel = useRef<RealtimeCongestion['level'] | null>(null);
@@ -203,6 +378,7 @@ export default function TripScreen() {
     // 백그라운드에 오래 있다 돌아오면 다음 틱까지 최대 5분 낡은 값 — 복귀 즉시 한 번 갱신.
     const appStateSubscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
+        setNowMs(Date.now());
         fetchCongestion();
       }
     });
@@ -214,7 +390,7 @@ export default function TripScreen() {
     };
   }, [destinationParams, selected]);
 
-  if (!course || !destination) {
+  if (!plannedCourse || !destination) {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>진행 중인 코스가 없습니다.</Text>
@@ -225,24 +401,7 @@ export default function TripScreen() {
     );
   }
 
-  const completed = phase === 'completed';
-  const distanceToNext =
-    location && nextStop ? distanceInMeters(location, nextStop) : null;
-  const walkMinutes =
-    distanceToNext !== null ? Math.max(1, Math.round(distanceToNext / WALK_METERS_PER_MINUTE)) : null;
-
-  // 남은 시간 = 미방문 정류지의 이동+체류 + 복귀 이동
-  const remainingMinutes = completed
-    ? 0
-    : course.stops
-        .slice(Math.min(currentIndex, course.stops.length))
-        .reduce((total, stop) => total + stop.travelMinutesFromPrevious + stop.stayMinutes, 0) +
-      course.returnTravelMinutes;
-
-  // 마지막 코스 지점 = 목적지 복귀. 그 구간에 들어서면 "되돌아가는 중"으로 보여준다.
-  const returning = !completed && currentIndex === courseStops.length - 1;
-  // stayingAt은 방금 도착한 정류지 — course.stops 기준 인덱스는 (currentIndex - 1).
-  const stayingStop = stayingAt ? course.stops[currentIndex - 1] : undefined;
+  const stayingStop = stayingAt ? plannedCourse.stops[currentIndex] : undefined;
 
   const movingSubtitle =
     distanceToNext !== null && walkMinutes !== null
@@ -267,14 +426,11 @@ export default function TripScreen() {
       : movingSubtitle;
 
   // 로컬 상세에만 있던 영업·리뷰 확인 통로 — 진행 중 가게가 닫혀 있으면 여기서 판단.
-  const reviewTarget = completed
-    ? null
-    : stayingAt
-      ? { name: stayingAt.name, address: stayingStop?.address ?? null }
-      : !returning && nextStop
-        ? { name: nextStop.name, address: course.stops[currentIndex]?.address ?? null }
-        : null;
-  const canSkip = phase === 'in_progress' && !returning && !stayingAt && nextStop !== null;
+  const reviewTarget =
+    !completed && !returning && currentCourseStop
+      ? { name: currentCourseStop.name, address: currentCourseStop.address }
+      : null;
+  const canSkip = phase === 'in_progress' && !returning && currentCourseStop !== null;
 
   // 도착!·복귀 전환·완료 같은 "순간"에만 카드가 새로 떨어지게 키로 구분 —
   // GPS 거리 갱신(같은 상태)에는 애니메이션이 다시 돌지 않는다.
@@ -286,40 +442,169 @@ export default function TripScreen() {
         ? 'returning'
         : `moving-${currentIndex}`;
 
-  const handleSkip = () => {
-    const skipped = course.stops[currentIndex];
-    if (!skipped || reschedulingReminder.current) {
+  const previewRemainingAfterSkip = () => {
+    const nextIndex = currentIndex + 1;
+    const nextTarget = plannedCourse.stops[nextIndex] ?? destination;
+    const nextWalkMinutes = location
+      ? Math.max(
+          1,
+          Math.round(distanceInMeters(location, nextTarget) / WALK_METERS_PER_MINUTE),
+        )
+      : null;
+    return remainingTripMinutes({
+      course: plannedCourse,
+      currentIndex: nextIndex,
+      stayingSince: null,
+      now: nowMs,
+      currentWalkMinutes: nextWalkMinutes,
+    });
+  };
+
+  const openSkipPrompt = () => {
+    if (!currentCourseStop) {
       return;
     }
-    skipCurrent();
-    if (!notificationsGranted.current) {
+    const previewMinutes = previewRemainingAfterSkip();
+    setAlternatives([]);
+    setAlternativeStatus('idle');
+    setAdjustmentPrompt({
+      outcome: 'skipped',
+      title: `${currentCourseStop.name} 건너뛸까요?`,
+      body: `건너뛰면 ${timeLabelAt(nowMs + previewMinutes * 60_000)}쯤 복귀해요.`,
+    });
+  };
+
+  const confirmSkip = () => {
+    if (!currentCourseStop || !adjustmentPrompt) {
       return;
     }
-    // 건너뛴 이동+체류만큼 복귀가 앞당겨진다 — 예약 알림을 새 예상에 맞춘다.
-    const newRemainingMinutes =
-      remainingMinutes - skipped.travelMinutesFromPrevious - skipped.stayMinutes;
-    reschedulingReminder.current = true;
-    void (async () => {
-      try {
-        await cancelAllScheduledCourseNotifications();
-        returnReminderId.current = null;
-        const id = await scheduleReturnReminder({
-          destinationName: destination.name,
-          totalMinutes: newRemainingMinutes,
-          returnWalkMinutes: course.returnTravelMinutes,
-        });
-        returnReminderId.current = id;
-        setReturnAlarmSet(id !== null);
-      } finally {
-        reschedulingReminder.current = false;
+    skipCurrent(adjustmentPrompt.outcome);
+    alternativeRequestId.current += 1;
+    setAdjustmentPrompt(null);
+    setAlternatives([]);
+    setAlternativeStatus('idle');
+    refreshClock();
+  };
+
+  const canFindAlternative =
+    Boolean(stayingAt && currentCourseStop?.tourApiContentId) && deadlineMinutes >= 10;
+
+  const findAlternatives = async () => {
+    if (
+      !selected?.destinationParams ||
+      !currentCourseStop?.tourApiContentId ||
+      !canFindAlternative
+    ) {
+      return;
+    }
+    setAlternativeStatus('loading');
+    setAlternatives([]);
+    const requestId = ++alternativeRequestId.current;
+    try {
+      const result = await fetchCourseAlternatives({
+        originContentId: currentCourseStop.tourApiContentId,
+        destination: selected.destinationParams,
+        availableMinutes: deadlineMinutes,
+        excludeContentIds: plannedCourse.stops
+          .map((stop) => stop.tourApiContentId)
+          .filter((contentId): contentId is string => Boolean(contentId)),
+      });
+      const checked = await Promise.all(
+        result.alternatives.map(async (alternative): Promise<AlternativeOption | null> => {
+          const alternativeStop = alternative.stops[0];
+          if (!alternativeStop.tourApiContentId) {
+            return { course: alternative, operatingLabel: '운영정보 확인 필요' };
+          }
+          try {
+            const detail = await getLocalPlaceDetail(alternativeStop.tourApiContentId);
+            const availability = evaluateOperatingStatus(detail);
+            if (availability.state === 'closed' || availability.state === 'break') {
+              return null;
+            }
+            return {
+              course: alternative,
+              operatingLabel:
+                availability.state === 'unknown' ? '운영정보 확인 필요' : null,
+            };
+          } catch {
+            return { course: alternative, operatingLabel: '운영정보 확인 필요' };
+          }
+        }),
+      );
+      if (requestId !== alternativeRequestId.current) {
+        return;
       }
-    })();
+      setAlternatives(checked.filter((option): option is AlternativeOption => option !== null));
+      setAlternativeStatus('ready');
+    } catch {
+      if (requestId === alternativeRequestId.current) {
+        setAlternativeStatus('error');
+      }
+    }
+  };
+
+  const applyAlternative = (alternative: GeneratedCourse) => {
+    if (!selected) {
+      return;
+    }
+    const replanned = courseWithAlternative(plannedCourse, currentIndex, alternative);
+    setActiveCourse(replanned);
+    setSelectedCourse({ ...selected, course: replanned });
+    skipCurrent(adjustmentPrompt?.outcome ?? 'skipped');
+    alternativeRequestId.current += 1;
+    setAdjustmentPrompt(null);
+    setAlternatives([]);
+    setAlternativeStatus('idle');
+    refreshClock();
+  };
+
+  const returnNow = () => {
+    if (!selected || !currentCourseStop) {
+      return;
+    }
+    const distanceMeters = location
+      ? distanceInMeters(location, destination)
+      : distanceInMeters(currentCourseStop, destination);
+    const returnMinutes = Math.max(
+      1,
+      Math.ceil((distanceMeters * 1.3) / WALK_METERS_PER_MINUTE),
+    );
+    const returningCourse = courseReturningAfterCurrent(plannedCourse, currentIndex, {
+      minutes: returnMinutes,
+      distanceMeters: Math.round(distanceMeters * 1.3),
+    });
+    setActiveCourse(returningCourse);
+    setSelectedCourse({ ...selected, course: returningCourse });
+    skipCurrent(adjustmentPrompt?.outcome ?? 'skipped');
+    alternativeRequestId.current += 1;
+    setAdjustmentPrompt(null);
+    setAlternatives([]);
+    setAlternativeStatus('idle');
+    refreshClock();
   };
 
   const etaPillLabel =
-    !completed && nextStop && walkMinutes !== null
+    !completed && !stayingAt && nextStop && walkMinutes !== null
       ? `${nextStop.name.split(' ')[0]}까지 ${walkMinutes}분`
       : null;
+  const operatingAvailability = currentCourseStop && !returning
+    ? currentCourseStop.tourApiContentId
+      ? operatingInfo.targetId === currentCourseStop.tourApiContentId
+        ? operatingInfo.availability
+        : null
+      : { state: 'unknown' as const, label: '운영정보 확인 필요' }
+    : null;
+  const operatingNeedsAttention =
+    operatingAvailability && operatingAvailability.state !== 'open';
+  const operatingDetail =
+    operatingInfo.status === 'ready' &&
+    operatingInfo.targetId === currentCourseStop?.tourApiContentId
+      ? [operatingInfo.detail.restDays, operatingInfo.detail.openHours]
+          .filter((value): value is string => Boolean(value))
+          .join(' · ')
+      : '';
+  const skipActionLabel =
+    currentIndex + 1 < plannedCourse.stops.length ? '건너뛰고 다음' : '건너뛰고 복귀';
 
   return (
     <View style={styles.screen}>
@@ -345,12 +630,12 @@ export default function TripScreen() {
           detour={{
             id: 'generated',
             name: destination.name,
-            durationMinutes: course.totalMinutes,
+            durationMinutes: plannedCourse.totalMinutes,
             distanceKm: 0,
             description: '',
             coordinates: [
               { latitude: destination.latitude, longitude: destination.longitude },
-              ...course.stops.map((stop) => ({
+              ...plannedCourse.stops.map((stop) => ({
                 latitude: stop.latitude,
                 longitude: stop.longitude,
               })),
@@ -358,11 +643,15 @@ export default function TripScreen() {
             ],
             stops: [
               destination.name,
-              ...course.stops.map((stop) => stop.name),
+              ...plannedCourse.stops.map((stop) => stop.name),
               `${destination.name} 복귀`,
             ],
           }}
           routePath={routePath}
+          skippedStopIndexes={plannedCourse.stops.flatMap((stop, index) => {
+            const outcome = outcomes[courseStopId(stop, index)];
+            return outcome === 'skipped' || outcome === 'unavailable' ? [index] : [];
+          })}
           showsUserLocation={status === 'granted'}
         />
       </View>
@@ -387,6 +676,36 @@ export default function TripScreen() {
           </View>
         </Animated.View>
 
+        {operatingNeedsAttention && !completed && !returning && (
+          <Pressable
+            disabled={operatingAvailability.state === 'unknown'}
+            onPress={() => {
+              setAdjustmentPrompt({
+                outcome: 'unavailable',
+                title: `${currentCourseStop?.name ?? '이 장소'} 운영정보를 확인해 주세요`,
+                body: `${operatingAvailability.label} 계속 방문하거나 건너뛴 뒤 일정을 다시 계산할 수 있어요.`,
+              });
+            }}
+            style={[
+              styles.operatingChip,
+              operatingAvailability.state !== 'unknown' && styles.operatingChipWarning,
+            ]}>
+            <View
+              style={[
+                styles.operatingDot,
+                operatingAvailability.state !== 'unknown' && styles.operatingDotWarning,
+              ]}
+            />
+            <Text
+              style={[
+                styles.operatingLabel,
+                operatingAvailability.state !== 'unknown' && styles.operatingLabelWarning,
+              ]}>
+              {operatingAvailability.label}
+            </Text>
+          </Pressable>
+        )}
+
         {congestionEased && !completed && (
           <View style={styles.easedBanner}>
             <View style={styles.easedDot} />
@@ -398,15 +717,18 @@ export default function TripScreen() {
 
         <View style={styles.progressRow}>
           {courseStops.map((stop, index) => {
-            const done = completed || index < currentIndex;
+            const outcome = outcomes[stop.id];
+            const skipped = outcome === 'skipped' || outcome === 'unavailable';
             const isCurrent = !completed && index === currentIndex;
             const isReturn = index === courseStops.length - 1;
+            const done = outcome === 'visited' || (completed && isReturn);
             return (
               <View
                 key={stop.id}
                 style={[
                   styles.progressChip,
                   done && styles.progressChipDone,
+                  skipped && styles.progressChipSkipped,
                   isCurrent && styles.progressChipCurrent,
                 ]}>
                 <Text
@@ -414,9 +736,10 @@ export default function TripScreen() {
                   style={[
                     styles.progressChipLabel,
                     (done || isCurrent) && styles.progressChipLabelActive,
+                    skipped && styles.progressChipLabelSkipped,
                   ]}>
                   {/* 복귀 칩은 순번이 무의미하다 — 숫자 없이 라벨만. */}
-                  {(done ? '✓ ' : isReturn ? '' : `${index + 1} `) +
+                  {(done ? '✓ ' : skipped ? '– ' : isReturn ? '' : `${index + 1} `) +
                     (isReturn ? '복귀' : stop.name)}
                 </Text>
               </View>
@@ -434,8 +757,20 @@ export default function TripScreen() {
               </Pressable>
             )}
             {canSkip && (
-              <Pressable style={styles.stopActionButton} onPress={handleSkip}>
+              <Pressable style={styles.stopActionButton} onPress={openSkipPrompt}>
                 <Text style={styles.stopActionLabel}>이 장소 건너뛰기</Text>
+              </Pressable>
+            )}
+            {stayingAt && (
+              <Pressable
+                style={[styles.stopActionButton, styles.stopActionButtonPrimary]}
+                onPress={() => {
+                  finishCurrentStay();
+                  refreshClock();
+                }}>
+                <Text style={[styles.stopActionLabel, styles.stopActionLabelPrimary]}>
+                  다음 장소로
+                </Text>
               </Pressable>
             )}
           </View>
@@ -444,21 +779,25 @@ export default function TripScreen() {
         <View style={styles.noticeBox}>
           {/* 완료 후에는 예약이 취소되므로 알림 문구도 함께 내린다(상태 대신 파생 조건). */}
           <Text style={styles.noticeTitle}>
-            {returnAlarmSet && !completed
+            {slackMinutes < 0
+              ? `선택한 시간보다 ${Math.abs(slackMinutes)}분 늦어질 수 있어요`
+              : returnAlarmSet && !completed
               ? '돌아갈 시간이 되면 알려드려요'
               : '돌아갈 시간을 계산해 뒀어요'}
           </Text>
           <Text style={styles.noticeBody}>
-            {returnAlarmSet && !completed
+            {slackMinutes < 0
+              ? '바로 복귀하거나 다음 장소를 건너뛰면 복귀시각을 다시 계산해요.'
+              : returnAlarmSet && !completed
               ? '복귀 출발 5분 전에 알림을 드려요. 알림도 이 기기 안에서만 처리돼요.'
-              : '복귀 예정 시각을 기준으로 코스를 구성했어요. 목적지 혼잡도는 위에서 다시 확인할 수 있어요.'}
+              : '이동·체류·건너뛰기를 반영해 복귀시각을 계속 다시 계산해요.'}
           </Text>
         </View>
 
         <View style={styles.statsRow}>
           <View style={styles.statTile}>
             <Text style={styles.statLabel}>복귀 예정</Text>
-            <Text style={styles.statValue}>{timeLabelAfter(remainingMinutes)}</Text>
+            <Text style={styles.statValue}>{timeLabelAt(expectedReturnAt)}</Text>
           </View>
           <View style={styles.statTile}>
             <Text style={styles.statLabel}>목적지 혼잡</Text>
@@ -467,7 +806,7 @@ export default function TripScreen() {
             </Text>
           </View>
           <View style={styles.statTile}>
-            <Text style={styles.statLabel}>남은 코스</Text>
+            <Text style={styles.statLabel}>남은 시간</Text>
             <Text style={styles.statValue}>{remainingMinutes}분</Text>
           </View>
         </View>
@@ -505,6 +844,89 @@ export default function TripScreen() {
           </Text>
         </View>
       </View>
+
+      <Modal
+        animationType="fade"
+        onRequestClose={() => {
+          alternativeRequestId.current += 1;
+          setAdjustmentPrompt(null);
+          setAlternatives([]);
+          setAlternativeStatus('idle');
+        }}
+        transparent
+        visible={adjustmentPrompt !== null}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>{adjustmentPrompt?.title}</Text>
+            <Text style={styles.modalBody}>{adjustmentPrompt?.body}</Text>
+            {operatingDetail ? (
+              <Text numberOfLines={2} style={styles.modalDetail}>
+                한국관광공사 · {operatingDetail}
+              </Text>
+            ) : null}
+
+            {alternativeStatus === 'loading' && (
+              <View style={styles.alternativeState}>
+                <ActivityIndicator color={Teumta.green} size="small" />
+                <Text style={styles.alternativeStateText}>대체 코스를 계산하고 있어요…</Text>
+              </View>
+            )}
+            {alternativeStatus === 'error' && (
+              <Text style={styles.alternativeStateText}>대체 코스를 불러오지 못했어요.</Text>
+            )}
+            {alternativeStatus === 'ready' && alternatives.length === 0 && (
+              <Text style={styles.alternativeStateText}>남은 시간에 맞는 대체 장소가 없어요.</Text>
+            )}
+            {alternatives.map((option) => {
+              const alternative = option.course;
+              const alternativeStop = alternative.stops[0];
+              return (
+                <Pressable
+                  key={alternativeStop.tourApiContentId ?? alternativeStop.name}
+                  onPress={() => applyAlternative(alternative)}
+                  style={styles.alternativeCard}>
+                  <View style={styles.alternativeTexts}>
+                    <Text numberOfLines={1} style={styles.alternativeName}>
+                      {alternativeStop.name}
+                    </Text>
+                    <Text style={styles.alternativeMeta}>
+                      약 {alternative.totalMinutes}분 · {timeLabelAt(nowMs + alternative.totalMinutes * 60_000)} 복귀
+                    </Text>
+                    {option.operatingLabel && (
+                      <Text style={styles.alternativeCaution}>{option.operatingLabel}</Text>
+                    )}
+                  </View>
+                  <Text style={styles.alternativeApply}>적용</Text>
+                </Pressable>
+              );
+            })}
+
+            <View style={styles.modalActionRow}>
+              <Pressable
+                onPress={() => {
+                  alternativeRequestId.current += 1;
+                  setAdjustmentPrompt(null);
+                  setAlternatives([]);
+                  setAlternativeStatus('idle');
+                }}
+                style={styles.modalSecondaryButton}>
+                <Text style={styles.modalSecondaryLabel}>계속 방문</Text>
+              </Pressable>
+              {canFindAlternative && alternativeStatus === 'idle' && (
+                <Pressable onPress={() => void findAlternatives()} style={styles.modalSecondaryButton}>
+                  <Text style={styles.modalSecondaryLabel}>대체 장소 찾기</Text>
+                </Pressable>
+              )}
+              <Pressable onPress={returnNow} style={styles.modalSecondaryButton}>
+                <Text style={styles.modalSecondaryLabel}>바로 복귀</Text>
+              </Pressable>
+              <Pressable onPress={confirmSkip} style={styles.modalPrimaryButton}>
+                <Text style={styles.modalPrimaryLabel}>{skipActionLabel}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -651,6 +1073,37 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 14,
   },
+  operatingChip: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#F7F9F8',
+    borderRadius: 999,
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  operatingChipWarning: {
+    backgroundColor: Teumta.congestion.medium.background,
+  },
+  operatingDot: {
+    backgroundColor: Teumta.textTertiary,
+    borderRadius: 4,
+    height: 7,
+    width: 7,
+  },
+  operatingDotWarning: {
+    backgroundColor: Teumta.congestion.medium.dot,
+  },
+  operatingLabel: {
+    color: Teumta.textSecondary,
+    fontSize: 10,
+    fontWeight: '700',
+    lineHeight: 14,
+  },
+  operatingLabelWarning: {
+    color: Teumta.congestion.medium.text,
+  },
   progressRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -673,6 +1126,10 @@ const styles = StyleSheet.create({
     backgroundColor: Teumta.greenLight,
     borderColor: Teumta.green,
   },
+  progressChipSkipped: {
+    backgroundColor: '#F4F5F4',
+    borderColor: Teumta.border,
+  },
   progressChipLabel: {
     color: Teumta.textTertiary,
     fontSize: 10,
@@ -681,6 +1138,10 @@ const styles = StyleSheet.create({
   },
   progressChipLabelActive: {
     color: Teumta.greenDark,
+  },
+  progressChipLabelSkipped: {
+    color: Teumta.textTertiary,
+    textDecorationLine: 'line-through',
   },
   stopActionRow: {
     flexDirection: 'row',
@@ -694,11 +1155,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
     paddingVertical: 6,
   },
+  stopActionButtonPrimary: {
+    backgroundColor: Teumta.greenLight,
+    borderColor: Teumta.green,
+  },
   stopActionLabel: {
     color: Teumta.textSecondary,
     fontSize: 10,
     fontWeight: '700',
     lineHeight: 14,
+  },
+  stopActionLabelPrimary: {
+    color: Teumta.greenDark,
   },
   noticeBox: {
     backgroundColor: Teumta.greenLight,
@@ -806,5 +1274,121 @@ const styles = StyleSheet.create({
     color: Teumta.textSecondary,
     fontSize: 10,
     lineHeight: 14,
+  },
+  modalBackdrop: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(20, 28, 24, 0.42)',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    backgroundColor: Teumta.surface,
+    borderRadius: 20,
+    gap: 10,
+    maxWidth: 360,
+    padding: 20,
+    width: '100%',
+  },
+  modalTitle: {
+    color: Teumta.textPrimary,
+    fontSize: 17,
+    fontWeight: '800',
+    lineHeight: 23,
+  },
+  modalBody: {
+    color: Teumta.textSecondary,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  modalDetail: {
+    backgroundColor: '#F7F9F8',
+    borderRadius: 10,
+    color: Teumta.textSecondary,
+    fontSize: 10,
+    lineHeight: 15,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  alternativeState: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 6,
+  },
+  alternativeStateText: {
+    color: Teumta.textSecondary,
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  alternativeCard: {
+    alignItems: 'center',
+    borderColor: Teumta.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+  },
+  alternativeTexts: {
+    flex: 1,
+    gap: 2,
+  },
+  alternativeName: {
+    color: Teumta.textPrimary,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
+  },
+  alternativeMeta: {
+    color: Teumta.textSecondary,
+    fontSize: 10,
+    lineHeight: 14,
+  },
+  alternativeCaution: {
+    color: Teumta.congestion.medium.text,
+    fontSize: 9,
+    fontWeight: '700',
+    lineHeight: 13,
+  },
+  alternativeApply: {
+    color: Teumta.greenDark,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  modalActionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
+    justifyContent: 'flex-end',
+    marginTop: 2,
+  },
+  modalSecondaryButton: {
+    alignItems: 'center',
+    borderColor: Teumta.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 42,
+    paddingHorizontal: 12,
+  },
+  modalSecondaryLabel: {
+    color: Teumta.textSecondary,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  modalPrimaryButton: {
+    alignItems: 'center',
+    backgroundColor: Teumta.green,
+    borderRadius: 12,
+    justifyContent: 'center',
+    minHeight: 42,
+    paddingHorizontal: 15,
+  },
+  modalPrimaryLabel: {
+    color: Teumta.surface,
+    fontSize: 11,
+    fontWeight: '800',
   },
 });

@@ -45,6 +45,20 @@ describe('summarizeForecast', () => {
     expect(summary?.quietestDropPercent).toBe(45);
   });
 
+  it('공식 예측 기간인 향후 30일 전체에서 가장 한산한 날을 찾는다', () => {
+    const forecasts = Array.from({ length: 31 }, (_, index) => {
+      const day = index + 1;
+      const rate = day === 30 ? 10 : day === 31 ? 1 : 100;
+      return entry(`2026-10-${String(day).padStart(2, '0')}`, rate);
+    });
+
+    const summary = summarizeForecast(forecasts);
+
+    expect(summary?.upcoming).toHaveLength(30);
+    expect(summary?.median).toBe(100);
+    expect(summary?.quietest?.forecastDate).toBe('2026-10-30');
+  });
+
   it('오늘이 이미 가장 한산하면 대안 날짜를 제시하지 않는다', () => {
     const summary = summarizeForecast([entry('2026-08-15', 40), entry('2026-08-16', 80)]);
     expect(summary?.quietest).toBeNull();

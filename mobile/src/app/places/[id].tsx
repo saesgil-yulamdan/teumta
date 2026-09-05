@@ -20,6 +20,7 @@ import {
   getRealtimeCongestion,
 } from '@/api/places';
 import { PlaceThumbnail } from '@/components/place-thumbnail';
+import { ReportModal } from '@/components/report-modal';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
 import { REALTIME_LEVEL_LABEL, REALTIME_LEVEL_TO_CONGESTION_LEVEL } from '@/constants/congestion';
 import { Teumta } from '@/constants/theme';
@@ -38,15 +39,16 @@ import {
   summarizeForecast,
   type ForecastTone,
 } from '@/utils/forecast';
+import { realtimeBasisLabel } from '@/utils/realtime-status';
 
 const STATUS_BAR_TINT = '#CCE8DB';
 const HERO_BAND = '#1C4738';
 
-const CONGESTION_HEADLINE: Record<CongestionLevel, { title: string; subtitle: string }> = {
-  low: { title: '지금은 여유로운 편이에요', subtitle: '현재 혼잡도가 낮은 상태예요.' },
-  medium: { title: '지금은 무난한 편이에요', subtitle: '현재 혼잡도가 보통 상태예요.' },
-  high: { title: '지금은 붐비는 편이에요', subtitle: '현재 혼잡도가 높은 상태예요.' },
-  veryHigh: { title: '지금은 매우 붐벼요', subtitle: '현재 혼잡도가 매우 높은 상태예요.' },
+const CONGESTION_HEADLINE: Record<CongestionLevel, string> = {
+  low: '지금은 여유로운 편이에요',
+  medium: '지금은 무난한 편이에요',
+  high: '지금은 붐비는 편이에요',
+  veryHigh: '지금은 매우 붐벼요',
 };
 
 const CONGESTION_BAR_RATIO: Record<CongestionLevel, number> = {
@@ -69,18 +71,6 @@ const FORECAST_TONE_TITLE: Record<ForecastTone, string> = {
   usual: '오늘은 평소와 비슷해요',
   quiet: '오늘은 평소보다 한산한 날이에요',
 };
-
-/** 측정 시각 → "15:40". 값이 이상하면 미표시. */
-function measuredAtLabel(measuredAt: string | null): string | null {
-  if (!measuredAt) {
-    return null;
-  }
-  const at = new Date(measuredAt);
-  if (Number.isNaN(at.getTime())) {
-    return null;
-  }
-  return `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
-}
 
 function festivalPeriodLabel(start?: string | null, end?: string | null): string {
   const format = (value?: string | null) => {
@@ -138,6 +128,7 @@ export default function PlaceDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [showCrowdedAlert, setShowCrowdedAlert] = useState(false);
+  const [showReport, setShowReport] = useState(false);
 
   useEffect(() => {
     if (!id || !source) return;
@@ -328,34 +319,48 @@ export default function PlaceDetailScreen() {
 
         <View style={styles.content}>
           <View style={styles.congestionCard}>
-            {congestionStatus === 'loading' && <ActivityIndicator />}
+            {congestionStatus === 'loading' && (
+              <View style={styles.dataStatusRow}>
+                <ActivityIndicator color={Teumta.green} size="small" />
+                <Text style={styles.dataStatusText}>실시간 혼잡도 · 확인 중</Text>
+              </View>
+            )}
 
             {congestionStatus === 'unavailable' && (
-              <Text style={styles.congestionSubtitle}>
-                이 장소는 실시간 혼잡도를 제공하지 않아요.
-              </Text>
+              <View style={styles.dataStatusRow}>
+                <View style={[styles.dataStatusDot, styles.dataStatusDotMuted]} />
+                <Text style={styles.dataStatusText}>실시간 혼잡도 · 미제공</Text>
+              </View>
             )}
 
             {congestionStatus === 'error' && (
-              <Text style={styles.congestionSubtitle}>혼잡도 정보를 불러오지 못했어요.</Text>
+              <View style={styles.dataStatusRow}>
+                <View style={[styles.dataStatusDot, styles.dataStatusDotWarning]} />
+                <Text style={styles.dataStatusText}>실시간 혼잡도 · 확인 불가</Text>
+              </View>
             )}
 
             {congestionStatus === 'idle' && congestion && congestionLevel && palette && headline && (
               <>
                 <View style={styles.congestionHeader}>
                   <View style={styles.congestionTexts}>
-                    <Text style={styles.congestionTitle}>{headline.title}</Text>
-                    <Text style={styles.congestionSubtitle}>{headline.subtitle}</Text>
+                    <Text style={styles.congestionTitle}>{headline}</Text>
+                    <View style={styles.dataBasisRow}>
+                      <View
+                        style={[
+                          styles.dataStatusDot,
+                          !congestion.measuredAt && styles.dataStatusDotMuted,
+                        ]}
+                      />
+                      <Text numberOfLines={1} style={styles.dataBasisText}>
+                        {realtimeBasisLabel(congestion.measuredAt)}
+                      </Text>
+                    </View>
                   </View>
                   <View style={styles.congestionLevelBox}>
                     <Text style={[styles.congestionLevel, { color: palette.text }]}>
                       {REALTIME_LEVEL_LABEL[congestion.level]}
                     </Text>
-                    {measuredAtLabel(congestion.measuredAt) && (
-                      <Text style={styles.measuredAt}>
-                        {measuredAtLabel(congestion.measuredAt)} 기준
-                      </Text>
-                    )}
                   </View>
                 </View>
                 <View style={styles.congestionTrack}>
@@ -419,7 +424,7 @@ export default function PlaceDetailScreen() {
             <>
               <View style={styles.sectionRow}>
                 <Text style={styles.sectionTitle}>언제 가면 덜 붐빌까</Text>
-                <Text style={styles.sectionAction}>앞으로 2주</Text>
+                <Text style={styles.sectionAction}>향후 30일</Text>
               </View>
 
               <View style={styles.forecastCard}>
@@ -427,7 +432,7 @@ export default function PlaceDetailScreen() {
                   {FORECAST_TONE_TITLE[forecastSummary.tone]}
                 </Text>
                 <Text style={styles.forecastSubtitle}>
-                  앞으로 30일 평균과 견주면{' '}
+                  향후 30일 예측의 중간값과 비교하면{' '}
                   {forecastSummary.differenceFromMedian === 0
                     ? '비슷한 수준이에요'
                     : `${Math.abs(forecastSummary.differenceFromMedian)}% ${
@@ -436,7 +441,10 @@ export default function PlaceDetailScreen() {
                   .
                 </Text>
 
-                <View style={styles.forecastChart}>
+                <ScrollView
+                  contentContainerStyle={styles.forecastChart}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}>
                   {forecastSummary.upcoming.map((entry, index) => {
                     const isToday = index === 0;
                     const isQuietest =
@@ -467,7 +475,7 @@ export default function PlaceDetailScreen() {
                       </View>
                     );
                   })}
-                </View>
+                </ScrollView>
 
                 {forecastSummary.quietest && (
                   <View style={styles.forecastHint}>
@@ -592,6 +600,14 @@ export default function PlaceDetailScreen() {
           {(source === 'TOUR' || nearby.length > 0 || festivals.length > 0) && (
             <TourApiAttribution style={styles.attribution} />
           )}
+
+          <Pressable
+            accessibilityRole="button"
+            hitSlop={6}
+            onPress={() => setShowReport(true)}
+            style={styles.reportLink}>
+            <Text style={styles.reportLinkLabel}>정보가 다른가요? 제보하기</Text>
+          </Pressable>
         </View>
       </ScrollView>
 
@@ -610,6 +626,14 @@ export default function PlaceDetailScreen() {
         onRequestClose={() => setShowCrowdedAlert(false)}>
         <Pressable style={styles.alertBackdrop} onPress={() => setShowCrowdedAlert(false)}>
           <Pressable style={styles.alertCard} onPress={() => {}}>
+            <Pressable
+              accessibilityLabel="혼잡 안내 닫기"
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={() => setShowCrowdedAlert(false)}
+              style={({ pressed }) => [styles.alertCloseButton, pressed && styles.buttonPressed]}>
+              <Text style={styles.alertCloseLabel}>×</Text>
+            </Pressable>
             <Text style={styles.alertTitle}>{congestion?.detourPrompt?.title ?? '잠깐!'}</Text>
             <Text style={styles.alertBody}>
               {congestion?.detourPrompt?.body ?? '붐비는 장소예요\n틈타 코스를 이용해보시겠어요?'}
@@ -627,6 +651,18 @@ export default function PlaceDetailScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <ReportModal
+        visible={showReport}
+        onClose={() => setShowReport(false)}
+        kind="place"
+        place={{
+          name: name ?? '이름 확인 불가',
+          source: source === 'TOUR' ? '한국관광공사' : 'TMAP',
+          id,
+          ...(address ? { address } : {}),
+        }}
+      />
     </View>
   );
 }
@@ -715,7 +751,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   congestionTexts: {
-    gap: 2,
+    flex: 1,
+    gap: 3,
+    paddingRight: 10,
   },
   congestionTitle: {
     color: Teumta.textPrimary,
@@ -723,10 +761,40 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 22,
   },
-  congestionSubtitle: {
+  dataBasisRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 5,
+  },
+  dataBasisText: {
+    color: Teumta.textTertiary,
+    flexShrink: 1,
+    fontSize: 10,
+    lineHeight: 14,
+  },
+  dataStatusRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 7,
+    minHeight: 24,
+  },
+  dataStatusDot: {
+    backgroundColor: Teumta.green,
+    borderRadius: 4,
+    height: 7,
+    width: 7,
+  },
+  dataStatusDotMuted: {
+    backgroundColor: Teumta.textTertiary,
+  },
+  dataStatusDotWarning: {
+    backgroundColor: Teumta.congestion.medium.dot,
+  },
+  dataStatusText: {
     color: Teumta.textSecondary,
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 17,
   },
   congestionLevel: {
     fontSize: 26,
@@ -825,11 +893,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: 1,
   },
-  measuredAt: {
-    color: Teumta.textTertiary,
-    fontSize: 10,
-    lineHeight: 13,
-  },
   forecastCard: {
     backgroundColor: Teumta.surface,
     borderColor: Teumta.border,
@@ -858,8 +921,8 @@ const styles = StyleSheet.create({
   },
   forecastBarColumn: {
     alignItems: 'center',
-    flex: 1,
     gap: 4,
+    width: 20,
   },
   forecastBarTrack: {
     height: 64,
@@ -937,6 +1000,18 @@ const styles = StyleSheet.create({
   attribution: {
     marginTop: 4,
   },
+  reportLink: {
+    alignItems: 'center',
+    paddingBottom: 8,
+    paddingVertical: 10,
+  },
+  reportLinkLabel: {
+    color: Teumta.textSecondary,
+    fontSize: 11,
+    fontWeight: '600',
+    lineHeight: 15,
+    textDecorationLine: 'underline',
+  },
   footer: {
     backgroundColor: Teumta.surface,
     paddingHorizontal: 20,
@@ -965,8 +1040,30 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     gap: 10,
     maxWidth: 320,
-    padding: 24,
+    paddingBottom: 24,
+    paddingHorizontal: 24,
+    paddingTop: 46,
     width: '100%',
+  },
+  alertCloseButton: {
+    alignItems: 'center',
+    backgroundColor: Teumta.imagePlaceholder,
+    borderRadius: 20,
+    height: 40,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: 10,
+    top: 10,
+    width: 40,
+  },
+  alertCloseLabel: {
+    color: Teumta.textSecondary,
+    fontSize: 27,
+    fontWeight: '400',
+    lineHeight: 30,
+  },
+  buttonPressed: {
+    opacity: 0.6,
   },
   alertTitle: {
     color: Teumta.congestion.veryHigh.text,

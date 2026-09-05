@@ -1,5 +1,9 @@
 import { apiClient } from './client';
-import type { CourseGenerationResult, DestinationIdentifier } from '@/types/course';
+import type {
+  CourseAlternativesResult,
+  CourseGenerationResult,
+  DestinationIdentifier,
+} from '@/types/course';
 
 /**
  * GET /api/courses — 목적지 주변에서 가용 시간에 맞는 우회 코스를 실시간 생성한다.
@@ -15,5 +19,29 @@ export async function fetchCourses(
   const response = await apiClient.get<{ data: CourseGenerationResult }>('/courses', {
     params: { ...identifier, availableMinutes, variant },
   });
+  return response.data.data;
+}
+
+/**
+ * 도착한 정류지의 공개 좌표를 기준으로 대체 장소 → 원 목적지 복귀 코스를 계산한다.
+ * 사용자 현재 위치는 보내지 않는다.
+ */
+export async function fetchCourseAlternatives(input: {
+  originContentId: string;
+  destination: DestinationIdentifier;
+  availableMinutes: number;
+  excludeContentIds: string[];
+}): Promise<CourseAlternativesResult> {
+  const response = await apiClient.get<{ data: CourseAlternativesResult }>(
+    '/course-alternatives',
+    {
+      params: {
+        originContentId: input.originContentId,
+        ...input.destination,
+        availableMinutes: input.availableMinutes,
+        excludeContentIds: input.excludeContentIds.join(','),
+      },
+    },
+  );
   return response.data.data;
 }

@@ -13,6 +13,8 @@ type CourseMapViewProps = {
   routePath?: Coordinate[];
   /** 지도에 내 위치(파란 점)를 표시. 위치 권한이 허용된 화면에서만 켠다. */
   showsUserLocation?: boolean;
+  /** 건너뛴 정류지의 0-based 인덱스. 경로 기록은 남기되 마커를 비활성 상태로 표시한다. */
+  skippedStopIndexes?: number[];
 };
 
 const MARKER_ANCHOR = { x: 0.5, y: 0.5 };
@@ -26,7 +28,12 @@ function sameCoordinate(first: Coordinate, second: Coordinate): boolean {
   return first.latitude === second.latitude && first.longitude === second.longitude;
 }
 
-export function CourseMapView({ detour, routePath, showsUserLocation }: CourseMapViewProps) {
+export function CourseMapView({
+  detour,
+  routePath,
+  showsUserLocation,
+  skippedStopIndexes = [],
+}: CourseMapViewProps) {
   const coordinates = detour?.coordinates ?? [];
   // 실경로가 있으면 선은 그걸로 긋고, 화면 범위도 경로가 지점 바깥으로 볼록한 만큼 포함한다.
   const lineCoordinates = routePath && routePath.length > 1 ? routePath : coordinates;
@@ -53,6 +60,7 @@ export function CourseMapView({ detour, routePath, showsUserLocation }: CourseMa
       <MapView style={styles.map} initialRegion={region} showsUserLocation={showsUserLocation}>
         {markerCoordinates.map((coordinate, index) => {
           const isDestination = index === 0;
+          const isSkipped = !isDestination && skippedStopIndexes.includes(index - 1);
           const title = detour?.stops?.[index];
           return (
             <Marker
@@ -72,10 +80,16 @@ export function CourseMapView({ detour, routePath, showsUserLocation }: CourseMa
               <View
                 style={[
                   styles.marker,
-                  isDestination ? styles.markerDestination : styles.markerStop,
+                  isDestination
+                    ? styles.markerDestination
+                    : isSkipped
+                      ? styles.markerSkipped
+                      : styles.markerStop,
                 ]}>
-                {/* 정류지는 방문 순서를 숫자로 표시한다 — 색만으로는 구분이 안 된다. */}
-                {!isDestination && <Text style={styles.markerLabel}>{index}</Text>}
+                  {/* 정류지는 방문 순서를 숫자로 표시한다 — 색만으로는 구분이 안 된다. */}
+                {!isDestination && (
+                  <Text style={styles.markerLabel}>{isSkipped ? '–' : index}</Text>
+                )}
               </View>
             </Marker>
           );
@@ -132,6 +146,9 @@ const styles = StyleSheet.create({
   },
   markerStop: {
     backgroundColor: Teumta.greenDark,
+  },
+  markerSkipped: {
+    backgroundColor: Teumta.textTertiary,
   },
   markerLabel: {
     color: Teumta.surface,

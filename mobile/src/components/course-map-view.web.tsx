@@ -7,9 +7,10 @@ type CourseMapViewProps = {
   /** 네이티브 전용 옵션 — 웹 폴백에서는 사용하지 않는다. */
   routePath?: Coordinate[];
   showsUserLocation?: boolean;
+  skippedStopIndexes?: number[];
 };
 
-export function CourseMapView({ detour }: CourseMapViewProps) {
+export function CourseMapView({ detour, skippedStopIndexes = [] }: CourseMapViewProps) {
   const coordinates = detour?.coordinates ?? [];
 
   return (
@@ -19,6 +20,7 @@ export function CourseMapView({ detour }: CourseMapViewProps) {
       {coordinates.map((coordinate, index) => (
         <Text key={`${coordinate.latitude}-${coordinate.longitude}`} style={styles.coordinate}>
           {index + 1}. {coordinate.latitude}, {coordinate.longitude}
+          {index > 0 && skippedStopIndexes.includes(index - 1) ? ' · 건너뜀' : ''}
         </Text>
       ))}
     </View>
