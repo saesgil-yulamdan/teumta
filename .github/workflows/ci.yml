@@ -12,6 +12,9 @@ concurrency:
 jobs:
   server:
     runs-on: ubuntu-latest
+    env:
+      # Prisma 6 config는 generate 단계에도 DATABASE_URL을 요구한다. CI에서는 연결하지 않는 더미 URL을 쓴다.
+      DATABASE_URL: mysql://teumta:ci@localhost:3306/teumta
     defaults:
       run:
         working-directory: server
