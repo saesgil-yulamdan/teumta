@@ -11,6 +11,7 @@
     "ingest:prediction": "tsx scripts/ingest-prediction.ts",
     "ingest:tour": "tsx scripts/ingest-tour.ts",
     "measure:congestion": "tsx scripts/measure-featured-congestion.ts",
+    "smoke:live": "node scripts/smoke-live.mjs",
     "postinstall": "if [ -f prisma/schema.prisma ]; then prisma generate; fi",
     "start": "node dist/server.js",
     "start:deploy": "prisma migrate deploy && node dist/server.js",

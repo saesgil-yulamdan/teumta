@@ -1,12 +1,12 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { fetchCourses } from '@/api/courses';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
-import { Teumta } from '@/constants/theme';
+import { TeumtaHybrid } from '@/constants/theme';
 import { useCourseLog } from '@/hooks/use-course-log';
 import { setSelectedCourse } from '@/stores/selected-course';
 import {
@@ -18,12 +18,10 @@ import {
 } from '@/types/course';
 import { courseCompositionLabel, courseTitle, formatKilometers } from '@/utils/course-labels';
 import { createRequestGuard } from '@/utils/request-guard';
-import { withRoJosa } from '@/utils/text';
 import { timeLabelAfter } from '@/utils/time';
 
 /** 서버 지원 가용 시간 선택지(api-spec 3.10). */
 const DURATION_OPTIONS = [30, 60, 90] as const;
-const HEADER_TINTS = ['#A8D6C2', '#D6C7AB'];
 
 type Status = 'loading' | 'idle' | 'error';
 
@@ -37,8 +35,7 @@ type DetoursParams = {
 type RouteCardProps = {
   course: GeneratedCourse;
   destination: CourseDestination;
-  headerTint: string;
-  badgeLabel: string;
+  routeIndex: number;
   selected: boolean;
   onSelect: () => void;
 };
@@ -46,8 +43,7 @@ type RouteCardProps = {
 function RouteCard({
   course,
   destination,
-  headerTint,
-  badgeLabel,
+  routeIndex,
   selected,
   onSelect,
 }: RouteCardProps) {
@@ -62,26 +58,23 @@ function RouteCard({
 
   return (
     <Pressable
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
       onPress={onSelect}
       style={[styles.card, selected ? styles.cardSelected : styles.cardAlternative]}>
-      <View
-        style={[
-          styles.cardHeader,
-          { backgroundColor: headerTint },
-          selected ? styles.cardHeaderSelected : styles.cardHeaderAlternative,
-        ]}>
-        <View style={styles.badge}>
-          <Text style={styles.badgeLabel}>{badgeLabel}</Text>
+      <View style={styles.cardHeader}>
+        <View style={[styles.routeCode, selected && styles.routeCodeSelected]}>
+          <Text style={[styles.routeCodeLabel, selected && styles.routeCodeLabelSelected]}>
+            R{routeIndex + 1}
+          </Text>
         </View>
-        {selected ? (
-          <View style={styles.summaryPill}>
-            <Text style={styles.summaryText}>
-              약 {course.totalMinutes}분 · 도보 {distanceLabel} · {withRoJosa(destination.name)} 복귀
-            </Text>
-          </View>
-        ) : (
-          <Text style={styles.headerDuration}>약 {course.totalMinutes}분 코스</Text>
-        )}
+        <View style={styles.routeHeaderTexts}>
+          <Text style={styles.routeKind}>{selected ? '추천 경로' : '대안 경로'}</Text>
+          <Text style={styles.headerDuration}>
+            {course.totalMinutes} MIN · {distanceLabel}
+          </Text>
+        </View>
+        <View style={selected ? styles.radioOn : styles.radioOff} />
       </View>
 
       <View style={[styles.cardBody, selected ? styles.cardBodySelected : styles.cardBodyAlternative]}>
@@ -98,13 +91,13 @@ function RouteCard({
               {courseCompositionLabel(course)}
             </Text>
           </View>
-          <View style={selected ? styles.radioOn : styles.radioOff} />
         </View>
 
         {recommendationTags.length > 0 && (
           <View style={styles.reasonRow}>
-            {recommendationTags.map((tag) => (
+            {recommendationTags.map((tag, index) => (
               <View key={tag} style={styles.reasonChip}>
+                {index > 0 && <Text style={styles.reasonDivider}>/</Text>}
                 <Text style={styles.reasonChipLabel}>{tag}</Text>
               </View>
             ))}
@@ -113,18 +106,26 @@ function RouteCard({
 
         <View style={styles.stopsRow}>
           {stopNames.map((stop, index) => (
-            <Fragment key={`${stop}-${index}`}>
-              {index > 0 && <Text style={styles.stopArrow}>→</Text>}
+            <View key={`${stop}-${index}`} style={styles.stopRow}>
+              <View style={styles.stopCode}>
+                <Text style={styles.stopCodeLabel}>
+                  {index === stopNames.length - 1 ? 'D' : String(index + 1).padStart(2, '0')}
+                </Text>
+              </View>
               <Text style={styles.stopName}>{stop}</Text>
-            </Fragment>
+            </View>
           ))}
         </View>
 
         <View style={styles.statsRow}>
-          {stats.map((stat) => (
+          {stats.map((stat, index) => (
             <View
               key={stat.label}
-              style={[styles.statTile, selected ? styles.statTileSelected : styles.statTileAlternative]}>
+              style={[
+                styles.statTile,
+                index === stats.length - 1 && styles.statTileLast,
+                selected ? styles.statTileSelected : styles.statTileAlternative,
+              ]}>
               <Text style={selected ? styles.statValue : styles.statValueAlternative}>
                 {stat.value}
               </Text>
@@ -238,7 +239,7 @@ export default function DetoursScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={{ height: insets.top, backgroundColor: Teumta.surface }} />
+      <View style={{ height: insets.top, backgroundColor: TeumtaHybrid.canvas }} />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
@@ -252,34 +253,40 @@ export default function DetoursScreen() {
             />
           </Pressable>
           <View style={styles.headerTexts}>
+            <Text style={styles.headerEyebrow}>시간 맞춤 보행 안내</Text>
             <Text style={styles.headerTitle}>틈타 코스</Text>
             <Text style={styles.headerSubtitle}>
-              {destinationName} 주변에서 남는 시간에 맞춰 골라보세요.
+              {destinationName} 복귀 경로
             </Text>
           </View>
         </View>
 
-        <View style={styles.chipRow}>
-          {DURATION_OPTIONS.map((minutes) => {
-            const chipSelected = minutes === availableMinutes;
-            return (
-              <Pressable
-                key={minutes}
-                onPress={() => handleChangeMinutes(minutes)}
-                disabled={status === 'loading'}
-                style={[styles.chip, chipSelected && styles.chipSelected]}>
-                <Text style={[styles.chipLabel, chipSelected && styles.chipLabelSelected]}>
-                  {minutes}분
-                </Text>
-              </Pressable>
-            );
-          })}
+        <View style={styles.durationBlock}>
+          <Text style={styles.durationLabel}>가용 시간</Text>
+          <View style={styles.chipRow}>
+            {DURATION_OPTIONS.map((minutes) => {
+              const chipSelected = minutes === availableMinutes;
+              return (
+                <Pressable
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: chipSelected, disabled: status === 'loading' }}
+                  key={minutes}
+                  onPress={() => handleChangeMinutes(minutes)}
+                  disabled={status === 'loading'}
+                  style={[styles.chip, chipSelected && styles.chipSelected]}>
+                  <Text style={[styles.chipLabel, chipSelected && styles.chipLabelSelected]}>
+                    {minutes}분
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
 
         {status === 'loading' && (
           <View style={styles.stateBox}>
             <ActivityIndicator />
-            <Text style={styles.stateText}>걷는 시간을 계산하고 있어요…</Text>
+            <Text style={styles.stateText}>경로 계산 중…</Text>
           </View>
         )}
 
@@ -287,8 +294,8 @@ export default function DetoursScreen() {
           <View style={styles.stateBox}>
             <Text style={styles.stateText}>
               {identifier
-                ? '코스를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'
-                : '목적지 정보가 없어 코스를 만들 수 없어요.'}
+                ? '코스를 불러오지 못했어요.'
+                : '목적지 정보가 없어요.'}
             </Text>
             {identifier && (
               <Pressable style={styles.retryButton} onPress={() => void load()}>
@@ -301,7 +308,7 @@ export default function DetoursScreen() {
         {status === 'idle' && courses.length === 0 && (
           <View style={styles.stateBox}>
             <Text style={styles.stateText}>
-              {availableMinutes}분 안에 다녀올 수 있는 코스가 없어요. 더 긴 시간을 골라보세요.
+              {availableMinutes}분 코스가 없어요. 시간을 늘려보세요.
             </Text>
           </View>
         )}
@@ -313,8 +320,7 @@ export default function DetoursScreen() {
               key={`${index}-${courseTitle(course)}`}
               course={course}
               destination={destination}
-              headerTint={HEADER_TINTS[index % HEADER_TINTS.length]}
-              badgeLabel={index === 0 ? '가장 알맞아요' : '조금 더 여유롭게'}
+              routeIndex={index}
               selected={index === selectedIndex}
               onSelect={() => setSelectedIndex(index)}
             />
@@ -325,8 +331,7 @@ export default function DetoursScreen() {
             <View style={styles.infoBox}>
               <Text style={styles.infoTitle}>추천 기준</Text>
               <Text style={styles.infoBody}>
-                걷는 시간은 실제 보행 경로로 계산했어요. 체류시간은 장소 유형을 기준으로 한 예상값이라
-                실제와 다를 수 있어요.
+                실제 보행 경로와 권장 체류시간을 반영합니다.
               </Text>
             </View>
 
@@ -337,7 +342,7 @@ export default function DetoursScreen() {
             </Pressable>
 
             <Pressable style={styles.ctaButton} onPress={handleStart}>
-              <Text style={styles.ctaLabel}>선택한 코스 자세히 보기</Text>
+              <Text style={styles.ctaLabel}>코스 상세 보기</Text>
             </Pressable>
           </>
         )}
@@ -348,17 +353,17 @@ export default function DetoursScreen() {
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: Teumta.background,
+    backgroundColor: TeumtaHybrid.canvas,
     flex: 1,
   },
   scroll: {
     flex: 1,
   },
   content: {
-    gap: 12,
-    paddingBottom: 12,
+    gap: 16,
+    paddingBottom: 24,
     paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingTop: 16,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -367,295 +372,343 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   emptyText: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.muted,
     fontSize: 16,
   },
   headerRow: {
     alignItems: 'center',
+    backgroundColor: TeumtaHybrid.slateSoft,
+    borderColor: TeumtaHybrid.line,
+    borderRadius: TeumtaHybrid.radius.medium,
+    borderWidth: 1,
     flexDirection: 'row',
-    gap: 10,
+    gap: 14,
+    padding: 16,
   },
   backButton: {
     alignItems: 'center',
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 13,
-    borderWidth: 1,
-    height: 38,
+    backgroundColor: TeumtaHybrid.paper,
+    borderRadius: TeumtaHybrid.radius.small,
+    height: 40,
     justifyContent: 'center',
-    width: 38,
+    width: 40,
   },
   backIcon: {
     height: 19,
     width: 19,
   },
   headerTexts: {
-    gap: 1,
+    flex: 1,
+    gap: 2,
+  },
+  headerEyebrow: {
+    color: TeumtaHybrid.terracotta,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    lineHeight: 14,
   },
   headerTitle: {
-    color: Teumta.textPrimary,
-    fontSize: 20,
+    color: TeumtaHybrid.ink,
+    fontSize: 25,
     fontWeight: '900',
-    lineHeight: 28,
+    lineHeight: 31,
   },
   headerSubtitle: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.muted,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  durationBlock: {
+    gap: 8,
+  },
+  durationLabel: {
+    color: TeumtaHybrid.muted,
     fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
     lineHeight: 15,
   },
   chipRow: {
     flexDirection: 'row',
-    gap: 7,
   },
   chip: {
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 999,
+    alignItems: 'center',
+    backgroundColor: TeumtaHybrid.paper,
+    borderColor: TeumtaHybrid.line,
     borderWidth: 1,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 42,
   },
   chipSelected: {
-    backgroundColor: Teumta.greenLight,
-    borderColor: Teumta.green,
+    backgroundColor: TeumtaHybrid.signalSoft,
+    borderColor: TeumtaHybrid.signal,
   },
   chipLabel: {
-    color: Teumta.textSecondary,
-    fontSize: 10,
-    fontWeight: '700',
-    lineHeight: 14,
+    color: TeumtaHybrid.navy,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
   },
   chipLabelSelected: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.navy,
   },
   card: {
-    backgroundColor: Teumta.surface,
+    backgroundColor: TeumtaHybrid.paper,
+    borderColor: TeumtaHybrid.line,
+    borderRadius: TeumtaHybrid.radius.small,
     overflow: 'hidden',
   },
   cardSelected: {
-    borderColor: Teumta.green,
-    borderRadius: 20,
+    borderColor: TeumtaHybrid.slate,
     borderWidth: 2,
   },
   cardAlternative: {
-    borderColor: Teumta.border,
-    borderRadius: 18,
     borderWidth: 1,
   },
   cardHeader: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  cardHeaderSelected: {
-    height: 104,
-    justifyContent: 'space-between',
-  },
-  cardHeaderAlternative: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    height: 70,
-    justifyContent: 'space-between',
-  },
-  badge: {
-    alignSelf: 'flex-start',
-    backgroundColor: Teumta.surface,
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-  },
-  badgeLabel: {
-    color: Teumta.greenDark,
-    fontSize: 10,
-    fontWeight: '700',
-    lineHeight: 14,
-  },
-  summaryPill: {
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: Teumta.greenLight,
-    borderRadius: 12,
-    height: 45,
-    justifyContent: 'center',
-    paddingHorizontal: 12,
+    borderBottomColor: TeumtaHybrid.line,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    minHeight: 64,
   },
-  summaryText: {
-    color: Teumta.greenDark,
-    fontSize: 11,
-    fontWeight: '700',
+  routeCode: {
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    backgroundColor: TeumtaHybrid.slateSoft,
+    justifyContent: 'center',
+    width: 58,
+  },
+  routeCodeSelected: {
+    backgroundColor: TeumtaHybrid.signalSoft,
+  },
+  routeCodeLabel: {
+    color: TeumtaHybrid.navy,
+    fontSize: 20,
+    fontWeight: '900',
+    letterSpacing: -0.5,
+  },
+  routeCodeLabelSelected: {
+    color: TeumtaHybrid.navy,
+  },
+  routeHeaderTexts: {
+    flex: 1,
+    gap: 2,
+    paddingHorizontal: 13,
+  },
+  routeKind: {
+    color: TeumtaHybrid.muted,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.9,
+    lineHeight: 14,
   },
   headerDuration: {
-    color: Teumta.surface,
-    fontSize: 10,
-    fontWeight: '700',
-    lineHeight: 14,
+    color: TeumtaHybrid.navy,
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 18,
   },
   cardBody: {
-    backgroundColor: Teumta.surface,
-    paddingHorizontal: 14,
+    backgroundColor: TeumtaHybrid.paper,
+    paddingHorizontal: 16,
   },
   cardBodySelected: {
-    gap: 8,
-    paddingVertical: 12,
+    gap: 14,
+    paddingVertical: 16,
   },
   cardBodyAlternative: {
-    gap: 7,
-    paddingVertical: 10,
+    gap: 12,
+    paddingVertical: 14,
   },
   cardTitleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   cardTexts: {
-    gap: 2,
+    flex: 1,
+    gap: 3,
   },
   cardTextsAlternative: {
-    gap: 1,
+    flex: 1,
+    gap: 3,
   },
   cardName: {
-    color: Teumta.textPrimary,
-    fontSize: 15,
-    fontWeight: '700',
-    lineHeight: 21,
+    color: TeumtaHybrid.ink,
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 24,
   },
   cardNameAlternative: {
-    color: Teumta.textPrimary,
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 20,
+    color: TeumtaHybrid.ink,
+    fontSize: 17,
+    fontWeight: '800',
+    lineHeight: 23,
   },
   cardDescription: {
-    color: Teumta.textSecondary,
-    fontSize: 10,
-    lineHeight: 14,
+    color: TeumtaHybrid.muted,
+    fontSize: 12,
+    lineHeight: 17,
   },
   cardDescriptionAlternative: {
-    color: Teumta.textSecondary,
-    fontSize: 10,
-    lineHeight: 14,
+    color: TeumtaHybrid.muted,
+    fontSize: 12,
+    lineHeight: 17,
   },
   reasonRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 5,
+    gap: 7,
   },
   reasonChip: {
-    backgroundColor: Teumta.greenLight,
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  reasonChipLabel: {
-    color: Teumta.greenDark,
-    fontSize: 9,
-    fontWeight: '700',
-    lineHeight: 12,
-  },
-  radioOn: {
-    backgroundColor: Teumta.green,
-    borderColor: Teumta.surface,
-    borderRadius: 9,
-    borderWidth: 4,
-    height: 18,
-    width: 18,
-  },
-  radioOff: {
-    borderColor: Teumta.border,
-    borderRadius: 9,
-    borderWidth: 2,
-    height: 18,
-    width: 18,
-  },
-  stopsRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 5,
+    gap: 7,
   },
-  stopName: {
-    color: Teumta.textSecondary,
-    fontSize: 10,
-    fontWeight: '500',
-    lineHeight: 14,
-  },
-  stopArrow: {
-    color: Teumta.textTertiary,
-    fontSize: 10,
-    fontWeight: '500',
-    lineHeight: 14,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  statTile: {
-    backgroundColor: Teumta.greenLight,
-    borderRadius: 10,
-    flex: 1,
-    gap: 1,
-    paddingHorizontal: 8,
-  },
-  statTileSelected: {
-    paddingVertical: 7,
-  },
-  statTileAlternative: {
-    paddingVertical: 6,
-  },
-  statValue: {
-    color: Teumta.greenDark,
+  reasonChipLabel: {
+    color: TeumtaHybrid.slate,
     fontSize: 11,
     fontWeight: '700',
     lineHeight: 15,
   },
-  statValueAlternative: {
-    color: Teumta.greenDark,
-    fontSize: 10,
-    fontWeight: '700',
-    lineHeight: 14,
+  reasonDivider: {
+    color: TeumtaHybrid.line,
+    fontSize: 11,
   },
-  statLabel: {
-    color: Teumta.textSecondary,
-    fontSize: 10,
-    lineHeight: 13,
+  radioOn: {
+    backgroundColor: TeumtaHybrid.slate,
+    borderColor: TeumtaHybrid.signalSoft,
+    borderWidth: 5,
+    height: 20,
+    marginRight: 14,
+    width: 20,
   },
-  statLabelAlternative: {
-    color: Teumta.textSecondary,
-    fontSize: 9,
-    lineHeight: 12,
+  radioOff: {
+    borderColor: TeumtaHybrid.slate,
+    borderWidth: 1,
+    height: 20,
+    marginRight: 14,
+    width: 20,
   },
-  infoBox: {
-    backgroundColor: Teumta.greenLight,
-    borderRadius: 14,
-    gap: 4,
-    paddingHorizontal: 14,
+  stopsRow: {
+    borderBottomColor: TeumtaHybrid.line,
+    borderTopColor: TeumtaHybrid.line,
+    borderTopWidth: 1,
+  },
+  stopRow: {
+    alignItems: 'center',
+    borderBottomColor: TeumtaHybrid.line,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    minHeight: 38,
+  },
+  stopCode: {
+    alignItems: 'center',
+    borderRightColor: TeumtaHybrid.line,
+    borderRightWidth: 1,
+    justifyContent: 'center',
+    width: 40,
+  },
+  stopCodeLabel: {
+    color: TeumtaHybrid.terracotta,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.7,
+  },
+  stopName: {
+    color: TeumtaHybrid.ink,
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 17,
+    paddingHorizontal: 11,
+  },
+  statsRow: {
+    borderBottomColor: TeumtaHybrid.line,
+    borderBottomWidth: 1,
+    borderTopColor: TeumtaHybrid.line,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+  },
+  statTile: {
+    borderRightColor: TeumtaHybrid.line,
+    borderRightWidth: 1,
+    flex: 1,
+    gap: 2,
+    paddingHorizontal: 10,
+  },
+  statTileLast: {
+    borderRightWidth: 0,
+  },
+  statTileSelected: {
     paddingVertical: 10,
   },
-  infoTitle: {
-    color: Teumta.greenDark,
+  statTileAlternative: {
+    paddingVertical: 9,
+  },
+  statValue: {
+    color: TeumtaHybrid.slate,
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 18,
+  },
+  statValueAlternative: {
+    color: TeumtaHybrid.slate,
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 17,
+  },
+  statLabel: {
+    color: TeumtaHybrid.muted,
     fontSize: 10,
-    fontWeight: '700',
+    lineHeight: 14,
+  },
+  statLabelAlternative: {
+    color: TeumtaHybrid.muted,
+    fontSize: 10,
+    lineHeight: 14,
+  },
+  infoBox: {
+    borderLeftColor: TeumtaHybrid.signal,
+    borderLeftWidth: 5,
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  infoTitle: {
+    color: TeumtaHybrid.navy,
+    fontSize: 11,
+    fontWeight: '900',
   },
   infoBody: {
-    color: Teumta.textSecondary,
-    fontSize: 10,
+    color: TeumtaHybrid.muted,
+    fontSize: 11,
+    lineHeight: 16,
   },
   stateBox: {
     alignItems: 'center',
+    borderColor: TeumtaHybrid.line,
+    borderWidth: 1,
     gap: 8,
-    paddingVertical: 24,
+    paddingHorizontal: 18,
+    paddingVertical: 28,
   },
   stateText: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.muted,
     fontSize: 12,
+    lineHeight: 18,
     textAlign: 'center',
   },
   retryButton: {
-    backgroundColor: Teumta.greenLight,
-    borderRadius: 999,
+    backgroundColor: TeumtaHybrid.navy,
+    borderRadius: TeumtaHybrid.radius.small,
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
   retryLabel: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.white,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -664,30 +717,30 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 16,
+    backgroundColor: TeumtaHybrid.paper,
+    borderColor: TeumtaHybrid.navy,
+    borderRadius: TeumtaHybrid.radius.small,
     borderWidth: 1,
     height: 46,
     justifyContent: 'center',
   },
   secondaryButtonLabel: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.navy,
     fontSize: 13,
     fontWeight: '700',
     lineHeight: 18,
   },
   ctaButton: {
     alignItems: 'center',
-    backgroundColor: Teumta.green,
-    borderRadius: 16,
-    height: 50,
+    backgroundColor: TeumtaHybrid.navy,
+    borderRadius: TeumtaHybrid.radius.small,
+    height: 52,
     justifyContent: 'center',
   },
   ctaLabel: {
-    color: Teumta.surface,
-    fontSize: 13,
-    fontWeight: '700',
+    color: TeumtaHybrid.white,
+    fontSize: 14,
+    fontWeight: '800',
     lineHeight: 18,
   },
 });

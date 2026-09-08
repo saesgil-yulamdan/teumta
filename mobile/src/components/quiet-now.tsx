@@ -6,7 +6,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { getRealtimeCongestion } from '@/api/places';
 import { REALTIME_LEVEL_LABEL, REALTIME_LEVEL_TO_CONGESTION_LEVEL } from '@/constants/congestion';
 import { FEATURED_DESTINATIONS, type FeaturedDestination } from '@/constants/destinations';
-import { Teumta } from '@/constants/theme';
+import { TeumtaHybrid, TeumtaHybridCongestion } from '@/constants/theme';
 import type { RealtimeCongestion } from '@/types/place';
 
 /**
@@ -114,7 +114,7 @@ export function QuietNow({ refreshSignal = 0, onRefreshed }: QuietNowProps) {
   return (
     <View style={styles.section}>
       <View style={styles.sectionRow}>
-        <Text style={styles.sectionTitle}>지금 어디가 여유로울까</Text>
+        <Text style={styles.sectionTitle}>지금 여유로운 곳</Text>
         <View style={styles.liveBadge}>
           <View style={styles.liveDot} />
           <Text style={styles.liveLabel}>실시간</Text>
@@ -131,7 +131,8 @@ export function QuietNow({ refreshSignal = 0, onRefreshed }: QuietNowProps) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.rail}>
           {entries.map(({ destination, congestion }) => {
-            const palette = Teumta.congestion[REALTIME_LEVEL_TO_CONGESTION_LEVEL[congestion.level]];
+            const palette =
+              TeumtaHybridCongestion[REALTIME_LEVEL_TO_CONGESTION_LEVEL[congestion.level]];
             return (
               <Link
                 key={destination.tourApiContentId}
@@ -210,36 +211,34 @@ function stableModulo(value: string, modulo: number): number {
 
 const styles = StyleSheet.create({
   section: {
-    gap: 8,
+    gap: 10,
   },
   sectionRow: {
     alignItems: 'center',
+    borderTopColor: TeumtaHybrid.ink,
+    borderTopWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingTop: 12,
   },
   sectionTitle: {
-    color: Teumta.textPrimary,
-    fontSize: 15,
-    fontWeight: '700',
-    lineHeight: 21,
+    color: TeumtaHybrid.ink,
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 24,
   },
   liveBadge: {
     alignItems: 'center',
-    backgroundColor: Teumta.greenLight,
-    borderRadius: 999,
     flexDirection: 'row',
     gap: 5,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
   },
   liveDot: {
-    backgroundColor: Teumta.green,
-    borderRadius: 3,
+    backgroundColor: TeumtaHybrid.terracotta,
     height: 6,
     width: 6,
   },
   liveLabel: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.muted,
     fontSize: 10,
     fontWeight: '700',
     lineHeight: 14,
@@ -255,16 +254,16 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   card: {
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 16,
-    borderWidth: 1,
+    backgroundColor: TeumtaHybrid.paper,
+    borderBottomColor: TeumtaHybrid.line,
+    borderBottomWidth: 1,
     overflow: 'hidden',
-    width: 148,
+    width: 156,
   },
   cardImage: {
-    backgroundColor: Teumta.imagePlaceholder,
-    height: 64,
+    backgroundColor: TeumtaHybrid.canvas,
+    borderRadius: TeumtaHybrid.radius.small,
+    height: 82,
   },
   cardBody: {
     gap: 3,
@@ -272,20 +271,20 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   cardName: {
-    color: Teumta.textPrimary,
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 17,
+    color: TeumtaHybrid.ink,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
   },
   cardMeta: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.muted,
     fontSize: 10,
     lineHeight: 14,
   },
   levelChip: {
     alignItems: 'center',
     alignSelf: 'flex-start',
-    borderRadius: 999,
+    borderRadius: TeumtaHybrid.radius.small,
     flexDirection: 'row',
     gap: 4,
     marginTop: 2,

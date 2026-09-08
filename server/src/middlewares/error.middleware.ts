@@ -24,8 +24,11 @@ export function resolveErrorResponse(error: unknown): ResolvedError {
     return { status: statusForExternalError(error), code: error.code, message: error.message };
   }
 
-  const message = error instanceof Error ? error.message : 'Unexpected server error';
-  return { status: 500, code: 'INTERNAL_ERROR', message };
+  return {
+    status: 500,
+    code: 'INTERNAL_ERROR',
+    message: '서버 내부 오류가 발생했습니다.',
+  };
 }
 
 function statusForExternalError(error: ExternalApiError): number {
@@ -54,7 +57,9 @@ function statusForExternalError(error: ExternalApiError): number {
 export const errorMiddleware: ErrorRequestHandler = (error, _req, res, _next) => {
   const { status, code, message } = resolveErrorResponse(error);
 
-  console.error(`Request failed [${code}]:`, message);
+  // 클라이언트에는 고정 문구만 보내되 서버 로그에는 원인 추적 정보를 남긴다.
+  const logMessage = error instanceof Error ? error.message : String(error);
+  console.error(`Request failed [${code}]:`, logMessage);
 
   res.status(status).json({
     success: false,

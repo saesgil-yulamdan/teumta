@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 
-import { Teumta } from '@/constants/theme';
+import { Teumta, TeumtaHybrid } from '@/constants/theme';
 import type { Coordinate, DetourCourse } from '@/types/place';
 
 type CourseMapViewProps = {
@@ -18,9 +18,9 @@ type CourseMapViewProps = {
 };
 
 const MARKER_ANCHOR = { x: 0.5, y: 0.5 };
-const DESTINATION_COLOR = '#FF9175';
-/** 이동 경로 전용 색 — 장소 마커(목적지 주황·정류지 초록)와 겹치지 않게 파랑으로 분리. */
-const ROUTE_LINE_COLOR = '#2F6FED';
+const DESTINATION_COLOR = TeumtaHybrid.terracotta;
+/** 저채도 청회색 경로 — 목적지 적갈색과 구분하되 지도 위에서 과하게 튀지 않는다. */
+const ROUTE_LINE_COLOR = TeumtaHybrid.slate;
 /** 파선 14px, 간격 9px — 마커(지름 26px)보다 확실히 길어 "점"이 아니라 "선"으로 읽힌다. */
 const ROUTE_DASH_PATTERN = [14, 9];
 
@@ -94,10 +94,10 @@ export function CourseMapView({
             </Marker>
           );
         })}
-        {/* 경로는 흰 밑선 위에 파랑 파선을 겹쳐 그린다.
+        {/* 경로는 흰 밑선 위에 청회색 파선을 겹쳐 그린다.
             둥근 점(lineDashPattern=[0, 12])으로 그리던 때는 점 하나하나가 작은 원이라
-            장소 마커(목적지 주황·정류지 초록)와 헷갈렸다. 경로 색을 마커와 겹치지 않는
-            파랑으로 분리해 "이 선이 이동 경로"라는 게 한눈에 읽히게 한다.
+            장소 마커와 헷갈렸다. 경로 색을 마커와 겹치지 않는 청회색으로 분리해
+            "이 선이 이동 경로"라는 게 한눈에 읽히게 한다.
             밑선은 파선 사이가 끊겨 보이지 않게 경로를 이어주고, 지도 배경과도 대비를 만든다. */}
         <Polyline
           coordinates={lineCoordinates}
@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
     backgroundColor: DESTINATION_COLOR,
   },
   markerStop: {
-    backgroundColor: Teumta.greenDark,
+    backgroundColor: TeumtaHybrid.navy,
   },
   markerSkipped: {
     backgroundColor: Teumta.textTertiary,

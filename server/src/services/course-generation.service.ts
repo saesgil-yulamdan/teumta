@@ -607,9 +607,10 @@ export async function generateCourses(
   const planned = planCourses(measured, params.availableMinutes, { diversitySeed });
   const verified = await Promise.all(planned.slice(0, MAX_VERIFICATION_PLANS).map(verifyPlan));
 
-  // 실측 후 초과한 코스 제외 — 약속한 시간 안에 복귀 불가
+  // 전 구간 실측 완료 + 실측 후 제한시간 이내인 코스만 추천한다.
+  // 추정 구간을 조용히 노출하면 사용자가 약속한 시간 안에 복귀하지 못할 수 있다.
   const courses = rankCourses(
-    verified.filter((plan) => plan.totalMinutes <= params.availableMinutes),
+    verified.filter((plan) => plan.verified && plan.totalMinutes <= params.availableMinutes),
     params.availableMinutes,
     diversitySeed,
   )

@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { PlaceThumbnail } from '@/components/place-thumbnail';
 import { ReportModal } from '@/components/report-modal';
 import { TeumtaTabBar } from '@/components/teumta-tab-bar';
-import { Teumta } from '@/constants/theme';
+import { TeumtaHybrid } from '@/constants/theme';
 import { useBookmarks } from '@/hooks/use-bookmarks';
 import { useCourseLog, type CourseLogEntry } from '@/hooks/use-course-log';
 import { setSelectedCourse } from '@/stores/selected-course';
@@ -74,12 +74,12 @@ export default function MyScreen() {
         showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>마이</Text>
-          <Text style={styles.headerSubtitle}>다녀온 코스와 저장한 장소를 관리해요.</Text>
+          <Text style={styles.headerSubtitle}>기록과 저장한 장소</Text>
         </View>
 
         <Text style={styles.sectionTitle}>다녀온 코스</Text>
         <Text style={styles.sectionCaption}>
-          붐비는 시간을 비켜 로컬을 다녀온 기록 — 관광 분산에 참여한 흔적이에요.
+          로컬을 다녀온 기록
         </Text>
         {completedEntries.length > 0 && (
           <View style={styles.statsCard}>
@@ -178,10 +178,9 @@ export default function MyScreen() {
 
         <Text style={styles.sectionTitle}>위치·개인정보</Text>
         <View style={styles.infoCard}>
-          <Text style={styles.infoCardTitle}>위치는 기기 안에서만 처리돼요</Text>
+          <Text style={styles.infoCardTitle}>위치는 기기에서만 처리</Text>
           <Text style={styles.infoCardBody}>
-            현재 위치와 이동 경로는 서버로 전송하지 않아요. 저장한 장소와 코스 기록도 이 기기
-            안에만 보관됩니다.
+            이동 경로, 저장 장소, 코스 기록을 서버로 보내지 않습니다.
           </Text>
           <Pressable onPress={confirmClear} hitSlop={8}>
             <Text style={styles.dangerAction}>저장 데이터 전체 삭제</Text>
@@ -231,15 +230,15 @@ export default function MyScreen() {
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: Teumta.background,
+    backgroundColor: TeumtaHybrid.paper,
     flex: 1,
   },
   scroll: {
     flex: 1,
   },
   content: {
-    gap: 12,
-    paddingBottom: 16,
+    gap: 18,
+    paddingBottom: 24,
     paddingHorizontal: 20,
     paddingTop: 8,
   },
@@ -248,38 +247,42 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   headerTitle: {
-    color: Teumta.textPrimary,
-    fontSize: 20,
+    color: TeumtaHybrid.ink,
+    fontSize: 28,
     fontWeight: '900',
     lineHeight: 28,
   },
   headerSubtitle: {
-    color: Teumta.textSecondary,
-    fontSize: 11,
-    lineHeight: 15,
+    color: TeumtaHybrid.muted,
+    fontSize: 12,
+    lineHeight: 18,
   },
   sectionTitle: {
-    color: Teumta.textPrimary,
-    fontSize: 15,
-    fontWeight: '700',
-    lineHeight: 21,
+    borderTopColor: TeumtaHybrid.ink,
+    borderTopWidth: 1,
+    color: TeumtaHybrid.ink,
+    fontSize: 17,
+    fontWeight: '800',
+    lineHeight: 23,
     marginTop: 2,
+    paddingTop: 12,
   },
   sectionCaption: {
-    color: Teumta.textSecondary,
-    fontSize: 10,
-    lineHeight: 14,
+    color: TeumtaHybrid.muted,
+    fontSize: 11,
+    lineHeight: 15,
     marginTop: -8,
   },
   statsCard: {
-    backgroundColor: Teumta.greenLight,
-    borderRadius: 15,
+    backgroundColor: TeumtaHybrid.canvas,
+    borderLeftColor: TeumtaHybrid.signal,
+    borderLeftWidth: 4,
     gap: 8,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
   statsTitle: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.navy,
     fontSize: 11,
     fontWeight: '700',
     lineHeight: 15,
@@ -292,20 +295,20 @@ const styles = StyleSheet.create({
     gap: 1,
   },
   statsValue: {
-    color: Teumta.textPrimary,
+    color: TeumtaHybrid.ink,
     fontSize: 16,
     fontWeight: '800',
     lineHeight: 22,
   },
   statsLabel: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.muted,
     fontSize: 10,
     lineHeight: 14,
   },
   minutesTile: {
     alignItems: 'center',
-    backgroundColor: Teumta.greenLight,
-    borderRadius: 12,
+    backgroundColor: TeumtaHybrid.signalSoft,
+    borderRadius: TeumtaHybrid.radius.small,
     flexDirection: 'row',
     gap: 1,
     height: 52,
@@ -313,60 +316,60 @@ const styles = StyleSheet.create({
     width: 52,
   },
   minutesValue: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.navy,
     fontSize: 16,
     fontWeight: '800',
     lineHeight: 22,
   },
   minutesUnit: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.navy,
     fontSize: 10,
     fontWeight: '700',
     lineHeight: 14,
     marginTop: 5,
   },
   doneBadge: {
-    backgroundColor: Teumta.greenLight,
-    borderRadius: 999,
+    backgroundColor: TeumtaHybrid.slateSoft,
+    borderRadius: TeumtaHybrid.radius.small,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
   doneBadgeLabel: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.navy,
     fontSize: 10,
     fontWeight: '700',
     lineHeight: 14,
   },
   emptyBox: {
-    backgroundColor: '#F7F9F8',
-    borderRadius: 12,
+    backgroundColor: TeumtaHybrid.canvas,
+    borderLeftColor: TeumtaHybrid.slate,
+    borderLeftWidth: 4,
     paddingHorizontal: 12,
     paddingVertical: 14,
   },
   emptyText: {
-    color: Teumta.textSecondary,
-    fontSize: 10,
-    lineHeight: 15,
+    color: TeumtaHybrid.muted,
+    fontSize: 11,
+    lineHeight: 16,
     textAlign: 'center',
   },
   list: {
-    gap: 8,
+    borderTopColor: TeumtaHybrid.line,
+    borderTopWidth: 1,
   },
   rowCard: {
     alignItems: 'center',
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 15,
-    borderWidth: 1,
+    borderBottomColor: TeumtaHybrid.line,
+    borderBottomWidth: 1,
     flexDirection: 'row',
     gap: 10,
     paddingLeft: 8,
     paddingRight: 10,
-    paddingVertical: 8,
+    paddingVertical: 10,
   },
   rowThumb: {
-    backgroundColor: Teumta.imagePlaceholder,
-    borderRadius: 12,
+    backgroundColor: TeumtaHybrid.canvas,
+    borderRadius: TeumtaHybrid.radius.small,
     height: 52,
     width: 52,
   },
@@ -375,44 +378,44 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   rowName: {
-    color: Teumta.textPrimary,
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 17,
+    color: TeumtaHybrid.ink,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
   },
   rowMeta: {
-    color: Teumta.textSecondary,
-    fontSize: 10,
-    lineHeight: 14,
+    color: TeumtaHybrid.muted,
+    fontSize: 11,
+    lineHeight: 15,
   },
   rowChevron: {
-    color: Teumta.textTertiary,
+    color: TeumtaHybrid.faint,
     fontSize: 20,
     fontWeight: '500',
     lineHeight: 28,
   },
   infoCard: {
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 16,
-    borderWidth: 1,
+    borderBottomColor: TeumtaHybrid.line,
+    borderBottomWidth: 1,
+    borderTopColor: TeumtaHybrid.line,
+    borderTopWidth: 1,
     gap: 8,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
   infoCardTitle: {
-    color: Teumta.textPrimary,
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 17,
+    color: TeumtaHybrid.ink,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
   },
   infoCardBody: {
-    color: Teumta.textSecondary,
-    fontSize: 10,
-    lineHeight: 15,
+    color: TeumtaHybrid.muted,
+    fontSize: 11,
+    lineHeight: 16,
   },
   dangerAction: {
-    color: Teumta.congestion.high.text,
+    color: TeumtaHybrid.terracotta,
     fontSize: 11,
     fontWeight: '700',
     lineHeight: 15,
@@ -424,19 +427,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   infoRowLabel: {
-    color: Teumta.textSecondary,
-    fontSize: 10,
-    lineHeight: 14,
+    color: TeumtaHybrid.muted,
+    fontSize: 11,
+    lineHeight: 15,
   },
   infoRowValue: {
-    color: Teumta.textPrimary,
-    fontSize: 10,
+    color: TeumtaHybrid.ink,
+    fontSize: 11,
     fontWeight: '700',
     lineHeight: 14,
   },
   infoRowLink: {
-    color: Teumta.greenDark,
-    fontSize: 10,
+    color: TeumtaHybrid.slate,
+    fontSize: 11,
     fontWeight: '700',
     lineHeight: 14,
   },

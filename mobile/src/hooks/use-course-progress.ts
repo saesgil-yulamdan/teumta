@@ -1,4 +1,5 @@
-import { useCallback, useReducer } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useCallback, useEffect, useReducer, useState } from 'react';
 
 import { ARRIVAL_RADIUS_METERS } from '@/constants/location';
 import type { Coordinate } from '@/types/place';
@@ -7,6 +8,7 @@ import {
   courseProgressReducer,
   INITIAL_COURSE_PROGRESS,
   type CourseStop,
+  type ProgressState,
 } from '@/utils/course-progress-state';
 import { distanceInMeters } from '@/utils/distance';
 
@@ -17,6 +19,29 @@ export type { CourseStop } from '@/utils/course-progress-state';
  * 같은 반경을 쓰면 GPS 요동만으로 도착↔이동이 깜빡인다(히스테리시스).
  */
 const STAY_LEAVE_RADIUS_METERS = ARRIVAL_RADIUS_METERS * 1.5;
+const PROGRESS_STORAGE_KEY = 'teumta:active-trip-progress:v1';
+
+function validRestoredState(value: unknown, stops: CourseStop[]): value is ProgressState {
+  const state = value as Partial<ProgressState> | null;
+  const phases = ['not_started', 'in_progress', 'completed'];
+  const validStayingAt =
+    state?.stayingAt === null ||
+    (typeof state?.stayingAt?.id === 'string' &&
+      stops.some((stop) => stop.id === state.stayingAt?.id));
+  return (
+    typeof state === 'object' &&
+    state !== null &&
+    phases.includes(String(state.phase)) &&
+    Number.isInteger(state.currentIndex) &&
+    Number(state.currentIndex) >= 0 &&
+    Number(state.currentIndex) <= stops.length &&
+    validStayingAt &&
+    (state.stayingSince === null || typeof state.stayingSince === 'number') &&
+    (state.startedAt === null || typeof state.startedAt === 'number') &&
+    typeof state.outcomes === 'object' &&
+    state.outcomes !== null
+  );
+}
 
 /**
  * 코스 진행 상태(시작/도착/체류/다음/복귀/완료)를 **단말 local state로만** 관리한다.
@@ -26,15 +51,55 @@ const STAY_LEAVE_RADIUS_METERS = ARRIVAL_RADIUS_METERS * 1.5;
  *  - 현재 위치가 다음 목적지 반경에 들어오면 로컬에서 도착 처리하고 다음 지점으로 넘어간다.
  *  - 서버에는 사용자가 특정 시각 특정 장소에 있었다는 정보가 남지 않는다.
  */
-export function useCourseProgress(stops: CourseStop[]) {
+export function useCourseProgress(stops: CourseStop[], persistenceKey?: string | null) {
   const [state, dispatch] = useReducer(courseProgressReducer, INITIAL_COURSE_PROGRESS);
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const ready = persistenceKey == null || loadedKey === persistenceKey;
   const { phase, currentIndex, stayingAt, stayingSince, startedAt, outcomes } = state;
 
   const nextStop: CourseStop | null = stops[currentIndex] ?? null;
 
+  useEffect(() => {
+    if (!persistenceKey || stops.length === 0) {
+      return;
+    }
+    let ignored = false;
+    AsyncStorage.getItem(PROGRESS_STORAGE_KEY)
+      .then((raw) => {
+        if (!raw || ignored) return;
+        const parsed = JSON.parse(raw) as { key?: unknown; state?: unknown };
+        if (parsed.key === persistenceKey && validRestoredState(parsed.state, stops)) {
+          dispatch({ type: 'restore', state: parsed.state });
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!ignored) setLoadedKey(persistenceKey);
+      });
+    return () => {
+      ignored = true;
+    };
+  }, [persistenceKey, stops]);
+
+  useEffect(() => {
+    if (!ready || !persistenceKey) return;
+    if (state.phase === 'completed') {
+      AsyncStorage.removeItem(PROGRESS_STORAGE_KEY).catch(() => {});
+      return;
+    }
+    AsyncStorage.setItem(
+      PROGRESS_STORAGE_KEY,
+      JSON.stringify({ key: persistenceKey, state }),
+    ).catch(() => {});
+  }, [ready, persistenceKey, state]);
+
   const start = useCallback(() => dispatch({ type: 'start', at: Date.now() }), []);
 
   const reset = useCallback(() => dispatch({ type: 'reset' }), []);
+
+  const clearPersistedProgress = useCallback(() => {
+    AsyncStorage.removeItem(PROGRESS_STORAGE_KEY).catch(() => {});
+  }, []);
 
   /**
    * 다음 정류지를 방문 처리 없이 넘긴다(가게가 닫혀 있는 등).
@@ -74,6 +139,7 @@ export function useCourseProgress(stops: CourseStop[]) {
 
   return {
     phase,
+    ready,
     currentIndex,
     nextStop,
     stayingAt,
@@ -82,6 +148,7 @@ export function useCourseProgress(stops: CourseStop[]) {
     outcomes,
     start,
     reset,
+    clearPersistedProgress,
     skipCurrent,
     finishCurrentStay,
     updateWithLocation,

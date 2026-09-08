@@ -8,13 +8,12 @@ import { getLocalPlaceDetail } from '@/api/places';
 import { PlaceThumbnail } from '@/components/place-thumbnail';
 import { ReportModal } from '@/components/report-modal';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
-import { Teumta } from '@/constants/theme';
+import { TeumtaHybrid } from '@/constants/theme';
 import type { LocalPlaceDetail } from '@/types/place';
 import { openDirections, openNaverMapPlace } from '@/utils/directions';
 import { withRoJosa } from '@/utils/text';
 
-const STATUS_BAR_TINT = '#CCE8DB';
-const HERO_BAND = '#1C4738';
+const STATUS_BAR_TINT = TeumtaHybrid.paper;
 
 /**
  * 주변 로컬 장소 상세.
@@ -140,7 +139,7 @@ export default function LocalPlaceDetailScreen() {
 
           {detail?.overview ? (
             <>
-              <Text style={styles.sectionTitle}>어떤 곳인가요</Text>
+              <Text style={styles.sectionTitle}>소개</Text>
               <Text style={styles.overview}>{detail.overview}</Text>
             </>
           ) : null}
@@ -178,7 +177,7 @@ export default function LocalPlaceDetailScreen() {
 
           <View style={styles.emptyBox}>
             <Text style={styles.emptyBoxText}>
-              걷는 거리와 시간은 실제 보행 경로로 계산한 값이에요.
+              거리·시간은 실제 보행 경로 기준입니다.
             </Text>
           </View>
 
@@ -188,7 +187,7 @@ export default function LocalPlaceDetailScreen() {
             onPress={() => {
               void openNaverMapPlace({ name: params.name as string, address: params.address });
             }}>
-            <Text style={styles.secondaryButtonLabel}>네이버지도에서 사진·리뷰 보기</Text>
+            <Text style={styles.secondaryButtonLabel}>네이버지도에서 더 보기</Text>
           </Pressable>
 
           <Pressable
@@ -196,7 +195,7 @@ export default function LocalPlaceDetailScreen() {
             hitSlop={6}
             onPress={() => setShowReport(true)}
             style={styles.reportLink}>
-            <Text style={styles.reportLinkLabel}>정보가 다른가요? 제보하기</Text>
+            <Text style={styles.reportLinkLabel}>정보 수정 제보</Text>
           </Pressable>
 
           <TourApiAttribution style={styles.attribution} />
@@ -242,7 +241,7 @@ export default function LocalPlaceDetailScreen() {
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: Teumta.background,
+    backgroundColor: TeumtaHybrid.canvas,
     flex: 1,
   },
   scroll: {
@@ -255,14 +254,14 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   emptyButton: {
-    backgroundColor: Teumta.greenLight,
-    borderRadius: 999,
+    backgroundColor: TeumtaHybrid.ink,
+    borderRadius: TeumtaHybrid.radius.small,
     marginTop: 12,
     paddingHorizontal: 18,
     paddingVertical: 10,
   },
   emptyButtonLabel: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.white,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -270,11 +269,11 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   emptyText: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.muted,
     fontSize: 16,
   },
   heroTopRow: {
-    backgroundColor: Teumta.surface,
+    backgroundColor: TeumtaHybrid.paper,
     flexDirection: 'row',
     paddingBottom: 6,
     paddingHorizontal: 18,
@@ -282,96 +281,107 @@ const styles = StyleSheet.create({
   },
   heroButton: {
     alignItems: 'center',
-    backgroundColor: Teumta.surface,
-    borderRadius: 13,
-    height: 38,
+    backgroundColor: TeumtaHybrid.paper,
+    borderColor: TeumtaHybrid.line,
+    borderRadius: TeumtaHybrid.radius.small,
+    borderWidth: 1,
+    height: 42,
     justifyContent: 'center',
-    width: 38,
+    width: 42,
   },
   heroButtonIcon: {
     height: 19,
     width: 19,
   },
   heroImage: {
-    backgroundColor: Teumta.imagePlaceholder,
-    height: 102,
+    backgroundColor: TeumtaHybrid.canvas,
+    height: 212,
   },
   heroTitleBand: {
-    backgroundColor: HERO_BAND,
-    gap: 1,
-    paddingBottom: 12,
+    backgroundColor: TeumtaHybrid.paper,
+    borderBottomColor: TeumtaHybrid.ink,
+    borderBottomWidth: 1,
+    gap: 5,
+    paddingBottom: 22,
     paddingHorizontal: 20,
-    paddingTop: 8,
+    paddingTop: 20,
   },
   heroCategory: {
-    color: Teumta.greenLight,
-    fontSize: 12,
-    fontWeight: '700',
+    color: TeumtaHybrid.terracotta,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
     lineHeight: 17,
   },
   heroTitle: {
-    color: Teumta.surface,
-    fontSize: 23,
+    color: TeumtaHybrid.ink,
+    fontSize: 30,
     fontWeight: '900',
     lineHeight: 32,
   },
   heroSubtitle: {
-    color: Teumta.surface,
-    fontSize: 11,
-    lineHeight: 15,
+    color: TeumtaHybrid.muted,
+    fontSize: 12,
+    lineHeight: 18,
   },
   content: {
-    backgroundColor: Teumta.surface,
-    gap: 14,
-    paddingBottom: 8,
+    backgroundColor: TeumtaHybrid.paper,
+    gap: 22,
+    paddingBottom: 20,
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 24,
   },
   statsRow: {
+    borderBottomColor: TeumtaHybrid.line,
+    borderBottomWidth: 1,
+    borderTopColor: TeumtaHybrid.ink,
+    borderTopWidth: 2,
     flexDirection: 'row',
-    gap: 7,
   },
   statTile: {
-    alignItems: 'center',
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 12,
-    borderWidth: 1,
+    alignItems: 'flex-start',
+    borderRightColor: TeumtaHybrid.line,
+    borderRightWidth: 1,
     flex: 1,
     gap: 2,
     paddingHorizontal: 8,
-    paddingVertical: 9,
+    paddingVertical: 12,
   },
   statLabel: {
-    color: Teumta.textTertiary,
-    fontSize: 10,
-    lineHeight: 13,
+    color: TeumtaHybrid.muted,
+    fontSize: 11,
+    lineHeight: 15,
   },
   statValue: {
-    color: Teumta.textPrimary,
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 17,
+    color: TeumtaHybrid.ink,
+    fontSize: 16,
+    fontWeight: '800',
+    lineHeight: 22,
   },
   sectionTitle: {
-    color: Teumta.textPrimary,
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 20,
+    borderTopColor: TeumtaHybrid.ink,
+    borderTopWidth: 1,
+    color: TeumtaHybrid.ink,
+    fontSize: 17,
+    fontWeight: '800',
+    lineHeight: 23,
+    paddingTop: 12,
   },
   description: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.muted,
     fontSize: 12,
     lineHeight: 19,
   },
   overview: {
-    color: Teumta.textPrimary,
+    color: TeumtaHybrid.ink,
     fontSize: 13,
     lineHeight: 21,
   },
   hoursCard: {
-    backgroundColor: '#F7F9F8',
-    borderRadius: 12,
+    borderBottomColor: TeumtaHybrid.line,
+    borderBottomWidth: 1,
+    borderTopColor: TeumtaHybrid.line,
+    borderTopWidth: 1,
     gap: 7,
     paddingHorizontal: 12,
     paddingVertical: 11,
@@ -381,40 +391,39 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   hoursLabel: {
-    color: Teumta.textTertiary,
+    color: TeumtaHybrid.muted,
     fontSize: 11,
     fontWeight: '700',
     lineHeight: 17,
     width: 52,
   },
   hoursValue: {
-    color: Teumta.textPrimary,
+    color: TeumtaHybrid.ink,
     flex: 1,
     fontSize: 12,
     lineHeight: 18,
   },
   emptyBox: {
-    backgroundColor: '#F7F9F8',
-    borderRadius: 12,
+    borderLeftColor: TeumtaHybrid.slate,
+    borderLeftWidth: 4,
     paddingHorizontal: 12,
     paddingVertical: 14,
   },
   emptyBoxText: {
-    color: Teumta.textSecondary,
-    fontSize: 10,
-    lineHeight: 15,
-    textAlign: 'center',
+    color: TeumtaHybrid.muted,
+    fontSize: 11,
+    lineHeight: 16,
   },
   secondaryButton: {
     alignItems: 'center',
-    borderColor: Teumta.border,
-    borderRadius: 12,
+    borderColor: TeumtaHybrid.line,
+    borderRadius: TeumtaHybrid.radius.small,
     borderWidth: 1,
     marginTop: 12,
     paddingVertical: 13,
   },
   secondaryButtonLabel: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.ink,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -423,56 +432,16 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   reportLinkLabel: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.muted,
     fontSize: 11,
     fontWeight: '600',
     lineHeight: 15,
     textDecorationLine: 'underline',
   },
-  courseList: {
-    gap: 8,
-  },
-  courseCard: {
-    alignItems: 'center',
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 15,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 10,
-    paddingLeft: 8,
-    paddingRight: 10,
-    paddingVertical: 8,
-  },
-  courseThumb: {
-    backgroundColor: Teumta.imagePlaceholder,
-    borderRadius: 12,
-    height: 52,
-    width: 52,
-  },
-  courseTexts: {
-    flex: 1,
-    gap: 2,
-  },
-  courseName: {
-    color: Teumta.textPrimary,
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 17,
-  },
-  courseMeta: {
-    color: Teumta.textSecondary,
-    fontSize: 10,
-    lineHeight: 14,
-  },
-  courseChevron: {
-    color: Teumta.textTertiary,
-    fontSize: 20,
-    fontWeight: '500',
-    lineHeight: 28,
-  },
   footer: {
-    backgroundColor: Teumta.surface,
+    backgroundColor: TeumtaHybrid.paper,
+    borderTopColor: TeumtaHybrid.ink,
+    borderTopWidth: 1,
     paddingHorizontal: 20,
     paddingTop: 10,
   },
@@ -482,8 +451,8 @@ const styles = StyleSheet.create({
   },
   returnButton: {
     alignItems: 'center',
-    borderColor: Teumta.border,
-    borderRadius: 16,
+    borderColor: TeumtaHybrid.line,
+    borderRadius: TeumtaHybrid.radius.small,
     borderWidth: 1,
     flex: 1,
     height: 50,
@@ -491,20 +460,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   returnLabel: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.muted,
     fontSize: 12,
     fontWeight: '700',
   },
   ctaButton: {
     alignItems: 'center',
-    backgroundColor: Teumta.green,
-    borderRadius: 16,
+    backgroundColor: TeumtaHybrid.ink,
+    borderRadius: TeumtaHybrid.radius.small,
     flex: 1,
     height: 50,
     justifyContent: 'center',
   },
   ctaLabel: {
-    color: Teumta.surface,
+    color: TeumtaHybrid.white,
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 20,

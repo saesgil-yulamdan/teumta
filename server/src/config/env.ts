@@ -28,6 +28,16 @@ const envSchema = z.object({
   // 코드/Git에 절대 넣지 않는다. 배포 환경(Cloudtype)에도 반드시 설정한다.
   ADMIN_PASSWORD: z.string().optional().default(''),
 
+  // 브라우저 Origin 허용 목록(쉼표 구분). native 앱처럼 Origin이 없는 요청은 허용한다.
+  CORS_ALLOWED_ORIGINS: z.string().optional().default(''),
+
+  // 앱에서 사용하지 않는 과거 Trip API. 기본 비활성, 재검토 시에만 명시적으로 연다.
+  ENABLE_LEGACY_TRIP_API: z
+    .enum(['true', 'false'])
+    .optional()
+    .default('false')
+    .transform((value) => value === 'true'),
+
   // 집중률 예측 일일 자동 적재 대상. "areaCd:signguCd" 쉼표 구분(예: "11:11110,26:26350").
   // 비우면 스케줄러 비활성(수동 스크립트만 사용).
   PREDICTION_INGEST_TARGETS: z.string().optional().default(''),

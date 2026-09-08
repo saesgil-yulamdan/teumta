@@ -96,24 +96,35 @@ async function lookupTmapPoiId(contentId: string): Promise<string | null> {
     return null;
   }
 
-  // SK 제공 장소 인덱스는 매칭 힌트 — 로드 실패(null)면 기존 TMAP 매칭만으로 동작.
-  const skIndex = await getSkPoiIndex();
-
   const candidates = mapPoiSearchToDestinations(
     await fetchPoiSearch(name, { count: POI_SEARCH_COUNT }),
   );
-  const best = pickBestPoiMatch(candidates, { name, coordinate }, skIndex ?? undefined);
+  const directBest = pickBestPoiMatch(candidates, { name, coordinate });
 
-  // 후보 확정 순서: 수동 확정 매핑 → TMAP 최적 후보 → SK 목록 이름 역매칭.
+  // 일반적인 직접 매칭을 먼저 확정한다. SK 전체 장소 인덱스는 최대 30페이지라
+  // 이를 먼저 기다리면 첫 혼잡도 요청이 수십 초 느려진다. 직접 후보가 실시간 검증에
+  // 실패한 예외 장소에서만 인덱스 역매칭을 사용한다.
+  const directCandidates: string[] = [];
+  const manual = MANUAL_POI_ID_BY_CONTENT_ID[contentId];
+  if (manual) directCandidates.push(manual);
+  if (directBest !== null && !directCandidates.includes(directBest)) {
+    directCandidates.push(directBest);
+  }
+  const directVerified = await firstWithRealtime(directCandidates);
+  if (directVerified !== null) {
+    return directVerified;
+  }
+
+  // SK 제공 장소 인덱스는 예외 매칭 힌트. 로드 실패(null)면 TMAP 결과로 폴백.
+  const skIndex = await getSkPoiIndex();
+  const indexedBest = pickBestPoiMatch(candidates, { name, coordinate }, skIndex ?? undefined);
+
+  // 후보 확정 순서: SK 인덱스가 선택한 TMAP 후보 → SK 목록 이름 역매칭.
   // 목록에 있어도 "실시간"은 부분집합이라(통계 전용 장소 존재 — 2026-08-16 실측:
   // 불국사·남이섬은 목록엔 있지만 rltm 404) 최종 판정은 실시간 조회 성공 여부로 한다.
   const verifyCandidates: string[] = [];
-  const manual = MANUAL_POI_ID_BY_CONTENT_ID[contentId];
-  if (manual) {
-    verifyCandidates.push(manual);
-  }
-  if (best !== null && !verifyCandidates.includes(best)) {
-    verifyCandidates.push(best);
+  if (indexedBest !== null && !directCandidates.includes(indexedBest)) {
+    verifyCandidates.push(indexedBest);
   }
   if (skIndex !== null) {
     for (const poiId of await matchBySkPoiName(skIndex, name, coordinate)) {
@@ -125,7 +136,7 @@ async function lookupTmapPoiId(contentId: string): Promise<string | null> {
 
   const verified = await firstWithRealtime(verifyCandidates.slice(0, RLTM_VERIFY_LIMIT));
   // 전부 실시간 미제공이면 기존 최적 후보 유지 — 사용자에게는 최종 조회가 404로 알린다.
-  return verified ?? best;
+  return verified ?? indexedBest ?? directBest;
 }
 
 /**

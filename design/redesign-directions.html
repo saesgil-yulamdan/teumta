@@ -1,0 +1,812 @@
+<div id="teumta-redesign-compare">
+  <style>
+    #teumta-redesign-compare {
+      color-scheme: light dark;
+      width: 100%;
+      color: var(--foreground);
+    }
+    #teumta-redesign-compare .compare-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+    #teumta-redesign-compare .compare-head h2 {
+      margin: 0;
+    }
+    #teumta-redesign-compare .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    #teumta-redesign-compare .controls + .controls {
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    #teumta-redesign-compare .stage {
+      display: grid;
+      place-items: center;
+      min-height: 730px;
+    }
+    #teumta-redesign-compare .phone {
+      --tm-bg: light-dark(#f3f0e8, #171815);
+      --tm-surface: light-dark(#fbfaf5, #22231f);
+      --tm-ink: light-dark(#171915, #f4f2e9);
+      --tm-sub: light-dark(#66685f, #a9aaa2);
+      --tm-line: light-dark(#d7d5cc, #3a3b36);
+      --tm-brand: light-dark(#174f3d, #73d0ab);
+      --tm-accent: light-dark(#f05f3b, #ff8669);
+      background: var(--tm-bg);
+      color: var(--tm-ink);
+      width: min(360px, calc(100vw - 36px));
+      min-height: 690px;
+      border: 1px solid light-dark(#bdbdb7, #4b4b46);
+      border-radius: 34px;
+      overflow: hidden;
+      box-shadow: 0 18px 48px light-dark(rgba(24, 28, 24, 0.13), rgba(0, 0, 0, 0.38));
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
+    }
+    #teumta-redesign-compare .phone[data-direction="wayfinding"] {
+      --tm-bg: light-dark(#f5f1df, #191a18);
+      --tm-surface: light-dark(#fffdf4, #252521);
+      --tm-ink: light-dark(#14233a, #f5f1df);
+      --tm-sub: light-dark(#5e6773, #afb4ba);
+      --tm-line: light-dark(#14233a, #6f7780);
+      --tm-brand: light-dark(#123c66, #78b8f0);
+      --tm-accent: light-dark(#f1be32, #f1be32);
+      border-radius: 18px;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
+    }
+    #teumta-redesign-compare .statusbar {
+      display: flex;
+      justify-content: space-between;
+      padding: 13px 20px 7px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    #teumta-redesign-compare .screen {
+      display: none;
+      min-height: 650px;
+      position: relative;
+      padding-bottom: 76px;
+    }
+    #teumta-redesign-compare .screen.active {
+      display: block;
+    }
+    #teumta-redesign-compare .topline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 18px 12px;
+    }
+    #teumta-redesign-compare .icon-button {
+      display: grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      color: inherit;
+      background: transparent;
+      border: 0;
+    }
+    #teumta-redesign-compare .editorial-logo {
+      font-family: ui-serif, Georgia, "AppleMyungjo", serif;
+      font-size: 19px;
+      letter-spacing: -0.04em;
+    }
+    #teumta-redesign-compare .eyebrow {
+      color: var(--tm-brand);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    #teumta-redesign-compare .hero-photo {
+      position: relative;
+      height: 196px;
+      margin: 0 14px;
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, transparent 36%, rgba(12, 18, 15, 0.64)),
+        radial-gradient(circle at 70% 22%, #e8d49d 0 10%, transparent 11%),
+        linear-gradient(136deg, #778e7d 0 33%, #c0ad86 34% 56%, #516958 57% 100%);
+    }
+    #teumta-redesign-compare .hero-photo::after {
+      content: "경복궁 · 서울 종로";
+      position: absolute;
+      left: 16px;
+      bottom: 14px;
+      color: #fffdf7;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+    }
+    #teumta-redesign-compare .editorial-title {
+      padding: 20px 18px 8px;
+    }
+    #teumta-redesign-compare .editorial-title h1 {
+      margin: 4px 0 4px;
+      font-family: ui-serif, Georgia, "AppleMyungjo", serif;
+      font-size: 32px;
+      font-weight: 500;
+      letter-spacing: -0.06em;
+    }
+    #teumta-redesign-compare .editorial-title p,
+    #teumta-redesign-compare .muted {
+      margin: 0;
+      color: var(--tm-sub);
+      font-size: 12px;
+    }
+    #teumta-redesign-compare .metric-block {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: end;
+      gap: 10px;
+      margin: 18px;
+      padding: 18px 0;
+      border-top: 1px solid var(--tm-line);
+      border-bottom: 1px solid var(--tm-line);
+    }
+    #teumta-redesign-compare .metric-word {
+      display: block;
+      margin-top: 4px;
+      font-size: 34px;
+      font-weight: 500;
+      letter-spacing: -0.06em;
+    }
+    #teumta-redesign-compare .metric-meta {
+      text-align: right;
+      color: var(--tm-sub);
+      font-size: 11px;
+    }
+    #teumta-redesign-compare .forecast-strip {
+      margin: 0 18px 20px;
+    }
+    #teumta-redesign-compare .forecast-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 12px;
+      font-size: 13px;
+    }
+    #teumta-redesign-compare .bars {
+      display: flex;
+      align-items: end;
+      gap: 8px;
+      height: 48px;
+      border-bottom: 1px solid var(--tm-line);
+    }
+    #teumta-redesign-compare .bars i {
+      display: block;
+      flex: 1;
+      background: color-mix(in srgb, var(--tm-brand) 34%, transparent);
+    }
+    #teumta-redesign-compare .bars i:nth-child(1) { height: 22px; background: var(--tm-brand); }
+    #teumta-redesign-compare .bars i:nth-child(2) { height: 34px; }
+    #teumta-redesign-compare .bars i:nth-child(3) { height: 29px; }
+    #teumta-redesign-compare .bars i:nth-child(4) { height: 41px; }
+    #teumta-redesign-compare .bars i:nth-child(5) { height: 25px; }
+    #teumta-redesign-compare .bars i:nth-child(6) { height: 18px; }
+    #teumta-redesign-compare .section-label {
+      margin: 20px 18px 9px;
+      font-family: ui-serif, Georgia, "AppleMyungjo", serif;
+      font-size: 19px;
+      font-weight: 500;
+    }
+    #teumta-redesign-compare .place-row {
+      display: grid;
+      grid-template-columns: 58px 1fr auto;
+      align-items: center;
+      gap: 12px;
+      margin: 0 18px;
+      padding: 11px 0;
+      border-bottom: 1px solid var(--tm-line);
+    }
+    #teumta-redesign-compare .thumb {
+      width: 58px;
+      height: 58px;
+      background: linear-gradient(145deg, #b99b76, #526858);
+    }
+    #teumta-redesign-compare .place-row strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    #teumta-redesign-compare .place-row span {
+      color: var(--tm-sub);
+      font-size: 11px;
+    }
+    #teumta-redesign-compare .primary-footer {
+      position: absolute;
+      left: 14px;
+      right: 14px;
+      bottom: 14px;
+      min-height: 52px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--tm-ink);
+      color: var(--tm-bg);
+      font-size: 14px;
+      font-weight: 500;
+    }
+    #teumta-redesign-compare .course-intro {
+      padding: 12px 18px 18px;
+    }
+    #teumta-redesign-compare .course-intro h1 {
+      margin: 7px 0 8px;
+      font-family: ui-serif, Georgia, "AppleMyungjo", serif;
+      font-size: 29px;
+      font-weight: 500;
+      letter-spacing: -0.05em;
+    }
+    #teumta-redesign-compare .time-selector {
+      display: flex;
+      gap: 18px;
+      margin: 0 18px;
+      padding: 12px 0;
+      border-top: 1px solid var(--tm-line);
+      border-bottom: 1px solid var(--tm-line);
+    }
+    #teumta-redesign-compare .time-selector button {
+      min-height: 44px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--tm-sub);
+      font-size: 13px;
+    }
+    #teumta-redesign-compare .time-selector button.selected {
+      color: var(--tm-ink);
+      text-decoration: underline;
+      text-underline-offset: 7px;
+    }
+    #teumta-redesign-compare .route-feature {
+      margin: 22px 18px 0;
+      padding: 0 0 17px;
+      border-bottom: 1px solid var(--tm-line);
+    }
+    #teumta-redesign-compare .route-number {
+      color: var(--tm-accent);
+      font-family: ui-serif, Georgia, serif;
+      font-size: 30px;
+    }
+    #teumta-redesign-compare .route-feature h2 {
+      margin: 8px 0 6px;
+      font-size: 18px;
+      font-weight: 500;
+    }
+    #teumta-redesign-compare .route-meta {
+      color: var(--tm-sub);
+      font-size: 11px;
+    }
+    #teumta-redesign-compare .route-line {
+      display: grid;
+      grid-template-columns: 26px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding-top: 14px;
+      font-size: 12px;
+    }
+    #teumta-redesign-compare .route-dot {
+      width: 8px;
+      height: 8px;
+      margin-left: 8px;
+      border-radius: 50%;
+      background: var(--tm-brand);
+    }
+    #teumta-redesign-compare .route-time {
+      color: var(--tm-sub);
+      font-size: 11px;
+    }
+    #teumta-redesign-compare .trip-map {
+      height: 240px;
+      margin: 0 14px;
+      position: relative;
+      overflow: hidden;
+      background:
+        linear-gradient(30deg, transparent 48%, color-mix(in srgb, var(--tm-line) 55%, transparent) 49% 51%, transparent 52%) 0 0/74px 74px,
+        linear-gradient(150deg, transparent 48%, color-mix(in srgb, var(--tm-line) 55%, transparent) 49% 51%, transparent 52%) 0 0/92px 92px,
+        var(--tm-surface);
+    }
+    #teumta-redesign-compare .trip-map::before {
+      content: "";
+      position: absolute;
+      left: 56px;
+      top: 115px;
+      width: 215px;
+      height: 64px;
+      border-left: 4px solid var(--tm-accent);
+      border-bottom: 4px solid var(--tm-accent);
+      transform: skewX(-24deg) rotate(-8deg);
+    }
+    #teumta-redesign-compare .map-pin {
+      position: absolute;
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: var(--tm-ink);
+      color: var(--tm-bg);
+      font-size: 11px;
+    }
+    #teumta-redesign-compare .map-pin.one { left: 52px; top: 145px; }
+    #teumta-redesign-compare .map-pin.two { right: 48px; top: 78px; background: var(--tm-accent); }
+    #teumta-redesign-compare .trip-now {
+      padding: 20px 18px 12px;
+    }
+    #teumta-redesign-compare .trip-now h1 {
+      margin: 5px 0 5px;
+      font-family: ui-serif, Georgia, "AppleMyungjo", serif;
+      font-size: 27px;
+      font-weight: 500;
+      letter-spacing: -0.04em;
+    }
+    #teumta-redesign-compare .trip-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      margin: 8px 18px 0;
+      padding: 14px 0;
+      border-top: 1px solid var(--tm-line);
+      border-bottom: 1px solid var(--tm-line);
+    }
+    #teumta-redesign-compare .trip-stat + .trip-stat {
+      border-left: 1px solid var(--tm-line);
+      padding-left: 12px;
+    }
+    #teumta-redesign-compare .trip-stat small {
+      display: block;
+      color: var(--tm-sub);
+      font-size: 10px;
+      margin-bottom: 5px;
+    }
+    #teumta-redesign-compare .trip-stat strong {
+      font-size: 16px;
+      font-weight: 500;
+    }
+    #teumta-redesign-compare .trip-actions {
+      display: flex;
+      gap: 8px;
+      margin: 16px 18px;
+    }
+    #teumta-redesign-compare .trip-actions button {
+      min-height: 46px;
+      padding: 0 14px;
+      border: 1px solid var(--tm-line);
+      border-radius: 6px;
+      color: var(--tm-ink);
+      background: transparent;
+      font-size: 12px;
+    }
+    #teumta-redesign-compare .trip-actions button:last-child {
+      flex: 1;
+      border-color: var(--tm-ink);
+      background: var(--tm-ink);
+      color: var(--tm-bg);
+    }
+
+    #teumta-redesign-compare .way-head {
+      margin: 0 12px 12px;
+      padding: 13px 14px;
+      background: var(--tm-ink);
+      color: var(--tm-bg);
+    }
+    #teumta-redesign-compare .way-head-line {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+    }
+    #teumta-redesign-compare .way-head h1 {
+      margin: 16px 0 3px;
+      font-size: 27px;
+      font-weight: 500;
+      letter-spacing: -0.05em;
+    }
+    #teumta-redesign-compare .way-head p {
+      margin: 0;
+      opacity: 0.72;
+      font-size: 11px;
+    }
+    #teumta-redesign-compare .status-board {
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      margin: 0 12px;
+      border: 2px solid var(--tm-line);
+    }
+    #teumta-redesign-compare .status-signal {
+      display: grid;
+      place-items: center;
+      min-height: 108px;
+      background: var(--tm-accent);
+      color: #14233a;
+      font-size: 24px;
+      font-weight: 500;
+    }
+    #teumta-redesign-compare .status-copy {
+      padding: 14px;
+    }
+    #teumta-redesign-compare .status-copy strong {
+      display: block;
+      margin-bottom: 9px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    #teumta-redesign-compare .status-copy span {
+      color: var(--tm-sub);
+      font-size: 11px;
+    }
+    #teumta-redesign-compare .way-section {
+      margin: 20px 12px 8px;
+      padding-bottom: 7px;
+      border-bottom: 2px solid var(--tm-line);
+      font-size: 12px;
+      letter-spacing: 0.07em;
+    }
+    #teumta-redesign-compare .day-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 3px;
+      margin: 10px 12px 18px;
+    }
+    #teumta-redesign-compare .day {
+      min-height: 54px;
+      padding: 7px 5px;
+      background: color-mix(in srgb, var(--tm-brand) 10%, var(--tm-surface));
+      font-size: 9px;
+    }
+    #teumta-redesign-compare .day b {
+      display: block;
+      margin-top: 9px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    #teumta-redesign-compare .day.active {
+      background: var(--tm-brand);
+      color: var(--tm-bg);
+    }
+    #teumta-redesign-compare .way-list {
+      margin: 0 12px;
+      border-top: 1px solid var(--tm-line);
+    }
+    #teumta-redesign-compare .way-row {
+      display: grid;
+      grid-template-columns: 34px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      min-height: 64px;
+      border-bottom: 1px solid var(--tm-line);
+    }
+    #teumta-redesign-compare .way-code {
+      color: var(--tm-brand);
+      font-size: 11px;
+    }
+    #teumta-redesign-compare .way-row strong {
+      display: block;
+      margin-bottom: 3px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    #teumta-redesign-compare .way-row span {
+      color: var(--tm-sub);
+      font-size: 10px;
+    }
+    #teumta-redesign-compare .way-button {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      min-height: 54px;
+      border: 0;
+      border-radius: 0;
+      background: var(--tm-brand);
+      color: var(--tm-bg);
+      font-size: 14px;
+      font-weight: 500;
+    }
+    #teumta-redesign-compare .way-time {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      margin: 0 12px 18px;
+      border: 2px solid var(--tm-line);
+    }
+    #teumta-redesign-compare .way-time button {
+      min-height: 50px;
+      border: 0;
+      border-right: 1px solid var(--tm-line);
+      color: var(--tm-ink);
+      background: var(--tm-surface);
+      font-size: 12px;
+    }
+    #teumta-redesign-compare .way-time button:last-child { border-right: 0; }
+    #teumta-redesign-compare .way-time button.selected {
+      background: var(--tm-accent);
+      color: #14233a;
+    }
+    #teumta-redesign-compare .route-board {
+      margin: 0 12px;
+      border-top: 2px solid var(--tm-line);
+    }
+    #teumta-redesign-compare .route-board-head {
+      display: grid;
+      grid-template-columns: 54px 1fr auto;
+      align-items: center;
+      min-height: 64px;
+      border-bottom: 1px solid var(--tm-line);
+    }
+    #teumta-redesign-compare .route-board-head b {
+      display: grid;
+      place-items: center;
+      align-self: stretch;
+      background: var(--tm-brand);
+      color: var(--tm-bg);
+      font-size: 17px;
+      font-weight: 500;
+    }
+    #teumta-redesign-compare .route-board-head strong {
+      padding-left: 12px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    #teumta-redesign-compare .route-board-head span {
+      padding-right: 10px;
+      color: var(--tm-sub);
+      font-size: 10px;
+    }
+    #teumta-redesign-compare .way-stop {
+      display: grid;
+      grid-template-columns: 54px 1fr auto;
+      align-items: center;
+      min-height: 58px;
+      border-bottom: 1px solid var(--tm-line);
+    }
+    #teumta-redesign-compare .way-stop b {
+      padding-left: 15px;
+      color: var(--tm-brand);
+      font-size: 12px;
+      font-weight: 500;
+    }
+    #teumta-redesign-compare .way-stop strong {
+      font-size: 12px;
+      font-weight: 500;
+    }
+    #teumta-redesign-compare .way-stop span {
+      padding-right: 10px;
+      color: var(--tm-sub);
+      font-size: 10px;
+    }
+    #teumta-redesign-compare .way-map {
+      height: 280px;
+      margin: 0 12px;
+      position: relative;
+      background:
+        linear-gradient(90deg, transparent 49%, color-mix(in srgb, var(--tm-brand) 16%, transparent) 50% 51%, transparent 52%) 0 0/48px 48px,
+        linear-gradient(transparent 49%, color-mix(in srgb, var(--tm-brand) 16%, transparent) 50% 51%, transparent 52%) 0 0/48px 48px,
+        var(--tm-surface);
+      border: 2px solid var(--tm-line);
+    }
+    #teumta-redesign-compare .way-map-line {
+      position: absolute;
+      left: 68px;
+      top: 58px;
+      width: 190px;
+      height: 135px;
+      border-left: 7px solid var(--tm-brand);
+      border-bottom: 7px solid var(--tm-brand);
+      border-radius: 0 0 0 26px;
+      transform: skewX(18deg);
+    }
+    #teumta-redesign-compare .way-pin {
+      position: absolute;
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      background: var(--tm-accent);
+      color: #14233a;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    #teumta-redesign-compare .way-pin.a { left: 51px; top: 48px; }
+    #teumta-redesign-compare .way-pin.b { right: 47px; bottom: 54px; background: var(--tm-brand); color: var(--tm-bg); }
+    #teumta-redesign-compare .next-board {
+      margin: 14px 12px 0;
+      display: grid;
+      grid-template-columns: 78px 1fr;
+      border: 2px solid var(--tm-line);
+    }
+    #teumta-redesign-compare .next-count {
+      display: grid;
+      place-items: center;
+      background: var(--tm-accent);
+      color: #14233a;
+      font-size: 26px;
+      font-weight: 500;
+    }
+    #teumta-redesign-compare .next-copy {
+      padding: 12px;
+    }
+    #teumta-redesign-compare .next-copy small {
+      display: block;
+      color: var(--tm-sub);
+      margin-bottom: 4px;
+      font-size: 10px;
+    }
+    #teumta-redesign-compare .next-copy strong {
+      font-size: 15px;
+      font-weight: 500;
+    }
+    #teumta-redesign-compare .way-trip-actions {
+      display: grid;
+      grid-template-columns: 1fr 1.6fr;
+      gap: 6px;
+      margin: 10px 12px;
+    }
+    #teumta-redesign-compare .way-trip-actions button {
+      min-height: 48px;
+      border: 2px solid var(--tm-line);
+      border-radius: 0;
+      color: var(--tm-ink);
+      background: var(--tm-surface);
+      font-size: 12px;
+    }
+    #teumta-redesign-compare .way-trip-actions button:last-child {
+      border-color: var(--tm-brand);
+      background: var(--tm-brand);
+      color: var(--tm-bg);
+    }
+    @media (max-width: 440px) {
+      #teumta-redesign-compare .compare-head {
+        align-items: start;
+        flex-direction: column;
+      }
+      #teumta-redesign-compare .stage {
+        min-height: 710px;
+      }
+    }
+  </style>
+
+  <div class="compare-head">
+    <h2>틈타 리디자인 방향</h2>
+    <span id="direction-caption" class="text-small text-muted" aria-live="polite">A · 도시 산책 에디토리얼</span>
+  </div>
+  <div class="controls" aria-label="디자인 방향 선택">
+    <button class="btn btn-primary direction-control" type="button" data-direction="editorial" aria-pressed="true">A · 에디토리얼</button>
+    <button class="btn direction-control" type="button" data-direction="wayfinding" aria-pressed="false">B · 안내체계</button>
+  </div>
+  <div class="controls" aria-label="화면 선택">
+    <button class="btn btn-primary screen-control" type="button" data-screen="place" aria-pressed="true">관광지 상세</button>
+    <button class="btn screen-control" type="button" data-screen="course" aria-pressed="false">코스 선택</button>
+    <button class="btn screen-control" type="button" data-screen="trip" aria-pressed="false">코스 진행</button>
+  </div>
+
+  <div class="stage">
+    <div class="phone" data-direction="editorial">
+      <div class="statusbar"><span>9:41</span><span>● 5G  ▰</span></div>
+
+      <section class="screen active" data-screen-panel="place" aria-label="관광지 상세 화면">
+        <div class="editorial-only">
+          <div class="topline">
+            <button class="icon-button" type="button" aria-label="뒤로"><i data-lucide="arrow-left" aria-hidden="true"></i></button>
+            <span class="editorial-logo">틈타</span>
+            <button class="icon-button" type="button" aria-label="저장"><i data-lucide="bookmark" aria-hidden="true"></i></button>
+          </div>
+          <div class="hero-photo"></div>
+          <div class="editorial-title">
+            <span class="eyebrow">오늘의 목적지</span>
+            <h1>경복궁</h1>
+            <p>서울 종로구 사직로 161</p>
+          </div>
+          <div class="metric-block">
+            <div><span class="eyebrow">실시간 · 14:20 기준</span><strong class="metric-word">여유</strong></div>
+            <div class="metric-meta">지금 방문하기 좋음<br>30일 중 낮은 편</div>
+          </div>
+          <div class="forecast-strip">
+            <div class="forecast-head"><span>앞으로 6일</span><span class="muted">금요일이 가장 한산</span></div>
+            <div class="bars"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
+          <h2 class="section-label">근처에서 잠깐</h2>
+          <div class="place-row"><div class="thumb"></div><div><strong>국립현대미술관 서울</strong><span>문화시설 · 도보 8분</span></div><span>›</span></div>
+          <button class="primary-footer" type="button">30분 틈타 코스 보기</button>
+        </div>
+        <div class="wayfinding-only" hidden>
+          <div class="topline"><button class="icon-button" type="button" aria-label="뒤로"><i data-lucide="arrow-left" aria-hidden="true"></i></button><span class="eyebrow">DESTINATION 01</span><button class="icon-button" type="button" aria-label="저장"><i data-lucide="bookmark" aria-hidden="true"></i></button></div>
+          <div class="way-head"><div class="way-head-line"><span>서울 · 종로</span><span>GYEONGBOKGUNG</span></div><h1>경복궁</h1><p>서울 종로구 사직로 161</p></div>
+          <div class="status-board"><div class="status-signal">여유</div><div class="status-copy"><strong>현재 이동 원활</strong><span>실시간 혼잡도<br>14:20 기준</span></div></div>
+          <div class="way-section">30일 방문 신호</div>
+          <div class="day-grid"><div class="day active">오늘<b>낮음</b></div><div class="day">화<b>보통</b></div><div class="day">수<b>보통</b></div><div class="day">목<b>높음</b></div><div class="day">금<b>낮음</b></div><div class="day">토<b>높음</b></div></div>
+          <div class="way-section">주변 정차 지점</div>
+          <div class="way-list"><div class="way-row"><b class="way-code">L01</b><div><strong>국립현대미술관 서울</strong><span>문화시설 · 620m</span></div><span>도보 8분</span></div><div class="way-row"><b class="way-code">L02</b><div><strong>서촌 골목시장</strong><span>시장 · 780m</span></div><span>도보 11분</span></div></div>
+          <button class="way-button" type="button">틈타 코스 조회 →</button>
+        </div>
+      </section>
+
+      <section class="screen" data-screen-panel="course" aria-label="코스 선택 화면">
+        <div class="editorial-only">
+          <div class="topline"><button class="icon-button" type="button" aria-label="뒤로"><i data-lucide="arrow-left" aria-hidden="true"></i></button><span class="editorial-logo">틈타</span><span style="width:44px"></span></div>
+          <div class="course-intro"><span class="eyebrow">경복궁에서 다시 돌아오기</span><h1>비켜 걷는<br>30분의 서울</h1><p class="muted">실제 보행 경로와 운영정보를 확인한 코스</p></div>
+          <div class="time-selector"><button class="selected" type="button">30분</button><button type="button">60분</button><button type="button">90분</button></div>
+          <div class="route-feature"><span class="route-number">01</span><h2>미술관을 지나 서촌으로</h2><div class="route-meta">총 2.1km · 걷기 24분 · 머무르기 16분</div><div class="route-line"><i class="route-dot"></i><span>국립현대미술관 서울</span><span class="route-time">8분</span></div><div class="route-line"><i class="route-dot"></i><span>서촌 골목시장</span><span class="route-time">7분</span></div><div class="route-line"><i class="route-dot"></i><span>경복궁 복귀</span><span class="route-time">9분</span></div></div>
+          <div class="route-feature"><span class="route-number">02</span><h2>돌담길 따라 조용히</h2><div class="route-meta">총 1.8km · 걷기 22분 · 머무르기 18분</div></div>
+          <button class="primary-footer" type="button">01 코스 자세히 보기</button>
+        </div>
+        <div class="wayfinding-only" hidden>
+          <div class="topline"><button class="icon-button" type="button" aria-label="뒤로"><i data-lucide="arrow-left" aria-hidden="true"></i></button><span class="eyebrow">DETOUR ROUTE</span><span style="width:44px"></span></div>
+          <div class="way-head"><div class="way-head-line"><span>출발·복귀</span><span>경복궁</span></div><h1>틈타 코스</h1><p>가능한 시간에 맞춰 경로를 선택하세요.</p></div>
+          <div class="way-time"><button class="selected" type="button">30분</button><button type="button">60분</button><button type="button">90분</button></div>
+          <div class="route-board"><div class="route-board-head"><b>R1</b><strong>미술관–서촌 순환</strong><span>40분 · 2.1km</span></div><div class="way-stop"><b>01</b><strong>국립현대미술관 서울</strong><span>도보 8분</span></div><div class="way-stop"><b>02</b><strong>서촌 골목시장</strong><span>체류 10분</span></div><div class="way-stop"><b>↩</b><strong>경복궁 복귀</strong><span>14:52 예정</span></div></div>
+          <div class="route-board" style="margin-top:14px"><div class="route-board-head"><b>R2</b><strong>돌담길 순환</strong><span>38분 · 1.8km</span></div><div class="way-stop"><b>01</b><strong>정동 전망대</strong><span>도보 9분</span></div><div class="way-stop"><b>↩</b><strong>경복궁 복귀</strong><span>14:50 예정</span></div></div>
+          <button class="way-button" type="button">R1 경로 선택 →</button>
+        </div>
+      </section>
+
+      <section class="screen" data-screen-panel="trip" aria-label="코스 진행 화면">
+        <div class="editorial-only">
+          <div class="topline"><button class="icon-button" type="button" aria-label="뒤로"><i data-lucide="arrow-left" aria-hidden="true"></i></button><span class="eyebrow">14:52 복귀 예정</span><button class="icon-button" type="button" aria-label="더보기"><i data-lucide="ellipsis" aria-hidden="true"></i></button></div>
+          <div class="trip-map"><span class="map-pin one">나</span><span class="map-pin two">1</span></div>
+          <div class="trip-now"><span class="eyebrow">다음 장소 · 도보 6분</span><h1>국립현대미술관<br>서울로 이동 중</h1><p class="muted">620m 남음 · 운영 중</p></div>
+          <div class="trip-stats"><div class="trip-stat"><small>복귀 예정</small><strong>14:52</strong></div><div class="trip-stat"><small>남은 시간</small><strong>28분</strong></div><div class="trip-stat"><small>진행</small><strong>1 / 2</strong></div></div>
+          <div class="trip-actions"><button type="button">건너뛰기</button><button type="button">길찾기 열기</button></div>
+          <button class="primary-footer" type="button">도착했어요</button>
+        </div>
+        <div class="wayfinding-only" hidden>
+          <div class="topline"><button class="icon-button" type="button" aria-label="뒤로"><i data-lucide="arrow-left" aria-hidden="true"></i></button><span class="eyebrow">ROUTE R1 · ACTIVE</span><button class="icon-button" type="button" aria-label="더보기"><i data-lucide="ellipsis" aria-hidden="true"></i></button></div>
+          <div class="way-map"><div class="way-map-line"></div><span class="way-pin a">나</span><span class="way-pin b">01</span></div>
+          <div class="next-board"><div class="next-count">6분</div><div class="next-copy"><small>NEXT STOP · 620m</small><strong>국립현대미술관 서울</strong></div></div>
+          <div class="way-section">운행 정보</div>
+          <div class="way-list"><div class="way-row"><b class="way-code">ETA</b><div><strong>경복궁 복귀</strong><span>예정 시각 자동 계산</span></div><span>14:52</span></div><div class="way-row"><b class="way-code">OPEN</b><div><strong>운영 중</strong><span>한국관광공사 기준</span></div><span>18:00 종료</span></div></div>
+          <div class="way-trip-actions"><button type="button">건너뛰기</button><button type="button">외부 길찾기 →</button></div>
+          <button class="way-button" type="button">01 도착 확인</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const root = document.getElementById('teumta-redesign-compare');
+      const phone = root.querySelector('.phone');
+      const caption = root.querySelector('#direction-caption');
+      const directionControls = [...root.querySelectorAll('.direction-control')];
+      const screenControls = [...root.querySelectorAll('.screen-control')];
+
+      function setDirection(direction) {
+        phone.dataset.direction = direction;
+        caption.textContent = direction === 'editorial'
+          ? 'A · 도시 산책 에디토리얼'
+          : 'B · 공공 안내체계';
+        directionControls.forEach((button) => {
+          const selected = button.dataset.direction === direction;
+          button.setAttribute('aria-pressed', String(selected));
+          button.classList.toggle('btn-primary', selected);
+        });
+        root.querySelectorAll('.editorial-only').forEach((element) => {
+          element.hidden = direction !== 'editorial';
+        });
+        root.querySelectorAll('.wayfinding-only').forEach((element) => {
+          element.hidden = direction !== 'wayfinding';
+        });
+      }
+
+      function setScreen(screen) {
+        root.querySelectorAll('[data-screen-panel]').forEach((panel) => {
+          panel.classList.toggle('active', panel.dataset.screenPanel === screen);
+        });
+        screenControls.forEach((button) => {
+          const selected = button.dataset.screen === screen;
+          button.setAttribute('aria-pressed', String(selected));
+          button.classList.toggle('btn-primary', selected);
+        });
+      }
+
+      directionControls.forEach((button) => {
+        button.addEventListener('click', () => setDirection(button.dataset.direction));
+      });
+      screenControls.forEach((button) => {
+        button.addEventListener('click', () => setScreen(button.dataset.screen));
+      });
+    })();
+  </script>
+</div>

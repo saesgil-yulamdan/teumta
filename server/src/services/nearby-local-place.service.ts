@@ -24,6 +24,7 @@ import {
   mapNearbyCandidateList,
 } from '../external/tour';
 import { prisma } from '../utils/prisma';
+import { TtlCache } from '../utils/ttl-cache';
 
 /**
  * 주변 로컬 장소 실시간 조회(TourAPI + TMAP).
@@ -37,6 +38,17 @@ export const MAX_RADIUS_METERS = 20_000;
 export const MAX_TOUR_CANDIDATES = 10;
 /** TMAP 동시 호출 제한. */
 export const TMAP_CONCURRENCY = 3;
+
+/**
+ * 상세 화면과 코스 생성이 같은 목적지를 연달아 조회할 때 보행 경로 실측을 공유한다.
+ * 외부 장소 목록은 자주 바뀌지 않지만 운영 중 변경을 빠르게 반영하도록 5분만 보관한다.
+ */
+export const NEARBY_MEASUREMENT_CACHE_TTL_MS = 5 * 60 * 1000;
+const NEARBY_MEASUREMENT_CACHE_MAX_ENTRIES = 500;
+const nearbyMeasurementCache = new TtlCache<MeasuredNearbyPlace[]>(
+  NEARBY_MEASUREMENT_CACHE_TTL_MS,
+  NEARBY_MEASUREMENT_CACHE_MAX_ENTRIES,
+);
 
 /** 로컬 장소 후보로 볼 TourAPI contentTypeId. 14=문화시설, 38=쇼핑, 39=음식점. */
 const LOCAL_CANDIDATE_CONTENT_TYPE_IDS = ['14', '38', '39'] as const;
@@ -261,12 +273,37 @@ export async function measureNearbyLocalPlaces(
   base: DestinationBase,
   radiusMeters: number,
 ): Promise<MeasuredNearbyPlace[]> {
+  const key = measurementCacheKey(base, radiusMeters);
+  return nearbyMeasurementCache.getOrCreate(key, () =>
+    measureNearbyLocalPlacesUncached(base, radiusMeters),
+  );
+}
+
+async function measureNearbyLocalPlacesUncached(
+  base: DestinationBase,
+  radiusMeters: number,
+): Promise<MeasuredNearbyPlace[]> {
   const candidates = await fetchNearbyCandidates(base, radiusMeters, base.contentId);
   if (candidates.length === 0) {
     return [];
   }
   const selected = selectClosestCandidates(candidates, base, MAX_TOUR_CANDIDATES);
   return resolveWalkingDistances(base, selected, radiusMeters);
+}
+
+function measurementCacheKey(base: DestinationBase, radiusMeters: number): string {
+  return [
+    base.contentId || 'tmap',
+    base.name,
+    base.latitude.toFixed(6),
+    base.longitude.toFixed(6),
+    radiusMeters,
+  ].join(':');
+}
+
+/** 테스트·운영 진단에서 측정 캐시를 명시적으로 비운다. */
+export function clearNearbyMeasurementCache(): void {
+  nearbyMeasurementCache.clear();
 }
 
 /** 공용 코어 결과를 3.3b 응답 형태로 변환. */

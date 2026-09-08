@@ -49,6 +49,8 @@
 ### Trip / TripEvent 취급
 - 현재 Trip/TripEvent를 사용하는 API/코드는 없다(진행 상태는 서버에 저장되지 않음).
 - 진행 상태(코스 시작/도착/출발/복귀/완료)는 **mobile local state**에서 관리한다.
+  현재 코스와 진행 상태는 AsyncStorage에 저장해 앱이 재시작되어도 복구하며,
+  코스 완료 또는 명시적 종료 시 삭제한다. 이 데이터는 서버로 전송하지 않는다.
 - 향후 "방문 로그" 기능이 필요하면, `PLACE_ARRIVED + placeId + timestamp + persistent deviceId`처럼
   사용자 방문 위치를 지속 축적하는 구조는 피한다. Trip 식별은 device identifier 대신
   **Trip 자체 id 또는 Trip 한정 랜덤 session id**를 사용한다.
@@ -75,7 +77,8 @@
 | `utils/arrival.ts` | `hasArrived(current, destination, radius)` |
 | `utils/directions.ts` | 외부 지도 앱 길찾기(목적지만 전달) |
 | `hooks/use-current-location.ts` | foreground 전용 위치 훅(구독 해제 포함) |
-| `hooks/use-course-progress.ts` | 코스 진행 상태 local state 관리 |
+| `hooks/use-course-progress.ts` | 코스 진행 상태 local state·AsyncStorage 복구 관리 |
+| `stores/selected-course.ts` | 현재 코스 선택값을 AsyncStorage에 보존·복구 |
 
 ---
 

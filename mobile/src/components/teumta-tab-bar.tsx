@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Teumta } from '@/constants/theme';
+import { TeumtaHybrid } from '@/constants/theme';
 
 export type TeumtaTab = 'home' | 'explore' | 'trips' | 'my';
 
@@ -64,7 +64,7 @@ export function TeumtaTabBar({ active }: { active: TeumtaTab }) {
           <Pressable key={tab.key} style={styles.item} onPress={() => goTo(tab.key)}>
             <Image
               source={isActive ? tab.activeIcon : tab.inactiveIcon}
-              style={styles.icon}
+              style={[styles.icon, isActive && styles.iconActive]}
               contentFit="contain"
             />
             <Text style={[styles.label, isActive && styles.labelActive]}>{tab.label}</Text>
@@ -78,17 +78,13 @@ export function TeumtaTabBar({ active }: { active: TeumtaTab }) {
 const styles = StyleSheet.create({
   bar: {
     alignItems: 'center',
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 22,
-    borderWidth: 1,
+    backgroundColor: TeumtaHybrid.paper,
+    borderTopColor: TeumtaHybrid.line,
+    borderTopWidth: 1,
     flexDirection: 'row',
-    height: 82,
+    height: 70,
     justifyContent: 'space-between',
-    marginBottom: 12,
-    marginHorizontal: 20,
-    marginTop: 10,
-    paddingHorizontal: 18,
+    paddingHorizontal: 38,
   },
   item: {
     alignItems: 'center',
@@ -98,13 +94,16 @@ const styles = StyleSheet.create({
     height: 20,
     width: 20,
   },
+  iconActive: {
+    tintColor: TeumtaHybrid.navy,
+  },
   label: {
-    color: Teumta.textTertiary,
+    color: TeumtaHybrid.faint,
     fontSize: 10,
     fontWeight: '700',
     lineHeight: 14,
   },
   labelActive: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.navy,
   },
 });

@@ -52,8 +52,8 @@
  Place       ingest:tour 스크립트(수동). 현재 종로구 528곳
              → 저장형 코스의 정류지, 집중률 매칭 참조용
  Congestion  집중률 예측 스케줄러(자동, 매일 05시 KST) — MATCHED만 저장
-             미매칭은 관리자 웹에서 alias로 수동 연결
- Route/Trip  관리자가 등록하는 저장형 코스. 앱은 현재 사용하지 않는다
+             미매칭은 로그로 확인. alias 관리 구현은 보존만 함
+ Route/Trip  과거 저장형 코스·방문 구현. 앱은 현재 사용하지 않는다
 ```
 
 > ⚠️ **DB에는 종로구 528곳뿐이다.** 전국 장소는 어디에도 저장돼 있지 않다.
@@ -74,12 +74,14 @@
 | 검색 1회 | 1 | 0~1 (폴백 시) | — |
 | 주변 장소 1회 (contentId) | 4 | 10 | — |
 | 주변 장소 1회 (poiId) | 3 | 11 | — |
-| 우회 코스 1회 | 0 (주변 장소 결과 재사용) | 수 건(반환 코스 구간 검증) | — |
+| 우회 코스 1회 | 목적지·후보 조회 수 건 | 캐시 미스 시 최대 32, 상세 직후 후보 측정 최대 16회 재사용 | — |
 | 혼잡도 1회 | — | — | 0~1 (5분 캐시) |
 | 집중률 1회 | 1 | — | — (KTO 별도, 지역 6시간 캐시) |
 
 **한도** — TourAPI 일 1,000 · TMAP 보행자 일 1,000 / POI 검색 일 20,000 · 퍼즐 월 3,000
-→ **하루 감당량 ≈ 주변 장소 조회 100회**(병목: TMAP 보행자).
+→ **병목은 TMAP 보행자 경로다.** 로컬·행사 후보 측정은 서버 TTL 캐시로 상세와 코스 생성이
+공유되지만, 코스 정류지 사이 검증은 variant마다 다시 호출된다. 공개 API 비용 가중 rate limit과
+`public_api_usage` 구조화 로그로 호출을 보호·계측한다.
 프론트는 검색 자동완성 금지(버튼 또는 500ms+ debounce).
 
 ---
@@ -92,9 +94,9 @@ org main 머지 → Cloudtype 콘솔 "배포하기" → 반영
 
 - 서버 `https://port-0-teumta-server-msh476v8e47b3c7e.sel3.cloudtype.app`
   (기동 시 `prisma migrate deploy` 자동 실행)
-- 관리자 웹 `https://port-0-teumta-admin-web-msh476v8e47b3c7e.sel3.cloudtype.app` (로그인 필요)
+- 관리자 웹은 2026-09-08 운영 폐기. 소스와 API는 참고용으로 보존하지만 배포·CI·신규 개발 대상이 아니다.
 - DB: MariaDB 11.2, 영구 볼륨 · 백업은 GitHub Actions 매일 05:30 KST(artifact 30일)
-- 서버·DB 유료 리소스, 상시 실행. **서버와 관리자 웹은 각각 배포해야 한다**
+- 서버·DB 유료 리소스, 상시 실행. 관리자 웹은 더 이상 배포하지 않는다.
 - 상세: [deploy-cloudtype.md](./deploy-cloudtype.md)
 
 ---
@@ -113,15 +115,15 @@ server/src/
 │   ├── place-search.service.ts           [B] 목적지 검색
 │   ├── congestion.service.ts             [B] 실시간 혼잡도
 │   ├── concentration-forecast.service.ts [B] 실시간 집중률
-│   ├── concentration-matching.service.ts [B] 집중률 매칭·alias (관리자 웹)
+│   ├── concentration-matching.service.ts [B] 집중률 매칭·alias (보존)
 │   ├── *-ingestion.service.ts            [B] 적재
 │   ├── prediction-scheduler.service.ts   [B] 일일 적재 스케줄러
 │   └── route-calculation.service.ts      [B 제공 → A 소비] TMAP 경로 계산
-├── middlewares/        error · admin-auth · login-rate-limit
+├── middlewares/        error · public-api-guard · admin-auth · login-rate-limit
 ├── controllers/ routes/
 └── prisma/             [A] 스키마 — 변경은 A에게 요청
 ```
 
 - `mobile/` Expo(React Native) — 사용자 앱
-- `admin/` React + Vite — 관리자 웹. **용도 재검토 중**([team-todo.md](./team-todo.md))
+- `admin/` React + Vite — **운영 폐기, 삭제하지 않고 보존만 함**([team-todo.md](./team-todo.md))
 - `web/` 지원·개인정보처리방침 정적 페이지(GitHub Pages)

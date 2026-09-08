@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Teumta } from '@/constants/theme';
+import { TeumtaHybrid } from '@/constants/theme';
 
 /** 봤는지 여부만 기기에 남긴다 — 다른 저장 데이터와 달리 지워도 다시 뜨는 것뿐이라 전체 삭제에 안 묶는다. */
 const STORAGE_KEY = 'teumta:onboarding-seen:v1';
@@ -12,18 +12,18 @@ const STORAGE_KEY = 'teumta:onboarding-seen:v1';
 const STEPS = [
   {
     key: 'check',
-    title: '지금 얼마나 붐비는지 확인',
-    body: '가려던 관광지의 실시간 혼잡도를 먼저 봐요.',
+    title: '혼잡도 확인',
+    body: '목적지의 현재 상태를 봅니다.',
   },
   {
     key: 'detour',
-    title: '붐비면 근처 로컬로 틈타기',
-    body: '남는 시간에 맞춘 도보 코스로 주변을 둘러봐요.',
+    title: '주변으로 우회',
+    body: '남는 시간에 맞춰 걸어봅니다.',
   },
   {
     key: 'return',
-    title: '여유로워지면 다시 복귀',
-    body: '돌아갈 시간이 되면 알려드려요. 여행은 그대로 이어져요.',
+    title: '제시간에 복귀',
+    body: '복귀시각을 계속 다시 계산합니다.',
   },
 ] as const;
 
@@ -72,8 +72,7 @@ export function Onboarding() {
 
           <Text style={styles.title}>붐비는 시간은 비켜가고,{'\n'}여행은 그대로.</Text>
           <Text style={styles.subtitle}>
-            관광객이 한곳에 몰린 사이, 걸어서 몇 분 거리의 로컬은 한산해요. 틈타가 그 사이를
-            이어드려요.
+            혼잡한 목적지를 잠시 비켜 주변을 걷고 돌아옵니다.
           </Text>
 
           <View style={styles.steps}>
@@ -93,7 +92,7 @@ export function Onboarding() {
           <View style={styles.privacyStrip}>
             <View style={styles.privacyDot} />
             <Text style={styles.privacyText}>
-              로그인 없이 쓰고, 위치는 기기 밖으로 나가지 않아요.
+              로그인 없이 사용 · 위치는 기기에서만 처리
             </Text>
           </View>
         </View>
@@ -108,7 +107,7 @@ export function Onboarding() {
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: Teumta.background,
+    backgroundColor: TeumtaHybrid.paper,
     flex: 1,
     paddingHorizontal: 24,
   },
@@ -127,19 +126,19 @@ const styles = StyleSheet.create({
     width: 32,
   },
   brandName: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.ink,
     fontSize: 22,
     fontWeight: '900',
     lineHeight: 32,
   },
   title: {
-    color: Teumta.textPrimary,
+    color: TeumtaHybrid.ink,
     fontSize: 27,
     fontWeight: '900',
     lineHeight: 38,
   },
   subtitle: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.muted,
     fontSize: 13,
     lineHeight: 20,
   },
@@ -149,10 +148,8 @@ const styles = StyleSheet.create({
   },
   stepRow: {
     alignItems: 'center',
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 16,
-    borderWidth: 1,
+    borderBottomColor: TeumtaHybrid.line,
+    borderBottomWidth: 1,
     flexDirection: 'row',
     gap: 12,
     paddingHorizontal: 14,
@@ -160,14 +157,14 @@ const styles = StyleSheet.create({
   },
   stepBadge: {
     alignItems: 'center',
-    backgroundColor: Teumta.greenLight,
-    borderRadius: 14,
+    backgroundColor: TeumtaHybrid.signalSoft,
+    borderRadius: TeumtaHybrid.radius.small,
     height: 28,
     justifyContent: 'center',
     width: 28,
   },
   stepBadgeLabel: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.navy,
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 18,
@@ -177,13 +174,13 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   stepTitle: {
-    color: Teumta.textPrimary,
+    color: TeumtaHybrid.ink,
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 20,
   },
   stepBody: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.muted,
     fontSize: 11,
     lineHeight: 16,
   },
@@ -194,26 +191,25 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   privacyDot: {
-    backgroundColor: Teumta.green,
-    borderRadius: 4,
+    backgroundColor: TeumtaHybrid.slate,
     height: 8,
     width: 8,
   },
   privacyText: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.muted,
     fontSize: 11,
     lineHeight: 15,
   },
   ctaButton: {
     alignItems: 'center',
-    backgroundColor: Teumta.green,
-    borderRadius: 16,
+    backgroundColor: TeumtaHybrid.ink,
+    borderRadius: TeumtaHybrid.radius.small,
     height: 52,
     justifyContent: 'center',
     marginBottom: 12,
   },
   ctaLabel: {
-    color: Teumta.surface,
+    color: TeumtaHybrid.white,
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 20,

@@ -185,6 +185,7 @@ describe('resolveTmapPoiId', () => {
   it('이름+좌표가 맞는 POI의 id를 반환한다', async () => {
     await expect(resolveTmapPoiId('126508')).resolves.toBe('362105');
     expect(fetchPoiSearchMock).toHaveBeenCalledWith('경복궁', { count: 5 });
+    expect(getSkPoiIndexMock).not.toHaveBeenCalled();
   });
 
   it('두 번째 호출은 캐시로 답하고 외부 API를 다시 부르지 않는다', async () => {

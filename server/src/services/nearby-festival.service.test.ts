@@ -33,7 +33,10 @@ vi.mock('../external/tmap', async (importOriginal) => {
   };
 });
 
-import { measureNearbyFestivals } from './nearby-festival.service';
+import {
+  clearFestivalMeasurementCache,
+  measureNearbyFestivals,
+} from './nearby-festival.service';
 import type { DestinationBase } from './nearby-local-place.service';
 
 const BASE: DestinationBase = {
@@ -103,11 +106,22 @@ function routeResponse(distanceMeters: number): TmapRouteResponse {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  clearFestivalMeasurementCache();
   fetchTourPlaceDetailMock.mockResolvedValue(detailResponse());
   fetchPedestrianRouteMock.mockResolvedValue(routeResponse(600));
 });
 
 describe('measureNearbyFestivals', () => {
+  it('같은 목적지의 연속 요청은 행사 목록·TMAP 실측을 공유한다', async () => {
+    fetchTourFestivalsMock.mockResolvedValue(listResponse([festivalItem('1', '행사1')], 1, 1));
+
+    await measureNearbyFestivals(BASE, 5000);
+    await measureNearbyFestivals(BASE, 5000);
+
+    expect(fetchTourFestivalsMock).toHaveBeenCalledTimes(1);
+    expect(fetchPedestrianRouteMock).toHaveBeenCalledTimes(1);
+  });
+
   it('searchFestival2를 최대 3페이지까지 얕게 조회해 후보 누락을 줄인다', async () => {
     fetchTourFestivalsMock.mockImplementation(({ pageNo }: { pageNo?: number }) => {
       const page = pageNo ?? 1;

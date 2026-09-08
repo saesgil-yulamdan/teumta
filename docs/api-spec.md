@@ -49,10 +49,18 @@
 | 401 | 관리자 인증 실패/토큰 없음·만료 (`UNAUTHORIZED`, `INVALID_CREDENTIALS`) |
 | 404 | 리소스 없음 |
 | 409 | 충돌 (`TAG_ALREADY_EXISTS`, `PLACE_IN_USE`) |
-| 429 | 로그인 시도 초과 (`TOO_MANY_ATTEMPTS`, `Retry-After` 헤더 포함) |
+| 429 | 공개 API 비용 한도 또는 로그인 시도 초과 (`Retry-After` 헤더 포함) |
 | 500 | 서버 내부 오류 |
 | 502 / 503 | 외부 API 연동 실패/지연 (B 영역) |
 | 503 | 관리자 인증 미설정 (`ADMIN_AUTH_NOT_CONFIGURED`) |
+
+### 1.5 공개 API 보호
+
+- `/api/admin/*`를 제외한 `/api/*`는 IP별 60초 고정 창의 비용 가중 rate limit을 적용한다.
+- 코스 생성 15, 주변 로컬·행사 5, 검색·예측 2, 나머지 1을 차감하며 한도는 60이다.
+- 초과 시 `429 PUBLIC_API_RATE_LIMITED`와 `Retry-After`를 반환한다.
+- 완료된 요청은 `public_api_usage` 구조화 로그로 경로·상태·소요시간·비용을 남기되 IP와 query는 기록하지 않는다.
+- 브라우저 Origin은 `CORS_ALLOWED_ORIGINS`에 명시된 값만 허용한다. Origin이 없는 native 앱 요청은 허용한다.
 
 ---
 
@@ -634,6 +642,9 @@ GET /api/routes/:routeId
 ---
 
 ### 3.7 방문(Trip) 생성 — [A]
+
+> 보존 전용 legacy API. 기본은 라우터가 비활성화되며
+> `ENABLE_LEGACY_TRIP_API=true`를 설정한 환경에서만 3.7~3.9를 사용할 수 있다.
 ```
 POST /api/trips
 ```
@@ -651,11 +662,13 @@ POST /api/trips/:tripId/events
 Body:
 ```jsonc
 {
-  "eventType": "PLACE_ARRIVED",   // TripEventType (필수)
-  "placeId": 1,                     // optional
+  "eventType": "TRIP_STARTED",    // 서버 허용 3종 중 하나(필수)
+  "placeId": null,                   // 사용자 방문 장소는 기록하지 않음
   "metadata": { }                    // optional JSON — 사용자 좌표 넣지 말 것(privacy)
 }
 ```
+- 허용: `TRIP_STARTED`, `TRIP_COMPLETED`, `TRIP_CANCELLED`.
+- `PLACE_ARRIVED`, `PLACE_LEFT`, `MAIN_PLACE_RETURNED`는 위치 프라이버시 정책상 거부한다.
 - `400 INVALID_EVENT_TYPE`, `404 TRIP_NOT_FOUND`
 - 201: `data`는 생성된 `TripEvent`.
 
@@ -710,9 +723,10 @@ SK 퍼즐 커버리지 밖(`CONGESTION_DATA_NOT_FOUND`)은 장애성 warn이 아
 
 ---
 
-## 6. 관리자 API — [B] (구현됨, 2026-08-07)
+## 6. 관리자 API — [B] (보존 전용, 운영 폐기 2026-09-08)
 
-관리자 웹(`admin/`)이 소비한다. 소스: `server/src/routes/admin.routes.ts`, `place.routes.ts`.
+관리자 웹(`admin/`)과 API 구현은 삭제하지 않고 보존하지만 현재 운영·배포·신규 개발에서 제외한다.
+소스: `server/src/routes/admin.routes.ts`, `place.routes.ts`.
 
 ### 6.1 인증 규약
 
