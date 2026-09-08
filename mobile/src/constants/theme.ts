@@ -44,6 +44,46 @@ export const Teumta = {
   },
 } as const;
 
+/**
+ * 2026 hybrid visual direction.
+ *
+ * Discovery screens use the editorial paper/ink/forest colors while active
+ * course screens use the navy/signal wayfinding colors. Keeping this separate
+ * from `Teumta` lets screens move over incrementally without changing legacy
+ * surfaces by accident.
+ */
+export const TeumtaHybrid = {
+  canvas: '#F1EEE5',
+  paper: '#FBFAF5',
+  ink: '#191A17',
+  muted: '#67685F',
+  faint: '#96978F',
+  line: '#D3D0C5',
+  forest: '#174F3D',
+  forestSoft: '#DCE8DE',
+  terracotta: '#B85D45',
+  terracottaSoft: '#EFE1DA',
+  navy: '#344454',
+  navySoft: '#E2E6E8',
+  signal: '#D2AA57',
+  signalSoft: '#F0E7D0',
+  slate: '#60717C',
+  slateSoft: '#E6EAEB',
+  white: '#FFFFFF',
+  radius: {
+    small: 3,
+    medium: 6,
+    large: 10,
+  },
+} as const;
+
+export const TeumtaHybridCongestion = {
+  low: { text: '#526F7A', background: '#E6ECEE', dot: '#6C8A94' },
+  medium: { text: '#8B692E', background: '#F1E8D5', dot: '#B28A43' },
+  high: { text: '#A45542', background: '#F0E0DA', dot: '#BF684F' },
+  veryHigh: { text: '#8F3F36', background: '#ECD8D4', dot: '#A84B3E' },
+} as const;
+
 export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */

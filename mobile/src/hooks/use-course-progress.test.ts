@@ -19,6 +19,18 @@ const initial = {
 };
 
 describe('courseProgressReducer', () => {
+  it('단말에 저장한 진행 상태를 복원한다', () => {
+    const restored = {
+      ...initial,
+      phase: 'in_progress' as const,
+      currentIndex: 1,
+      startedAt: 100,
+      outcomes: { 'stop-1': 'visited' as const },
+    };
+
+    expect(courseProgressReducer(initial, { type: 'restore', state: restored })).toEqual(restored);
+  });
+
   it('도착해 머무는 동안은 다음 정류지로 넘기지 않는다', () => {
     const started = courseProgressReducer(initial, { type: 'start', at: 100 });
     const arrived = courseProgressReducer(started, {

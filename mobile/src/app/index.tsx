@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { Link, type Href } from 'expo-router';
+import { Link, type Href, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,7 +14,8 @@ import {
   type FeaturedDestination,
   type Region,
 } from '@/constants/destinations';
-import { Teumta } from '@/constants/theme';
+import { TeumtaHybrid } from '@/constants/theme';
+import { loadSelectedCourse, type SelectedCourse } from '@/stores/selected-course';
 
 /** 목적지 상세로 넘길 파라미터. 상세 화면이 이 식별자로 실시간 정보를 조회한다. */
 function detailHref(destination: FeaturedDestination) {
@@ -31,6 +32,19 @@ function detailHref(destination: FeaturedDestination) {
 }
 
 export default function HomeScreen() {
+  const [activeCourse, setActiveCourse] = useState<SelectedCourse | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      let ignored = false;
+      void loadSelectedCourse().then((course) => {
+        if (!ignored) setActiveCourse(course);
+      });
+      return () => {
+        ignored = true;
+      };
+    }, []),
+  );
   // null = 전체
   const [region, setRegion] = useState<Region | null>(null);
   const destinations = destinationsInRegion(region);
@@ -57,7 +71,7 @@ export default function HomeScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor={Teumta.green}
+            tintColor={TeumtaHybrid.terracotta}
           />
         }
         showsVerticalScrollIndicator={false}>
@@ -73,7 +87,7 @@ export default function HomeScreen() {
         <View style={styles.intro}>
           <Text style={styles.eyebrow}>오늘의 여행</Text>
           <Text style={styles.title}>어디로 떠나세요?</Text>
-          <Text style={styles.subtitle}>붐비는 시간은 비켜가고, 여행은 그대로 이어가요.</Text>
+          <Text style={styles.subtitle}>혼잡은 피하고, 여행은 이어가요.</Text>
         </View>
 
         <Link href={'/search' as Href} asChild>
@@ -83,11 +97,26 @@ export default function HomeScreen() {
               style={styles.searchIcon}
               contentFit="contain"
             />
-            <Text style={styles.searchPlaceholder}>관광지나 지역을 검색해 보세요</Text>
+            <Text style={styles.searchPlaceholder}>장소·지역 검색</Text>
           </Pressable>
         </Link>
 
         <QuietNow refreshSignal={refreshSignal} onRefreshed={handleRefreshed} />
+
+        {activeCourse && (
+          <Link href={'/trip' as Href} asChild>
+            <Pressable style={styles.resumeCard}>
+              <View style={styles.resumeCopy}>
+                <Text style={styles.resumeEyebrow}>진행 중인 코스</Text>
+                <Text numberOfLines={1} style={styles.resumeTitle}>
+                  {activeCourse.destination.name}
+                </Text>
+                <Text style={styles.resumeMeta}>마지막 진행 지점부터 이어서 시작해요.</Text>
+              </View>
+              <Text style={styles.resumeAction}>이어가기</Text>
+            </Pressable>
+          </Link>
+        )}
 
         <ScrollView
           horizontal
@@ -114,7 +143,7 @@ export default function HomeScreen() {
         </ScrollView>
 
         <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>붐비기 쉬운 대표 관광지</Text>
+          <Text style={styles.sectionTitle}>대표 관광지</Text>
           {region !== null && (
             <Pressable onPress={() => setRegion(null)} hitSlop={8}>
               <Text style={styles.sectionAction}>전체 지역 보기</Text>
@@ -141,7 +170,7 @@ export default function HomeScreen() {
                 <View style={styles.featuredTexts}>
                   <Text style={styles.featuredName}>{featured.name}</Text>
                   <Text style={styles.featuredMeta}>
-                    {featured.areaLabel} · 혼잡도와 우회 코스 확인
+                    {featured.areaLabel} · 혼잡도·코스
                   </Text>
                 </View>
               </View>
@@ -186,15 +215,15 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: Teumta.background,
+    backgroundColor: TeumtaHybrid.paper,
     flex: 1,
   },
   scroll: {
     flex: 1,
   },
   content: {
-    gap: 14,
-    paddingBottom: 16,
+    gap: 22,
+    paddingBottom: 24,
     paddingHorizontal: 20,
     paddingTop: 8,
   },
@@ -208,7 +237,7 @@ const styles = StyleSheet.create({
     width: 32,
   },
   brandName: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.ink,
     fontSize: 22,
     fontWeight: '900',
     lineHeight: 32,
@@ -217,27 +246,28 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   eyebrow: {
-    color: Teumta.greenDark,
-    fontSize: 12,
-    fontWeight: '700',
+    color: TeumtaHybrid.terracotta,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.1,
     lineHeight: 17,
   },
   title: {
-    color: Teumta.textPrimary,
-    fontSize: 27,
+    color: TeumtaHybrid.ink,
+    fontSize: 30,
     fontWeight: '900',
     lineHeight: 39,
   },
   subtitle: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.muted,
     fontSize: 13,
     lineHeight: 19,
   },
   searchField: {
     alignItems: 'center',
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 16,
+    backgroundColor: TeumtaHybrid.paper,
+    borderColor: TeumtaHybrid.line,
+    borderRadius: TeumtaHybrid.radius.small,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 10,
@@ -249,7 +279,7 @@ const styles = StyleSheet.create({
     width: 19,
   },
   searchPlaceholder: {
-    color: Teumta.textTertiary,
+    color: TeumtaHybrid.faint,
     fontSize: 13,
     lineHeight: 19,
   },
@@ -258,74 +288,112 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   chip: {
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 999,
+    backgroundColor: TeumtaHybrid.paper,
+    borderColor: TeumtaHybrid.line,
+    borderRadius: TeumtaHybrid.radius.small,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
   chipSelected: {
-    backgroundColor: Teumta.greenLight,
-    borderColor: Teumta.green,
+    backgroundColor: TeumtaHybrid.slateSoft,
+    borderColor: TeumtaHybrid.slate,
   },
   chipLabel: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.muted,
     fontSize: 11,
     fontWeight: '700',
     lineHeight: 16,
   },
   chipLabelSelected: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.navy,
   },
   sectionRow: {
     alignItems: 'center',
+    borderTopColor: TeumtaHybrid.ink,
+    borderTopWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingTop: 12,
   },
-  sectionTitle: {
-    color: Teumta.textPrimary,
+  resumeCard: {
+    alignItems: 'center',
+    backgroundColor: TeumtaHybrid.navySoft,
+    borderColor: TeumtaHybrid.navy,
+    borderRadius: TeumtaHybrid.radius.small,
+    borderWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 14,
+  },
+  resumeCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  resumeEyebrow: {
+    color: TeumtaHybrid.slate,
+    fontSize: 10,
+    fontWeight: '800',
+    lineHeight: 14,
+  },
+  resumeTitle: {
+    color: TeumtaHybrid.ink,
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '800',
     lineHeight: 21,
   },
+  resumeMeta: {
+    color: TeumtaHybrid.muted,
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  resumeAction: {
+    color: TeumtaHybrid.navy,
+    fontSize: 12,
+    fontWeight: '800',
+    marginLeft: 12,
+  },
+  sectionTitle: {
+    color: TeumtaHybrid.ink,
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 24,
+  },
   sectionAction: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.terracotta,
     fontSize: 11,
     fontWeight: '700',
     lineHeight: 15,
   },
   featuredCard: {
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 20,
-    borderWidth: 1,
+    backgroundColor: TeumtaHybrid.paper,
+    borderBottomColor: TeumtaHybrid.ink,
+    borderBottomWidth: 1,
     overflow: 'hidden',
   },
   featuredImage: {
-    backgroundColor: Teumta.imagePlaceholder,
-    height: 130,
+    backgroundColor: TeumtaHybrid.canvas,
+    height: 176,
   },
   featuredBody: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
   featuredTexts: {
     gap: 1,
   },
   featuredName: {
-    color: Teumta.textPrimary,
-    fontSize: 16,
-    fontWeight: '700',
-    lineHeight: 22,
+    color: TeumtaHybrid.ink,
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 24,
   },
   featuredMeta: {
-    color: Teumta.textSecondary,
-    fontSize: 10,
-    lineHeight: 14,
+    color: TeumtaHybrid.muted,
+    fontSize: 11,
+    lineHeight: 16,
   },
   attribution: {
     marginTop: 4,
@@ -346,17 +414,17 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   regionCard: {
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 16,
-    borderWidth: 1,
+    backgroundColor: TeumtaHybrid.paper,
+    borderBottomColor: TeumtaHybrid.line,
+    borderBottomWidth: 1,
     // flex:1은 줄바꿈과 함께 쓰면 한 줄에 전부 밀어넣는다. 2열 격자라 폭을 고정한다.
     overflow: 'hidden',
     width: '48%',
   },
   regionImage: {
-    backgroundColor: Teumta.imagePlaceholder,
-    height: 88,
+    backgroundColor: TeumtaHybrid.canvas,
+    borderRadius: TeumtaHybrid.radius.small,
+    height: 104,
   },
   regionBody: {
     gap: 2,
@@ -364,14 +432,14 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   regionName: {
-    color: Teumta.textPrimary,
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 17,
+    color: TeumtaHybrid.ink,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
   },
   regionMeta: {
-    color: Teumta.textSecondary,
-    fontSize: 10,
-    lineHeight: 14,
+    color: TeumtaHybrid.muted,
+    fontSize: 11,
+    lineHeight: 15,
   },
 });

@@ -43,6 +43,10 @@ const festivalCache = new TtlCache<NearbyFestivalsResult>(
   FESTIVAL_CACHE_TTL_MS,
   FESTIVAL_CACHE_MAX_ENTRIES,
 );
+const measuredFestivalCache = new TtlCache<MeasuredNearbyPlace[]>(
+  FESTIVAL_CACHE_TTL_MS,
+  FESTIVAL_CACHE_MAX_ENTRIES,
+);
 
 export type NearbyFestivalsResult =
   | { status: 'NOT_FOUND' }
@@ -58,8 +62,7 @@ export async function getNearbyFestivalsByContentId(
     if (!base) {
       return { status: 'NOT_FOUND' as const };
     }
-    const candidates = await fetchNearbyFestivalCandidates(base, radiusMeters, contentId);
-    const measured = await measureFestivalCandidates(base, candidates, radiusMeters);
+    const measured = await measureNearbyFestivals(base, radiusMeters);
     return { status: 'SUCCESS' as const, festivals: measured.map(toFestivalDto) };
   });
 }
@@ -74,8 +77,7 @@ export async function getNearbyFestivalsByPoiId(
     if (!base) {
       return { status: 'NOT_FOUND' as const };
     }
-    const candidates = await fetchNearbyFestivalCandidates(base, radiusMeters, '');
-    const measured = await measureFestivalCandidates(base, candidates, radiusMeters);
+    const measured = await measureNearbyFestivals(base, radiusMeters);
     return { status: 'SUCCESS' as const, festivals: measured.map(toFestivalDto) };
   });
 }
@@ -85,8 +87,24 @@ export async function measureNearbyFestivals(
   base: DestinationBase,
   radiusMeters: number,
 ): Promise<MeasuredNearbyPlace[]> {
-  const candidates = await fetchNearbyFestivalCandidates(base, radiusMeters, base.contentId);
-  return measureFestivalCandidates(base, candidates, radiusMeters);
+  const key = [
+    todayKstYmd(),
+    base.contentId || 'tmap',
+    base.name,
+    base.latitude.toFixed(6),
+    base.longitude.toFixed(6),
+    radiusMeters,
+  ].join(':');
+  return measuredFestivalCache.getOrCreate(key, async () => {
+    const candidates = await fetchNearbyFestivalCandidates(base, radiusMeters, base.contentId);
+    return measureFestivalCandidates(base, candidates, radiusMeters);
+  });
+}
+
+/** 테스트·운영 진단에서 행사 측정 캐시를 명시적으로 비운다. */
+export function clearFestivalMeasurementCache(): void {
+  festivalCache.clear();
+  measuredFestivalCache.clear();
 }
 
 async function fetchNearbyFestivalCandidates(

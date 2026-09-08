@@ -3,7 +3,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 
 import '@/global.css';
-import { Teumta } from '@/constants/theme';
+import { TeumtaHybrid } from '@/constants/theme';
 import { BookmarksProvider } from '@/hooks/use-bookmarks';
 import { CourseLogProvider } from '@/hooks/use-course-log';
 
@@ -21,9 +21,10 @@ export default function RootLayout() {
         <CourseLogProvider>
           <Stack
             screenOptions={{
-              headerStyle: { backgroundColor: Teumta.surface },
-              headerTintColor: Teumta.textPrimary,
-              contentStyle: { backgroundColor: Teumta.background },
+              headerStyle: { backgroundColor: TeumtaHybrid.paper },
+              headerTintColor: TeumtaHybrid.ink,
+              headerShadowVisible: false,
+              contentStyle: { backgroundColor: TeumtaHybrid.paper },
             }}>
             <Stack.Screen name="index" options={{ title: 'teumta', headerShown: false }} />
             <Stack.Screen name="search" options={{ title: '관광지 검색' }} />

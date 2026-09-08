@@ -12,7 +12,7 @@ import {
 
 import { searchPlaces } from '@/api/places';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
-import { Teumta } from '@/constants/theme';
+import { TeumtaHybrid } from '@/constants/theme';
 import type { SearchPlaceResult } from '@/types/place';
 import {
   MAX_RECENT_SEARCHES,
@@ -108,7 +108,7 @@ export default function SearchScreen() {
           onSubmitEditing={() => void runSearch(keyword)}
           returnKeyType="search"
           placeholder="관광지, 지역, 테마 검색"
-          placeholderTextColor={Teumta.textTertiary}
+          placeholderTextColor={TeumtaHybrid.faint}
           style={styles.searchInput}
         />
         <Pressable style={styles.searchButton} onPress={() => void runSearch(keyword)}>
@@ -154,7 +154,7 @@ export default function SearchScreen() {
       {status === 'loading' && <ActivityIndicator style={styles.stateBox} />}
 
       {status === 'error' && (
-        <Text style={styles.stateText}>검색 중 문제가 발생했습니다. 다시 시도해 주세요.</Text>
+        <Text style={styles.stateText}>검색하지 못했어요. 다시 시도해 주세요.</Text>
       )}
 
       {status === 'idle' && hasSearched && results.length === 0 && (
@@ -209,7 +209,8 @@ export default function SearchScreen() {
 // 다른 화면과 같은 Teumta 토큰만 쓴다 — 이 화면만 초기 프로토타입 색이 남아 이질적이었다.
 const styles = StyleSheet.create({
   container: {
-    gap: 16,
+    backgroundColor: TeumtaHybrid.paper,
+    gap: 22,
     padding: 20,
   },
   searchRow: {
@@ -217,11 +218,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   searchInput: {
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 14,
+    backgroundColor: TeumtaHybrid.paper,
+    borderColor: TeumtaHybrid.line,
+    borderRadius: TeumtaHybrid.radius.small,
     borderWidth: 1,
-    color: Teumta.textPrimary,
+    color: TeumtaHybrid.ink,
     flex: 1,
     fontSize: 14,
     paddingHorizontal: 15,
@@ -229,13 +230,13 @@ const styles = StyleSheet.create({
   },
   searchButton: {
     alignItems: 'center',
-    backgroundColor: Teumta.green,
-    borderRadius: 14,
+    backgroundColor: TeumtaHybrid.ink,
+    borderRadius: TeumtaHybrid.radius.small,
     justifyContent: 'center',
     paddingHorizontal: 17,
   },
   searchButtonText: {
-    color: Teumta.surface,
+    color: TeumtaHybrid.white,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -248,13 +249,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   shortcutTitle: {
-    color: Teumta.textPrimary,
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 20,
+    color: TeumtaHybrid.ink,
+    fontSize: 16,
+    fontWeight: '800',
+    lineHeight: 22,
   },
   shortcutClear: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.terracotta,
     fontSize: 11,
     fontWeight: '700',
     lineHeight: 15,
@@ -265,15 +266,15 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   chip: {
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 999,
+    backgroundColor: TeumtaHybrid.slateSoft,
+    borderColor: TeumtaHybrid.line,
+    borderRadius: TeumtaHybrid.radius.small,
     borderWidth: 1,
     paddingHorizontal: 13,
     paddingVertical: 8,
   },
   chipLabel: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.slate,
     fontSize: 12,
     fontWeight: '700',
     lineHeight: 17,
@@ -282,36 +283,34 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   stateText: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.muted,
     fontSize: 12,
     lineHeight: 18,
   },
   list: {
-    gap: 9,
+    borderTopColor: TeumtaHybrid.line,
+    borderTopWidth: 1,
   },
   attribution: {
     marginTop: 4,
   },
   card: {
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 15,
-    borderWidth: 1,
+    borderBottomColor: TeumtaHybrid.line,
+    borderBottomWidth: 1,
     gap: 3,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 14,
   },
   cardDisabled: {
     opacity: 0.5,
   },
   placeName: {
-    color: Teumta.textPrimary,
+    color: TeumtaHybrid.ink,
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 20,
   },
   location: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.muted,
     fontSize: 11,
     lineHeight: 15,
   },

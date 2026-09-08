@@ -5,15 +5,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CourseMapView } from '@/components/course-map-view';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
-import { Teumta } from '@/constants/theme';
+import { TeumtaHybrid } from '@/constants/theme';
 import { getSelectedCourse } from '@/stores/selected-course';
 import { courseDistanceMeters, courseStayMinutes } from '@/types/course';
 import { buildCourseRoutePath } from '@/utils/course-path';
 import { withRoJosa } from '@/utils/text';
 import { timeLabelAfter } from '@/utils/time';
 
-const SHEET_OVERLAP = 26;
-const DOT_START = '#FF9175';
+const DOT_START = TeumtaHybrid.terracotta;
 
 export default function CourseMapScreen() {
   const router = useRouter();
@@ -101,7 +100,7 @@ export default function CourseMapScreen() {
     },
     ...course.stops.map((stop, index) => ({
       key: `${stop.name}-${stop.latitude}`,
-      dot: Teumta.greenDark,
+      dot: TeumtaHybrid.navy,
       // 지도 마커와 같은 번호 — 목록과 지도 대조용
       order: index + 1,
       title: stop.name,
@@ -119,7 +118,7 @@ export default function CourseMapScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={{ height: insets.top, backgroundColor: Teumta.surface }} />
+      <View style={{ height: insets.top, backgroundColor: TeumtaHybrid.slateSoft }} />
 
       <View style={styles.topBar}>
         <Pressable style={styles.topButton} onPress={() => router.back()}>
@@ -142,15 +141,13 @@ export default function CourseMapScreen() {
         style={styles.sheet}
         contentContainerStyle={[styles.sheetContent, { paddingBottom: 18 + insets.bottom }]}
         showsVerticalScrollIndicator={false}>
-        <View style={styles.sheetHandle} />
-
         <View style={styles.sheetHeader}>
           <View style={styles.sheetTitleTexts}>
             <Text style={styles.sheetTitle} numberOfLines={1}>
               {courseName}
             </Text>
             <Text style={styles.sheetSubtitle}>
-              총 약 {course.totalMinutes}분 · 도보 약 {distanceLabel}
+              {course.totalMinutes}분 · 도보 {distanceLabel}
             </Text>
           </View>
           <View style={styles.returnPill}>
@@ -193,8 +190,7 @@ export default function CourseMapScreen() {
         <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>복귀 안내</Text>
           <Text style={styles.infoBody}>
-            {returnTimeLabel} 복귀를 기준으로 코스를 구성했어요. 걷는 시간은 실제 보행 경로로
-            계산했고, 체류시간은 장소 유형을 기준으로 한 예상값이에요.
+            {returnTimeLabel} 복귀 기준 · 실제 보행 경로와 권장 체류시간 반영
           </Text>
         </View>
 
@@ -210,7 +206,7 @@ export default function CourseMapScreen() {
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: Teumta.background,
+    backgroundColor: TeumtaHybrid.canvas,
     flex: 1,
   },
   emptyContainer: {
@@ -220,18 +216,18 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   emptyText: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.muted,
     fontSize: 16,
   },
   emptyButton: {
-    backgroundColor: Teumta.greenLight,
-    borderRadius: 999,
+    backgroundColor: TeumtaHybrid.navy,
+    borderRadius: TeumtaHybrid.radius.small,
     marginTop: 12,
     paddingHorizontal: 18,
     paddingVertical: 10,
   },
   emptyButtonLabel: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.white,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -240,7 +236,9 @@ const styles = StyleSheet.create({
   },
   topBar: {
     alignItems: 'center',
-    backgroundColor: Teumta.surface,
+    backgroundColor: TeumtaHybrid.slateSoft,
+    borderBottomColor: TeumtaHybrid.line,
+    borderBottomWidth: 1,
     flexDirection: 'row',
     height: 50,
     justifyContent: 'space-between',
@@ -248,17 +246,17 @@ const styles = StyleSheet.create({
   },
   topButton: {
     alignItems: 'center',
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 13,
+    backgroundColor: TeumtaHybrid.paper,
+    borderColor: TeumtaHybrid.line,
+    borderRadius: TeumtaHybrid.radius.small,
     borderWidth: 1,
     height: 38,
     justifyContent: 'center',
     width: 38,
   },
   topButtonSaved: {
-    backgroundColor: Teumta.greenLight,
-    borderColor: Teumta.green,
+    backgroundColor: TeumtaHybrid.signalSoft,
+    borderColor: TeumtaHybrid.signal,
   },
   topButtonIcon: {
     height: 19,
@@ -266,41 +264,33 @@ const styles = StyleSheet.create({
   },
   shareButton: {
     alignItems: 'center',
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 13,
+    backgroundColor: TeumtaHybrid.paper,
+    borderColor: TeumtaHybrid.line,
+    borderRadius: TeumtaHybrid.radius.small,
     borderWidth: 1,
     height: 38,
     justifyContent: 'center',
     paddingHorizontal: 14,
   },
   shareLabel: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.navy,
     fontSize: 12,
     fontWeight: '700',
     lineHeight: 17,
   },
   mapArea: {
-    height: 256 + SHEET_OVERLAP,
+    height: 256,
   },
   sheet: {
-    backgroundColor: Teumta.surface,
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
+    backgroundColor: TeumtaHybrid.paper,
+    borderTopColor: TeumtaHybrid.slate,
+    borderTopWidth: 2,
     flex: 1,
-    marginTop: -SHEET_OVERLAP,
   },
   sheetContent: {
     gap: 12,
     paddingHorizontal: 20,
     paddingTop: 12,
-  },
-  sheetHandle: {
-    alignSelf: 'center',
-    backgroundColor: '#DBE3DE',
-    borderRadius: 999,
-    height: 5,
-    width: 44,
   },
   sheetHeader: {
     alignItems: 'flex-start',
@@ -314,32 +304,32 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   sheetTitle: {
-    color: Teumta.textPrimary,
+    color: TeumtaHybrid.ink,
     fontSize: 19,
     fontWeight: '900',
     lineHeight: 27,
   },
   sheetSubtitle: {
-    color: Teumta.textSecondary,
-    fontSize: 10,
-    lineHeight: 14,
+    color: TeumtaHybrid.muted,
+    fontSize: 11,
+    lineHeight: 15,
   },
   returnPill: {
     alignItems: 'flex-end',
-    backgroundColor: Teumta.greenLight,
-    borderRadius: 11,
+    backgroundColor: TeumtaHybrid.signalSoft,
+    borderRadius: TeumtaHybrid.radius.small,
     flexShrink: 0,
     minWidth: 64,
     paddingHorizontal: 10,
     paddingVertical: 7,
   },
   returnPillLabel: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.muted,
     fontSize: 10,
     lineHeight: 13,
   },
   returnPillTime: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.navy,
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 20,
@@ -354,13 +344,13 @@ const styles = StyleSheet.create({
   },
   timelineDot: {
     alignItems: 'center',
-    borderRadius: 10,
+    borderRadius: TeumtaHybrid.radius.small,
     height: 20,
     justifyContent: 'center',
     width: 20,
   },
   timelineDotLabel: {
-    color: Teumta.surface,
+    color: TeumtaHybrid.white,
     fontSize: 10,
     fontWeight: '800',
     lineHeight: 13,
@@ -370,26 +360,28 @@ const styles = StyleSheet.create({
     gap: 1,
   },
   timelineTitle: {
-    color: Teumta.textPrimary,
-    fontSize: 11,
-    fontWeight: '700',
-    lineHeight: 15,
+    color: TeumtaHybrid.ink,
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
   },
   timelineSubtitle: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.muted,
     fontSize: 10,
     lineHeight: 13,
   },
   timelineTime: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.slate,
     fontSize: 10,
     fontWeight: '700',
     lineHeight: 14,
   },
   statusStrip: {
     alignItems: 'center',
-    backgroundColor: '#F7FAF7',
-    borderRadius: 13,
+    borderBottomColor: TeumtaHybrid.line,
+    borderBottomWidth: 1,
+    borderTopColor: TeumtaHybrid.line,
+    borderTopWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 12,
@@ -402,54 +394,54 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   statusLabel: {
-    color: Teumta.textTertiary,
+    color: TeumtaHybrid.muted,
     fontSize: 10,
     lineHeight: 13,
   },
   statusNow: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.navy,
     fontSize: 17,
     fontWeight: '700',
     lineHeight: 24,
   },
   statusArrow: {
-    color: Teumta.textTertiary,
+    color: TeumtaHybrid.faint,
     fontSize: 15,
     fontWeight: '500',
     lineHeight: 21,
   },
   statusRecheck: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.navy,
     fontSize: 15,
     fontWeight: '700',
     lineHeight: 21,
   },
   infoBox: {
-    backgroundColor: Teumta.greenLight,
-    borderRadius: 14,
+    borderLeftColor: TeumtaHybrid.signal,
+    borderLeftWidth: 4,
     gap: 5,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
   infoTitle: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.navy,
     fontSize: 11,
     fontWeight: '700',
   },
   infoBody: {
-    color: Teumta.textSecondary,
-    fontSize: 10,
-    lineHeight: 15,
+    color: TeumtaHybrid.muted,
+    fontSize: 11,
+    lineHeight: 16,
   },
   ctaButton: {
     alignItems: 'center',
-    backgroundColor: Teumta.green,
-    borderRadius: 16,
+    backgroundColor: TeumtaHybrid.navy,
+    borderRadius: TeumtaHybrid.radius.small,
     height: 50,
     justifyContent: 'center',
   },
   ctaLabel: {
-    color: Teumta.surface,
+    color: TeumtaHybrid.white,
     fontSize: 13,
     fontWeight: '700',
     lineHeight: 18,

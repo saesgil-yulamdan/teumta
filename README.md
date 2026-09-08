@@ -14,6 +14,7 @@
 teumta/
 ├── mobile/
 ├── server/
+├── admin/              # 보존 전용(운영 폐기, 신규 개발·배포·CI 제외)
 ├── docs/
 ├── compose.yaml
 ├── .gitignore
@@ -115,6 +116,10 @@ curl http://localhost:3000/health
 }
 ```
 
+공개 API는 외부 API 쿼터 보호를 위해 IP별 비용 가중 rate limit을 적용합니다. 브라우저에서
+호출해야 하면 `server/.env`의 `CORS_ALLOWED_ORIGINS`에 Origin을 명시합니다. 모바일 native
+요청은 Origin 헤더가 없어 별도 등록이 필요 없습니다.
+
 ## 모바일 앱 실행
 
 ```sh
@@ -124,6 +129,29 @@ npm run start
 ```
 
 Expo Go에서 QR 코드를 스캔하거나 iOS/Android 시뮬레이터로 실행합니다.
+
+## 검증
+
+```sh
+cd server && npm run test:run && npm run build
+cd mobile && npm test && npm run typecheck && npm run lint
+```
+
+PR과 `main` push에서는 `.github/workflows/ci.yml`이 서버·모바일 검사를 실행합니다.
+폐기된 `admin/`은 CI 대상이 아닙니다.
+
+실제 배포 서버와 외부 API를 점검할 때는 호출 쿼터를 확인한 뒤 순차 스모크 테스트를 실행합니다.
+
+```sh
+cd server
+SMOKE_BASE_URL=https://<server> SMOKE_DESTINATION_LIMIT=5 npm run smoke:live
+```
+
+5곳 실행은 공개 API rate limit을 존중해 목적지 사이를 기본 61초 대기합니다.
+보호 미적용 격리 환경에서만 `SMOKE_INTERVAL_MS=0`으로 덮어쓸 수 있습니다.
+
+스토어 심사·기능설명서·백업 확인 현황은
+[`docs/release-readiness.md`](docs/release-readiness.md)에 기록합니다.
 
 ## Prisma migration 적용
 

@@ -15,7 +15,7 @@ describe('resolveErrorResponse', () => {
     expect(resolveErrorResponse(new Error('boom'))).toEqual({
       status: 500,
       code: 'INTERNAL_ERROR',
-      message: 'boom',
+      message: '서버 내부 오류가 발생했습니다.',
     });
   });
 

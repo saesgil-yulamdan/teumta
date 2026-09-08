@@ -23,7 +23,7 @@ import { PlaceThumbnail } from '@/components/place-thumbnail';
 import { ReportModal } from '@/components/report-modal';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
 import { REALTIME_LEVEL_LABEL, REALTIME_LEVEL_TO_CONGESTION_LEVEL } from '@/constants/congestion';
-import { Teumta } from '@/constants/theme';
+import { TeumtaHybrid, TeumtaHybridCongestion } from '@/constants/theme';
 import { useBookmarks } from '@/hooks/use-bookmarks';
 import type {
   CongestionLevel,
@@ -41,13 +41,12 @@ import {
 } from '@/utils/forecast';
 import { realtimeBasisLabel } from '@/utils/realtime-status';
 
-const STATUS_BAR_TINT = '#CCE8DB';
-const HERO_BAND = '#1C4738';
+const STATUS_BAR_TINT = TeumtaHybrid.paper;
 
 const CONGESTION_HEADLINE: Record<CongestionLevel, string> = {
-  low: '지금은 여유로운 편이에요',
-  medium: '지금은 무난한 편이에요',
-  high: '지금은 붐비는 편이에요',
+  low: '지금은 여유로워요',
+  medium: '지금은 무난해요',
+  high: '지금은 붐벼요',
   veryHigh: '지금은 매우 붐벼요',
 };
 
@@ -59,17 +58,17 @@ const CONGESTION_BAR_RATIO: Record<CongestionLevel, number> = {
 };
 
 const CONGESTION_MESSAGE: Record<CongestionLevel, string> = {
-  low: '주변이 여유로운 편이에요. 지금 방문하기 좋아요.',
-  medium: '무난한 편이지만, 여유를 원한다면 주변 로컬 장소를 먼저 둘러보는 것도 좋아요.',
-  high: '아래 틈타 코스를 확인해 다른 장소로 우회했다가 다시 방문해보세요.',
-  veryHigh: '아래 틈타 코스를 확인해 다른 장소로 우회했다가 다시 방문해보세요.',
+  low: '지금 방문하기 좋아요.',
+  medium: '덜 붐비는 날을 확인해보세요.',
+  high: '주변을 걷고 다시 방문해보세요.',
+  veryHigh: '주변을 걷고 다시 방문해보세요.',
 };
 
 /** 중앙값 대비 오늘의 위치. KTO는 등급 미제공이라 상대 표현만. */
 const FORECAST_TONE_TITLE: Record<ForecastTone, string> = {
-  busy: '오늘은 평소보다 붐비는 날이에요',
-  usual: '오늘은 평소와 비슷해요',
-  quiet: '오늘은 평소보다 한산한 날이에요',
+  busy: '오늘은 평소보다 혼잡',
+  usual: '오늘은 평소 수준',
+  quiet: '오늘은 평소보다 여유',
 };
 
 function festivalPeriodLabel(start?: string | null, end?: string | null): string {
@@ -242,7 +241,7 @@ export default function PlaceDetailScreen() {
 
   const congestionLevel = congestion ? REALTIME_LEVEL_TO_CONGESTION_LEVEL[congestion.level] : null;
   const forecastSummary = forecast ? summarizeForecast(forecast.forecasts) : null;
-  const palette = congestionLevel ? Teumta.congestion[congestionLevel] : null;
+  const palette = congestionLevel ? TeumtaHybridCongestion[congestionLevel] : null;
   const headline = congestionLevel ? CONGESTION_HEADLINE[congestionLevel] : null;
   // 우회 트리거(congestion-rules §5): CROWDED 이상일 때만 CTA 강조.
   // 그 미만·미제공(404)·조회 실패는 기존 모양 유지 — 예측값으로 대체 판단하지 않는다.
@@ -272,7 +271,7 @@ export default function PlaceDetailScreen() {
               setRefreshing(true);
               setRefreshNonce((nonce) => nonce + 1);
             }}
-            tintColor={Teumta.green}
+            tintColor={TeumtaHybrid.terracotta}
           />
         }
         showsVerticalScrollIndicator={false}>
@@ -313,6 +312,7 @@ export default function PlaceDetailScreen() {
           <View style={styles.heroImage} />
         )}
         <View style={styles.heroTitleBand}>
+          <Text style={styles.heroEyebrow}>PLACE NOTE</Text>
           <Text style={styles.heroTitle}>{name}</Text>
           {address && <Text style={styles.heroSubtitle}>{address}</Text>}
         </View>
@@ -321,7 +321,7 @@ export default function PlaceDetailScreen() {
           <View style={styles.congestionCard}>
             {congestionStatus === 'loading' && (
               <View style={styles.dataStatusRow}>
-                <ActivityIndicator color={Teumta.green} size="small" />
+                <ActivityIndicator color={TeumtaHybrid.slate} size="small" />
                 <Text style={styles.dataStatusText}>실시간 혼잡도 · 확인 중</Text>
               </View>
             )}
@@ -397,7 +397,7 @@ export default function PlaceDetailScreen() {
 
               <View style={styles.legendRow}>
                 {LEGEND_STEPS.map((step) => {
-                  const stepPalette = Teumta.congestion[step.key];
+                  const stepPalette = TeumtaHybridCongestion[step.key];
                   const active = step.key === congestionLevel;
                   return (
                     <View
@@ -423,7 +423,7 @@ export default function PlaceDetailScreen() {
           {forecastSummary && (
             <>
               <View style={styles.sectionRow}>
-                <Text style={styles.sectionTitle}>언제 가면 덜 붐빌까</Text>
+                <Text style={styles.sectionTitle}>덜 붐비는 날</Text>
                 <Text style={styles.sectionAction}>향후 30일</Text>
               </View>
 
@@ -432,13 +432,12 @@ export default function PlaceDetailScreen() {
                   {FORECAST_TONE_TITLE[forecastSummary.tone]}
                 </Text>
                 <Text style={styles.forecastSubtitle}>
-                  향후 30일 예측의 중간값과 비교하면{' '}
+                  30일 중간값보다{' '}
                   {forecastSummary.differenceFromMedian === 0
-                    ? '비슷한 수준이에요'
+                    ? '비슷해요'
                     : `${Math.abs(forecastSummary.differenceFromMedian)}% ${
                         forecastSummary.differenceFromMedian > 0 ? '높아요' : '낮아요'
                       }`}
-                  .
                 </Text>
 
                 <ScrollView
@@ -480,8 +479,8 @@ export default function PlaceDetailScreen() {
                 {forecastSummary.quietest && (
                   <View style={styles.forecastHint}>
                     <Text style={styles.forecastHintText}>
-                      {formatForecastDate(forecastSummary.quietest.forecastDate)}에 가면 오늘보다{' '}
-                      {forecastSummary.quietestDropPercent}% 한산할 것으로 예상돼요.
+                      {formatForecastDate(forecastSummary.quietest.forecastDate)} · 오늘보다{' '}
+                      {forecastSummary.quietestDropPercent}% 한산
                     </Text>
                   </View>
                 )}
@@ -491,7 +490,7 @@ export default function PlaceDetailScreen() {
           )}
 
           <View style={styles.sectionRow}>
-            <Text style={styles.sectionTitle}>요즘 근처 행사</Text>
+            <Text style={styles.sectionTitle}>근처 행사</Text>
             <Text style={styles.sectionAction}>진행 중·예정</Text>
           </View>
 
@@ -544,7 +543,7 @@ export default function PlaceDetailScreen() {
           </View>
 
           <View style={styles.sectionRow}>
-            <Text style={styles.sectionTitle}>근처에서 잠깐 둘러볼 곳</Text>
+            <Text style={styles.sectionTitle}>근처 둘러볼 곳</Text>
           </View>
 
           {nearbyStatus === 'loading' && <ActivityIndicator style={styles.stateBox} />}
@@ -606,7 +605,7 @@ export default function PlaceDetailScreen() {
             hitSlop={6}
             onPress={() => setShowReport(true)}
             style={styles.reportLink}>
-            <Text style={styles.reportLinkLabel}>정보가 다른가요? 제보하기</Text>
+            <Text style={styles.reportLinkLabel}>정보 수정 제보</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -634,10 +633,8 @@ export default function PlaceDetailScreen() {
               style={({ pressed }) => [styles.alertCloseButton, pressed && styles.buttonPressed]}>
               <Text style={styles.alertCloseLabel}>×</Text>
             </Pressable>
-            <Text style={styles.alertTitle}>{congestion?.detourPrompt?.title ?? '잠깐!'}</Text>
-            <Text style={styles.alertBody}>
-              {congestion?.detourPrompt?.body ?? '붐비는 장소예요\n틈타 코스를 이용해보시겠어요?'}
-            </Text>
+            <Text style={styles.alertTitle}>잠시 우회할까요?</Text>
+            <Text style={styles.alertBody}>주변 코스를 둘러보고 다시 와보세요.</Text>
             <Pressable
               style={styles.alertButton}
               onPress={() => {
@@ -669,7 +666,7 @@ export default function PlaceDetailScreen() {
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: Teumta.background,
+    backgroundColor: TeumtaHybrid.canvas,
     flex: 1,
   },
   scroll: {
@@ -682,84 +679,98 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   emptyText: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.muted,
     fontSize: 16,
   },
   heroTopRow: {
-    backgroundColor: Teumta.surface,
+    backgroundColor: TeumtaHybrid.paper,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingBottom: 6,
-    paddingHorizontal: 18,
-    paddingTop: 10,
+    paddingBottom: 10,
+    paddingHorizontal: 20,
+    paddingTop: 12,
   },
   heroButton: {
     alignItems: 'center',
-    backgroundColor: Teumta.surface,
-    borderRadius: 13,
-    height: 38,
+    backgroundColor: TeumtaHybrid.paper,
+    borderColor: TeumtaHybrid.line,
+    borderRadius: TeumtaHybrid.radius.small,
+    borderWidth: 1,
+    height: 42,
     justifyContent: 'center',
-    width: 38,
+    width: 42,
   },
   heroButtonSaved: {
-    backgroundColor: Teumta.greenLight,
+    backgroundColor: TeumtaHybrid.terracottaSoft,
+    borderColor: TeumtaHybrid.terracotta,
   },
   heroButtonIcon: {
     height: 19,
     width: 19,
   },
   heroImage: {
-    backgroundColor: Teumta.imagePlaceholder,
-    height: 102,
+    backgroundColor: TeumtaHybrid.line,
+    height: 212,
   },
   heroTitleBand: {
-    backgroundColor: HERO_BAND,
-    gap: 1,
-    paddingBottom: 12,
+    backgroundColor: TeumtaHybrid.paper,
+    borderBottomColor: TeumtaHybrid.ink,
+    borderBottomWidth: 1,
+    gap: 5,
+    paddingBottom: 22,
     paddingHorizontal: 20,
-    paddingTop: 8,
+    paddingTop: 20,
+  },
+  heroEyebrow: {
+    color: TeumtaHybrid.terracotta,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.8,
+    lineHeight: 14,
   },
   heroTitle: {
-    color: Teumta.surface,
-    fontSize: 23,
-    fontWeight: '900',
-    lineHeight: 32,
+    color: TeumtaHybrid.ink,
+    fontSize: 31,
+    fontWeight: '800',
+    letterSpacing: -1,
+    lineHeight: 39,
   },
   heroSubtitle: {
-    color: Teumta.surface,
-    fontSize: 11,
-    lineHeight: 15,
+    color: TeumtaHybrid.muted,
+    fontSize: 12,
+    lineHeight: 18,
   },
   content: {
-    backgroundColor: Teumta.surface,
-    gap: 14,
-    paddingBottom: 8,
+    backgroundColor: TeumtaHybrid.paper,
+    gap: 26,
+    paddingBottom: 20,
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 24,
   },
   congestionCard: {
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 20,
-    borderWidth: 1,
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    borderBottomColor: TeumtaHybrid.ink,
+    borderBottomWidth: 1,
+    borderTopColor: TeumtaHybrid.ink,
+    borderTopWidth: 3,
+    gap: 14,
+    paddingBottom: 20,
+    paddingTop: 18,
   },
   congestionHeader: {
+    alignItems: 'flex-end',
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   congestionTexts: {
     flex: 1,
-    gap: 3,
-    paddingRight: 10,
+    gap: 6,
+    paddingRight: 14,
   },
   congestionTitle: {
-    color: Teumta.textPrimary,
-    fontSize: 16,
+    color: TeumtaHybrid.ink,
+    fontSize: 19,
     fontWeight: '700',
-    lineHeight: 22,
+    lineHeight: 26,
   },
   dataBasisRow: {
     alignItems: 'center',
@@ -767,10 +778,10 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   dataBasisText: {
-    color: Teumta.textTertiary,
+    color: TeumtaHybrid.faint,
     flexShrink: 1,
-    fontSize: 10,
-    lineHeight: 14,
+    fontSize: 11,
+    lineHeight: 16,
   },
   dataStatusRow: {
     alignItems: 'center',
@@ -779,46 +790,44 @@ const styles = StyleSheet.create({
     minHeight: 24,
   },
   dataStatusDot: {
-    backgroundColor: Teumta.green,
-    borderRadius: 4,
+    backgroundColor: TeumtaHybrid.slate,
     height: 7,
     width: 7,
   },
   dataStatusDotMuted: {
-    backgroundColor: Teumta.textTertiary,
+    backgroundColor: TeumtaHybrid.faint,
   },
   dataStatusDotWarning: {
-    backgroundColor: Teumta.congestion.medium.dot,
+    backgroundColor: TeumtaHybrid.signal,
   },
   dataStatusText: {
-    color: Teumta.textSecondary,
-    fontSize: 12,
-    fontWeight: '600',
-    lineHeight: 17,
+    color: TeumtaHybrid.muted,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 18,
   },
   congestionLevel: {
-    fontSize: 26,
+    fontSize: 30,
     fontWeight: '900',
-    lineHeight: 36,
+    letterSpacing: -1,
+    lineHeight: 38,
   },
   congestionTrack: {
-    backgroundColor: '#F0F2F0',
-    borderRadius: 999,
-    height: 9,
+    backgroundColor: TeumtaHybrid.canvas,
+    height: 7,
     overflow: 'hidden',
   },
   congestionFill: {
-    borderRadius: 999,
-    height: 9,
+    height: 7,
   },
   congestionBanner: {
     alignItems: 'flex-start',
-    backgroundColor: Teumta.greenLight,
-    borderRadius: 12,
+    borderLeftColor: TeumtaHybrid.slate,
+    borderLeftWidth: 4,
     flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
+    gap: 9,
+    paddingLeft: 11,
+    paddingVertical: 3,
   },
   bannerIcon: {
     height: 16,
@@ -826,92 +835,88 @@ const styles = StyleSheet.create({
     width: 16,
   },
   bannerText: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.slate,
     flex: 1,
-    fontSize: 10,
-    fontWeight: '500',
-    lineHeight: 14,
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 18,
   },
   congestionBannerAlert: {
-    backgroundColor: Teumta.congestion.veryHigh.background,
+    borderLeftColor: TeumtaHybrid.terracotta,
   },
   bannerTextAlert: {
-    color: Teumta.congestion.veryHigh.text,
+    color: TeumtaHybrid.terracotta,
     fontWeight: '700',
   },
   sectionRow: {
     alignItems: 'center',
+    borderTopColor: TeumtaHybrid.ink,
+    borderTopWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingTop: 12,
   },
   sectionTitle: {
-    color: Teumta.textPrimary,
-    fontSize: 14,
+    color: TeumtaHybrid.ink,
+    fontSize: 18,
     fontWeight: '700',
-    lineHeight: 20,
+    lineHeight: 25,
   },
   sectionAction: {
-    color: Teumta.greenDark,
-    fontSize: 10,
-    fontWeight: '700',
-    lineHeight: 14,
+    color: TeumtaHybrid.terracotta,
+    fontSize: 11,
+    fontWeight: '800',
+    lineHeight: 15,
   },
   legendRow: {
     flexDirection: 'row',
-    gap: 10,
-    paddingVertical: 9,
+    gap: 6,
   },
   legendCard: {
     alignItems: 'center',
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 14,
+    backgroundColor: TeumtaHybrid.paper,
+    borderColor: TeumtaHybrid.line,
     borderWidth: 1,
     flex: 1,
-    gap: 5,
-    height: 58,
+    gap: 7,
+    height: 62,
     justifyContent: 'center',
   },
   legendDot: {
-    borderRadius: 5,
-    height: 10,
-    width: 10,
+    height: 5,
+    width: 24,
   },
   legendLabel: {
-    color: Teumta.textSecondary,
-    fontSize: 10,
+    color: TeumtaHybrid.muted,
+    fontSize: 11,
     fontWeight: '700',
   },
   stateBox: {
     marginTop: 4,
   },
   stateText: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.muted,
     fontSize: 12,
+    lineHeight: 18,
   },
   congestionLevelBox: {
     alignItems: 'flex-end',
     gap: 1,
   },
   forecastCard: {
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 10,
-    padding: 14,
+    gap: 14,
   },
   forecastTitle: {
-    color: Teumta.textPrimary,
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 20,
+    color: TeumtaHybrid.ink,
+    fontSize: 15,
+    fontWeight: '800',
+    lineHeight: 21,
   },
   forecastSubtitle: {
-    color: Teumta.textSecondary,
-    fontSize: 11,
-    lineHeight: 15,
-    marginTop: -6,
+    color: TeumtaHybrid.muted,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: -9,
   },
   forecastChart: {
     alignItems: 'flex-end',
@@ -930,72 +935,68 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   forecastBar: {
-    backgroundColor: '#D6E9DF',
-    borderRadius: 4,
+    backgroundColor: TeumtaHybrid.line,
     width: '100%',
   },
   forecastBarToday: {
-    backgroundColor: Teumta.textTertiary,
+    backgroundColor: TeumtaHybrid.navy,
   },
   forecastBarQuietest: {
-    backgroundColor: Teumta.green,
+    backgroundColor: TeumtaHybrid.terracotta,
   },
   forecastDayLabel: {
-    color: Teumta.textTertiary,
+    color: TeumtaHybrid.faint,
     fontSize: 10,
     lineHeight: 13,
   },
   forecastDayLabelStrong: {
-    color: Teumta.textPrimary,
+    color: TeumtaHybrid.ink,
     fontWeight: '700',
   },
   forecastHint: {
-    backgroundColor: Teumta.greenLight,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    borderLeftColor: TeumtaHybrid.terracotta,
+    borderLeftWidth: 4,
+    paddingLeft: 11,
+    paddingVertical: 3,
   },
   forecastHintText: {
-    color: Teumta.greenDark,
-    fontSize: 11,
+    color: TeumtaHybrid.ink,
+    fontSize: 12,
     fontWeight: '700',
-    lineHeight: 15,
+    lineHeight: 18,
   },
   nearbyList: {
-    gap: 8,
+    borderTopColor: TeumtaHybrid.line,
+    borderTopWidth: 1,
   },
   nearbyCard: {
     alignItems: 'center',
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 15,
-    borderWidth: 1,
+    borderBottomColor: TeumtaHybrid.line,
+    borderBottomWidth: 1,
     flexDirection: 'row',
-    gap: 10,
-    paddingLeft: 8,
-    paddingRight: 10,
-    paddingVertical: 8,
+    gap: 12,
+    paddingVertical: 11,
   },
   nearbyThumb: {
-    backgroundColor: Teumta.imagePlaceholder,
-    borderRadius: 12,
-    height: 52,
-    width: 52,
+    backgroundColor: TeumtaHybrid.canvas,
+    borderRadius: TeumtaHybrid.radius.small,
+    height: 66,
+    width: 66,
   },
   nearbyTexts: {
     flex: 1,
     gap: 2,
   },
   nearbyName: {
-    color: Teumta.textPrimary,
-    fontSize: 12,
+    color: TeumtaHybrid.ink,
+    fontSize: 15,
     fontWeight: '700',
-    lineHeight: 17,
+    lineHeight: 21,
   },
   nearbyMeta: {
-    color: Teumta.textSecondary,
-    fontSize: 10,
-    lineHeight: 14,
+    color: TeumtaHybrid.muted,
+    fontSize: 11,
+    lineHeight: 16,
   },
   attribution: {
     marginTop: 4,
@@ -1006,49 +1007,52 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   reportLinkLabel: {
-    color: Teumta.textSecondary,
-    fontSize: 11,
-    fontWeight: '600',
-    lineHeight: 15,
+    color: TeumtaHybrid.muted,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
     textDecorationLine: 'underline',
   },
   footer: {
-    backgroundColor: Teumta.surface,
+    backgroundColor: TeumtaHybrid.paper,
+    borderTopColor: TeumtaHybrid.ink,
+    borderTopWidth: 1,
     paddingHorizontal: 20,
-    paddingTop: 10,
+    paddingTop: 12,
   },
   ctaButton: {
     alignItems: 'center',
-    backgroundColor: Teumta.green,
-    borderRadius: 16,
-    height: 50,
+    backgroundColor: TeumtaHybrid.ink,
+    borderRadius: TeumtaHybrid.radius.medium,
+    height: 52,
     justifyContent: 'center',
   },
   ctaButtonCrowded: {
-    backgroundColor: Teumta.congestion.veryHigh.text,
+    backgroundColor: TeumtaHybrid.terracotta,
   },
   alertBackdrop: {
     alignItems: 'center',
-    backgroundColor: 'rgba(15, 20, 17, 0.55)',
+    backgroundColor: 'rgba(20, 24, 20, 0.62)',
     flex: 1,
     justifyContent: 'center',
     padding: 28,
   },
   alertCard: {
-    alignItems: 'center',
-    backgroundColor: Teumta.surface,
-    borderRadius: 20,
-    gap: 10,
+    alignItems: 'flex-start',
+    backgroundColor: TeumtaHybrid.paper,
+    borderRadius: TeumtaHybrid.radius.large,
+    gap: 12,
     maxWidth: 320,
-    paddingBottom: 24,
+    paddingBottom: 22,
     paddingHorizontal: 24,
-    paddingTop: 46,
+    paddingTop: 48,
     width: '100%',
   },
   alertCloseButton: {
     alignItems: 'center',
-    backgroundColor: Teumta.imagePlaceholder,
-    borderRadius: 20,
+    borderColor: TeumtaHybrid.line,
+    borderRadius: TeumtaHybrid.radius.small,
+    borderWidth: 1,
     height: 40,
     justifyContent: 'center',
     position: 'absolute',
@@ -1057,7 +1061,7 @@ const styles = StyleSheet.create({
     width: 40,
   },
   alertCloseLabel: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.ink,
     fontSize: 27,
     fontWeight: '400',
     lineHeight: 30,
@@ -1066,33 +1070,32 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   alertTitle: {
-    color: Teumta.congestion.veryHigh.text,
-    fontSize: 20,
-    fontWeight: '900',
+    color: TeumtaHybrid.terracotta,
+    fontSize: 24,
+    fontWeight: '800',
   },
   alertBody: {
-    color: Teumta.textPrimary,
+    color: TeumtaHybrid.ink,
     fontSize: 15,
     fontWeight: '600',
     lineHeight: 22,
-    textAlign: 'center',
   },
   alertButton: {
     alignItems: 'center',
-    backgroundColor: Teumta.green,
-    borderRadius: 14,
-    height: 46,
+    backgroundColor: TeumtaHybrid.navy,
+    borderRadius: TeumtaHybrid.radius.small,
+    height: 48,
     justifyContent: 'center',
     marginTop: 6,
     width: '100%',
   },
   alertButtonLabel: {
-    color: Teumta.surface,
+    color: TeumtaHybrid.white,
     fontSize: 14,
     fontWeight: '700',
   },
   ctaLabel: {
-    color: Teumta.surface,
+    color: TeumtaHybrid.white,
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 20,

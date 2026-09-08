@@ -58,6 +58,7 @@ vi.mock('../external/tmap', async (importOriginal) => {
 import { ExternalApiError } from '../external/common/external-api.error';
 import { resolveErrorResponse } from '../middlewares/error.middleware';
 import {
+  clearNearbyMeasurementCache,
   getLocalPlaceDetail,
   getNearbyLocalPlacesByContentId,
   getNearbyLocalPlacesByPoiId,
@@ -145,6 +146,7 @@ function tmapResponse(totalDistance: number, totalTime: number): TmapRouteRespon
 
 beforeEach(() => {
   vi.clearAllMocks();
+  clearNearbyMeasurementCache();
   prismaMock.place.findUnique.mockResolvedValue(BASE_PLACE);
   fetchTourPlaceDetailMock.mockResolvedValue(detailResponse('126.9770', '37.5788'));
   fetchTourPlaceIntroMock.mockResolvedValue(introResponse({}));
@@ -172,6 +174,18 @@ describe('getNearbyLocalPlacesRealtime — 기준 관광지 검증', () => {
 });
 
 describe('getNearbyLocalPlacesRealtime — TourAPI 호출', () => {
+  it('같은 목적지의 연속 요청은 후보·TMAP 실측 결과를 공유한다', async () => {
+    fetchTourPlacesByLocationMock.mockResolvedValue(listResponse([listItem()]));
+
+    await getNearbyLocalPlacesByContentId('999');
+    await getNearbyLocalPlacesByContentId('999');
+
+    // 목적지 상세는 두 번 해석하지만, 3개 분류 목록과 보행 실측은 한 번만 수행한다.
+    expect(fetchTourPlaceDetailMock).toHaveBeenCalledTimes(2);
+    expect(fetchTourPlacesByLocationMock).toHaveBeenCalledTimes(3);
+    expect(fetchPedestrianRouteMock).toHaveBeenCalledTimes(1);
+  });
+
   it('radius 미지정 시 기본 2000을 TourAPI에 전달한다', async () => {
     await getNearbyLocalPlacesRealtime(1);
     expect(fetchTourPlacesByLocationMock).toHaveBeenCalledWith(

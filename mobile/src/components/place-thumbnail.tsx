@@ -8,7 +8,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { Teumta } from '@/constants/theme';
+import { Teumta, TeumtaHybrid } from '@/constants/theme';
 
 /**
  * 장소 사진 자리.
@@ -39,7 +39,7 @@ type Tone = { background: string; text: string };
  */
 const FOOD: Tone = { background: '#FFF3E6', text: '#B5701A' };
 const SHOPPING: Tone = { background: '#F0EEFB', text: '#5B51A8' };
-const CULTURE: Tone = { background: Teumta.greenLight, text: Teumta.greenDark };
+const CULTURE: Tone = { background: TeumtaHybrid.slateSoft, text: TeumtaHybrid.slate };
 const NEUTRAL: Tone = { background: Teumta.imagePlaceholder, text: Teumta.textTertiary };
 
 /** 서버 분류 라벨(nearby-local-place.service의 표)과 같은 값을 쓴다. */

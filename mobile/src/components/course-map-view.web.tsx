@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { TeumtaHybrid } from '@/constants/theme';
 import type { Coordinate, DetourCourse } from '@/types/place';
 
 type CourseMapViewProps = {
@@ -15,13 +16,19 @@ export function CourseMapView({ detour, skippedStopIndexes = [] }: CourseMapView
 
   return (
     <View style={styles.webFallback}>
+      <Text style={styles.eyebrow}>ROUTE PREVIEW</Text>
       <Text style={styles.title}>{detour?.name}</Text>
-      <Text style={styles.description}>웹에서는 지도 SDK 연결 전까지 코스 좌표만 확인합니다.</Text>
+      <Text style={styles.description}>웹 지도 준비 중 · 경로 지점 미리보기</Text>
       {coordinates.map((coordinate, index) => (
-        <Text key={`${coordinate.latitude}-${coordinate.longitude}`} style={styles.coordinate}>
-          {index + 1}. {coordinate.latitude}, {coordinate.longitude}
-          {index > 0 && skippedStopIndexes.includes(index - 1) ? ' · 건너뜀' : ''}
-        </Text>
+        <View
+          key={`${index}-${coordinate.latitude}-${coordinate.longitude}`}
+          style={styles.coordinateRow}>
+          <Text style={styles.coordinateIndex}>{String(index + 1).padStart(2, '0')}</Text>
+          <Text style={styles.coordinate}>
+            {coordinate.latitude.toFixed(5)}, {coordinate.longitude.toFixed(5)}
+            {index > 0 && skippedStopIndexes.includes(index - 1) ? ' · 건너뜀' : ''}
+          </Text>
+        </View>
       ))}
     </View>
   );
@@ -29,22 +36,47 @@ export function CourseMapView({ detour, skippedStopIndexes = [] }: CourseMapView
 
 const styles = StyleSheet.create({
   webFallback: {
+    backgroundColor: TeumtaHybrid.canvas,
     flex: 1,
-    gap: 10,
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+  },
+  eyebrow: {
+    color: TeumtaHybrid.terracotta,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.4,
+    lineHeight: 14,
   },
   title: {
-    color: '#121417',
+    color: TeumtaHybrid.ink,
     fontSize: 22,
     fontWeight: '900',
+    marginTop: 2,
   },
   description: {
-    color: '#4a5563',
-    fontSize: 15,
-    lineHeight: 22,
+    color: TeumtaHybrid.muted,
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 14,
+    marginTop: 4,
+  },
+  coordinateRow: {
+    alignItems: 'center',
+    borderTopColor: TeumtaHybrid.line,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    minHeight: 34,
+  },
+  coordinateIndex: {
+    color: TeumtaHybrid.terracotta,
+    fontSize: 10,
+    fontWeight: '900',
+    width: 34,
   },
   coordinate: {
-    color: '#374151',
-    fontSize: 14,
+    color: TeumtaHybrid.slate,
+    fontSize: 11,
+    lineHeight: 15,
   },
 });

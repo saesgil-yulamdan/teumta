@@ -15,6 +15,7 @@ export type ProgressState = {
 
 export type ProgressAction =
   | { type: 'start'; at: number }
+  | { type: 'restore'; state: ProgressState }
   | { type: 'reset' }
   | { type: 'arrive'; stop: CourseStop; at: number; isReturn: boolean }
   | { type: 'leave' }
@@ -35,6 +36,8 @@ export function courseProgressReducer(
   action: ProgressAction,
 ): ProgressState {
   switch (action.type) {
+    case 'restore':
+      return action.state;
     case 'start':
       return state.phase === 'not_started'
         ? { ...state, phase: 'in_progress', startedAt: action.at }

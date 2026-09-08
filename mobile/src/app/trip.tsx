@@ -1,19 +1,26 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CourseMapView } from '@/components/course-map-view';
 import { REALTIME_LEVEL_LABEL } from '@/constants/congestion';
-import { Teumta } from '@/constants/theme';
+import { TeumtaHybrid } from '@/constants/theme';
 import { useCourseLog } from '@/hooks/use-course-log';
 import { useCourseProgress, type CourseStop } from '@/hooks/use-course-progress';
 import { useCurrentLocation } from '@/hooks/use-current-location';
 import { fetchCourseAlternatives } from '@/api/courses';
 import { getLocalPlaceDetail, getRealtimeCongestion } from '@/api/places';
-import { getSelectedCourse, setSelectedCourse } from '@/stores/selected-course';
+import {
+  clearSelectedCourse,
+  getSelectedCourse,
+  loadSelectedCourse,
+  selectedCourseKey,
+  setSelectedCourse,
+  type SelectedCourse,
+} from '@/stores/selected-course';
 import type { GeneratedCourse } from '@/types/course';
 import type { LocalPlaceDetail, RealtimeCongestion } from '@/types/place';
 import { buildCourseRoutePath } from '@/utils/course-path';
@@ -35,7 +42,6 @@ import {
   remainingTripMinutes,
 } from '@/utils/trip-plan';
 
-const SHEET_OVERLAP = 26;
 const WALK_METERS_PER_MINUTE = 67;
 /** 서버 혼잡도 캐시가 5분 — 같은 주기면 폴링해도 외부 호출이 거의 늘지 않는다. */
 const CONGESTION_POLL_INTERVAL_MS = 5 * 60 * 1000;
@@ -69,7 +75,8 @@ type OperatingInfoState =
 export default function TripScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const selected = getSelectedCourse();
+  const [selected, setSelected] = useState<SelectedCourse | null>(() => getSelectedCourse());
+  const [selectionReady, setSelectionReady] = useState(selected !== null);
   const course = selected?.course;
   const destination = selected?.destination;
   const [activeCourse, setActiveCourse] = useState<GeneratedCourse | null>(course ?? null);
@@ -90,13 +97,28 @@ export default function TripScreen() {
   const alternativeRequestId = useRef(0);
 
   useEffect(() => {
+    if (selected) return;
+    let ignored = false;
+    void loadSelectedCourse().then((restored) => {
+      if (!ignored) {
+        setSelected(restored);
+        setSelectionReady(true);
+      }
+    });
+    return () => {
+      ignored = true;
+    };
+  }, [selected]);
+
+  useEffect(() => {
     const timer = setInterval(() => setNowMs(Date.now()), CLOCK_TICK_MS);
     return () => clearInterval(timer);
   }, []);
 
   // 도착 판정 대상: 정류지들 + 마지막 목적지(복귀)
-  const courseStops: CourseStop[] = plannedCourse && destination
-    ? [
+  const courseStops: CourseStop[] = useMemo(
+    () => plannedCourse && destination
+      ? [
           ...plannedCourse.stops.map((stop, index) => ({
             id: courseStopId(stop, index),
             name: stop.name,
@@ -109,14 +131,17 @@ export default function TripScreen() {
             latitude: destination.latitude,
             longitude: destination.longitude,
           },
-      ]
-    : [];
+        ]
+      : [],
+    [plannedCourse, destination],
+  );
 
   const [congestion, setCongestion] = useState<RealtimeCongestion | null>(null);
 
   const { location, status, start: startLocation } = useCurrentLocation({ watch: true });
   const {
     phase,
+    ready: progressReady,
     currentIndex,
     nextStop,
     stayingAt,
@@ -124,10 +149,11 @@ export default function TripScreen() {
     startedAt,
     outcomes,
     start,
+    clearPersistedProgress,
     skipCurrent,
     finishCurrentStay,
     updateWithLocation,
-  } = useCourseProgress(courseStops);
+  } = useCourseProgress(courseStops, selected ? selectedCourseKey(selected) : null);
   const { markCourseCompleted } = useCourseLog();
   // 완료 기록은 코스당 1회 — 기록이 상태를 바꾸고 상태가 다시 기록을 부르는 순환 방지.
   const completionLogged = useRef(false);
@@ -271,13 +297,15 @@ export default function TripScreen() {
     if (selected && !completionLogged.current) {
       completionLogged.current = true;
       markCourseCompleted(selected, true);
+      clearSelectedCourse();
     }
   }, [phase, selected, markCourseCompleted]);
 
   useEffect(() => {
+    if (!selectionReady || !selected || !progressReady || courseStops.length === 0) return;
     start();
-    startLocation();
-  }, [start, startLocation]);
+    void startLocation();
+  }, [selectionReady, selected, progressReady, courseStops.length, start, startLocation]);
 
   useEffect(() => {
     if (location) {
@@ -306,8 +334,8 @@ export default function TripScreen() {
           warnedOperatingStops.current.add(contentId);
           setAdjustmentPrompt((current) => current ?? {
             outcome: 'unavailable',
-            title: `${currentCourseStop.name} 운영정보를 확인해 주세요`,
-            body: `${availability.label} 계속 방문하거나 건너뛴 뒤 일정을 다시 계산할 수 있어요.`,
+            title: `${currentCourseStop.name} 운영 확인`,
+            body: `${availability.label} 계속 가거나 건너뛸 수 있어요.`,
           });
         }
       })
@@ -390,6 +418,15 @@ export default function TripScreen() {
     };
   }, [destinationParams, selected]);
 
+  if (!selectionReady || !progressReady) {
+    return (
+      <View style={styles.emptyContainer}>
+        <ActivityIndicator color={TeumtaHybrid.navy} />
+        <Text style={styles.emptyText}>진행 중인 코스를 복구하고 있어요.</Text>
+      </View>
+    );
+  }
+
   if (!plannedCourse || !destination) {
     return (
       <View style={styles.emptyContainer}>
@@ -405,24 +442,24 @@ export default function TripScreen() {
 
   const movingSubtitle =
     distanceToNext !== null && walkMinutes !== null
-      ? `${formatDistance(distanceToNext)} · 도보 약 ${walkMinutes}분 남았어요`
+      ? `${formatDistance(distanceToNext)} · 도보 ${walkMinutes}분`
       : status === 'denied'
-        ? '위치 권한을 허용하면 남은 거리를 알려드려요'
-        : '현재 위치를 확인하고 있어요';
+        ? '남은 거리 확인에 위치 권한이 필요해요'
+        : '위치 확인 중';
 
   const statusTitle = completed
-    ? '코스를 모두 마쳤어요'
+    ? '코스 완료'
     : stayingAt
-      ? `${stayingAt.name} 도착!`
+      ? `${stayingAt.name} 도착`
       : returning
         ? `${withRoJosa(destination.name)} 되돌아가는 중`
         : nextStop
           ? `${withRoJosa(nextStop.name)} 이동 중`
           : '코스를 따라 이동 중';
   const statusSubtitle = completed
-    ? '복귀까지 완료했어요. 수고하셨어요!'
+    ? '목적지 복귀 완료'
     : stayingAt
-      ? `권장 체류 ${stayingStop?.stayMinutes ?? 10}분 · 둘러보고 나서면 다음 안내가 이어져요`
+      ? `권장 체류 ${stayingStop?.stayMinutes ?? 10}분`
       : movingSubtitle;
 
   // 로컬 상세에만 있던 영업·리뷰 확인 통로 — 진행 중 가게가 닫혀 있으면 여기서 판단.
@@ -549,7 +586,9 @@ export default function TripScreen() {
     }
     const replanned = courseWithAlternative(plannedCourse, currentIndex, alternative);
     setActiveCourse(replanned);
-    setSelectedCourse({ ...selected, course: replanned });
+    const nextSelected = { ...selected, course: replanned };
+    setSelected(nextSelected);
+    setSelectedCourse(nextSelected);
     skipCurrent(adjustmentPrompt?.outcome ?? 'skipped');
     alternativeRequestId.current += 1;
     setAdjustmentPrompt(null);
@@ -574,7 +613,9 @@ export default function TripScreen() {
       distanceMeters: Math.round(distanceMeters * 1.3),
     });
     setActiveCourse(returningCourse);
-    setSelectedCourse({ ...selected, course: returningCourse });
+    const nextSelected = { ...selected, course: returningCourse };
+    setSelected(nextSelected);
+    setSelectedCourse(nextSelected);
     skipCurrent(adjustmentPrompt?.outcome ?? 'skipped');
     alternativeRequestId.current += 1;
     setAdjustmentPrompt(null);
@@ -608,7 +649,7 @@ export default function TripScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={{ height: insets.top, backgroundColor: Teumta.surface }} />
+      <View style={{ height: insets.top, backgroundColor: TeumtaHybrid.slateSoft }} />
 
       <View style={styles.topBar}>
         <Pressable style={styles.topButton} onPress={() => router.back()}>
@@ -618,6 +659,12 @@ export default function TripScreen() {
             contentFit="contain"
           />
         </Pressable>
+        <View style={styles.tripIdentity}>
+          <Text style={styles.tripEyebrow}>LIVE ROUTE</Text>
+          <Text numberOfLines={1} style={styles.tripDestination}>
+            {destination.name}
+          </Text>
+        </View>
         {etaPillLabel && (
           <View style={styles.etaPill}>
             <Text style={styles.etaPillLabel}>{etaPillLabel}</Text>
@@ -657,8 +704,6 @@ export default function TripScreen() {
       </View>
 
       <View style={[styles.sheet, { paddingBottom: 18 + insets.bottom }]}>
-        <View style={styles.sheetHandle} />
-
         <Animated.View
           key={statusMomentKey}
           entering={FadeInDown.duration(280)}
@@ -682,8 +727,8 @@ export default function TripScreen() {
             onPress={() => {
               setAdjustmentPrompt({
                 outcome: 'unavailable',
-                title: `${currentCourseStop?.name ?? '이 장소'} 운영정보를 확인해 주세요`,
-                body: `${operatingAvailability.label} 계속 방문하거나 건너뛴 뒤 일정을 다시 계산할 수 있어요.`,
+                title: `${currentCourseStop?.name ?? '이 장소'} 운영 확인`,
+                body: `${operatingAvailability.label} 계속 가거나 건너뛸 수 있어요.`,
               });
             }}
             style={[
@@ -709,9 +754,7 @@ export default function TripScreen() {
         {congestionEased && !completed && (
           <View style={styles.easedBanner}>
             <View style={styles.easedDot} />
-            <Text style={styles.easedText}>
-              {destination.name} 혼잡이 풀렸어요 — 지금 돌아가기 좋아요.
-            </Text>
+            <Text style={styles.easedText}>{destination.name} 혼잡 완화 · 복귀하기 좋아요</Text>
           </View>
         )}
 
@@ -780,17 +823,17 @@ export default function TripScreen() {
           {/* 완료 후에는 예약이 취소되므로 알림 문구도 함께 내린다(상태 대신 파생 조건). */}
           <Text style={styles.noticeTitle}>
             {slackMinutes < 0
-              ? `선택한 시간보다 ${Math.abs(slackMinutes)}분 늦어질 수 있어요`
+              ? `${Math.abs(slackMinutes)}분 늦을 수 있어요`
               : returnAlarmSet && !completed
-              ? '돌아갈 시간이 되면 알려드려요'
-              : '돌아갈 시간을 계산해 뒀어요'}
+              ? '복귀 5분 전 알림'
+              : '복귀시각 자동 계산'}
           </Text>
           <Text style={styles.noticeBody}>
             {slackMinutes < 0
-              ? '바로 복귀하거나 다음 장소를 건너뛰면 복귀시각을 다시 계산해요.'
+              ? '건너뛰거나 바로 복귀하면 다시 계산합니다.'
               : returnAlarmSet && !completed
-              ? '복귀 출발 5분 전에 알림을 드려요. 알림도 이 기기 안에서만 처리돼요.'
-              : '이동·체류·건너뛰기를 반영해 복귀시각을 계속 다시 계산해요.'}
+              ? '알림은 이 기기에서만 처리합니다.'
+              : '이동과 체류 상태를 반영합니다.'}
           </Text>
         </View>
 
@@ -805,7 +848,7 @@ export default function TripScreen() {
               {congestion ? REALTIME_LEVEL_LABEL[congestion.level] : '확인 중'}
             </Text>
           </View>
-          <View style={styles.statTile}>
+          <View style={[styles.statTile, styles.statTileLast]}>
             <Text style={styles.statLabel}>남은 시간</Text>
             <Text style={styles.statValue}>{remainingMinutes}분</Text>
           </View>
@@ -821,6 +864,8 @@ export default function TripScreen() {
                 completionLogged.current = true;
                 markCourseCompleted(selected, phase === 'completed');
               }
+              clearPersistedProgress();
+              clearSelectedCourse();
               router.dismissAll();
             }}>
             <Text style={styles.endButtonLabel}>코스 종료</Text>
@@ -840,7 +885,7 @@ export default function TripScreen() {
         <View style={styles.privacyStrip}>
           <View style={styles.privacyDot} />
           <Text style={styles.privacyText}>
-            현재 위치는 기기 안에서만 확인하고 서버에는 보내지 않아요.
+            위치는 이 기기에서만 사용합니다.
           </Text>
         </View>
       </View>
@@ -867,7 +912,7 @@ export default function TripScreen() {
 
             {alternativeStatus === 'loading' && (
               <View style={styles.alternativeState}>
-                <ActivityIndicator color={Teumta.green} size="small" />
+                <ActivityIndicator color={TeumtaHybrid.navy} size="small" />
                 <Text style={styles.alternativeStateText}>대체 코스를 계산하고 있어요…</Text>
               </View>
             )}
@@ -933,7 +978,7 @@ export default function TripScreen() {
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: Teumta.background,
+    backgroundColor: TeumtaHybrid.canvas,
     flex: 1,
   },
   emptyContainer: {
@@ -943,166 +988,173 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   emptyText: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.muted,
     fontSize: 16,
   },
   emptyButton: {
-    backgroundColor: Teumta.greenLight,
-    borderRadius: 999,
+    backgroundColor: TeumtaHybrid.navy,
+    borderRadius: TeumtaHybrid.radius.small,
     marginTop: 12,
     paddingHorizontal: 18,
     paddingVertical: 10,
   },
   emptyButtonLabel: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.white,
     fontSize: 13,
     fontWeight: '700',
   },
   topBar: {
     alignItems: 'center',
-    backgroundColor: Teumta.surface,
+    backgroundColor: TeumtaHybrid.slateSoft,
+    borderBottomColor: TeumtaHybrid.line,
+    borderBottomWidth: 1,
     flexDirection: 'row',
-    height: 52,
-    justifyContent: 'space-between',
-    paddingHorizontal: 18,
+    gap: 11,
+    height: 62,
+    paddingHorizontal: 16,
   },
   topButton: {
     alignItems: 'center',
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 13,
-    borderWidth: 1,
-    height: 38,
+    backgroundColor: TeumtaHybrid.paper,
+    borderRadius: TeumtaHybrid.radius.small,
+    height: 40,
     justifyContent: 'center',
-    width: 38,
+    width: 40,
   },
   topButtonIcon: {
     height: 19,
     width: 19,
   },
+  tripIdentity: {
+    flex: 1,
+    gap: 1,
+  },
+  tripEyebrow: {
+    color: TeumtaHybrid.terracotta,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.4,
+    lineHeight: 12,
+  },
+  tripDestination: {
+    color: TeumtaHybrid.ink,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
+  },
   etaPill: {
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 11,
-    paddingVertical: 8,
+    backgroundColor: TeumtaHybrid.signalSoft,
+    borderRadius: TeumtaHybrid.radius.small,
+    maxWidth: 126,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
   },
   etaPillLabel: {
-    color: Teumta.greenDark,
-    fontSize: 10,
-    fontWeight: '700',
-    lineHeight: 14,
+    color: TeumtaHybrid.navy,
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
   },
   mapArea: {
     flex: 1,
   },
   sheet: {
-    backgroundColor: Teumta.surface,
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
-    gap: 12,
-    marginTop: -SHEET_OVERLAP,
+    backgroundColor: TeumtaHybrid.paper,
+    borderTopColor: TeumtaHybrid.slate,
+    borderTopWidth: 2,
+    gap: 10,
     paddingHorizontal: 20,
-    paddingTop: 12,
-  },
-  sheetHandle: {
-    alignSelf: 'center',
-    backgroundColor: '#DBE3DE',
-    borderRadius: 999,
-    height: 5,
-    width: 44,
+    paddingTop: 14,
   },
   statusCard: {
     alignItems: 'center',
-    backgroundColor: Teumta.greenLight,
-    borderRadius: 15,
+    backgroundColor: TeumtaHybrid.paper,
+    borderColor: TeumtaHybrid.line,
+    borderRadius: TeumtaHybrid.radius.small,
+    borderWidth: 1,
     flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
+    gap: 12,
+    padding: 10,
   },
   statusIconTile: {
     alignItems: 'center',
-    backgroundColor: Teumta.surface,
-    borderRadius: 12,
-    height: 38,
+    alignSelf: 'stretch',
+    backgroundColor: TeumtaHybrid.signalSoft,
+    borderRadius: TeumtaHybrid.radius.small,
     justifyContent: 'center',
-    width: 38,
+    width: 42,
   },
   statusIcon: {
-    height: 21,
-    width: 21,
+    height: 22,
+    width: 22,
   },
   statusTexts: {
     flex: 1,
     gap: 2,
   },
   statusTitle: {
-    color: Teumta.textPrimary,
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 17,
+    color: TeumtaHybrid.navy,
+    fontSize: 14,
+    fontWeight: '900',
+    lineHeight: 19,
   },
   statusSubtitle: {
-    color: Teumta.textSecondary,
-    fontSize: 10,
-    lineHeight: 14,
+    color: TeumtaHybrid.muted,
+    fontSize: 11,
+    lineHeight: 16,
   },
   easedBanner: {
     alignItems: 'center',
-    backgroundColor: Teumta.greenLight,
-    borderColor: Teumta.green,
-    borderRadius: 13,
-    borderWidth: 1,
+    borderLeftColor: TeumtaHybrid.slate,
+    borderLeftWidth: 4,
     flexDirection: 'row',
     gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingLeft: 10,
+    paddingVertical: 4,
   },
   easedDot: {
-    backgroundColor: Teumta.green,
-    borderRadius: 4,
-    height: 8,
-    width: 8,
+    backgroundColor: TeumtaHybrid.slate,
+    height: 7,
+    width: 7,
   },
   easedText: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.slate,
     flex: 1,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
-    lineHeight: 14,
+    lineHeight: 16,
   },
   operatingChip: {
     alignItems: 'center',
     alignSelf: 'flex-start',
-    backgroundColor: '#F7F9F8',
-    borderRadius: 999,
+    borderColor: TeumtaHybrid.line,
+    borderRadius: TeumtaHybrid.radius.small,
+    borderWidth: 1,
     flexDirection: 'row',
-    gap: 6,
+    gap: 7,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 7,
   },
   operatingChipWarning: {
-    backgroundColor: Teumta.congestion.medium.background,
+    backgroundColor: TeumtaHybrid.signalSoft,
+    borderColor: TeumtaHybrid.signal,
   },
   operatingDot: {
-    backgroundColor: Teumta.textTertiary,
-    borderRadius: 4,
+    backgroundColor: TeumtaHybrid.faint,
     height: 7,
     width: 7,
   },
   operatingDotWarning: {
-    backgroundColor: Teumta.congestion.medium.dot,
+    backgroundColor: TeumtaHybrid.terracotta,
   },
   operatingLabel: {
-    color: Teumta.textSecondary,
-    fontSize: 10,
+    color: TeumtaHybrid.muted,
+    fontSize: 11,
     fontWeight: '700',
-    lineHeight: 14,
+    lineHeight: 15,
   },
   operatingLabelWarning: {
-    color: Teumta.congestion.medium.text,
+    color: TeumtaHybrid.navy,
   },
   progressRow: {
     flexDirection: 'row',
@@ -1110,37 +1162,37 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   progressChip: {
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 999,
+    backgroundColor: TeumtaHybrid.paper,
+    borderColor: TeumtaHybrid.line,
+    borderRadius: TeumtaHybrid.radius.small,
     borderWidth: 1,
-    maxWidth: 132,
+    maxWidth: 142,
     paddingHorizontal: 9,
-    paddingVertical: 4,
+    paddingVertical: 5,
   },
   progressChipDone: {
-    backgroundColor: Teumta.greenLight,
-    borderColor: Teumta.greenLight,
+    backgroundColor: TeumtaHybrid.navySoft,
+    borderColor: TeumtaHybrid.navySoft,
   },
   progressChipCurrent: {
-    backgroundColor: Teumta.greenLight,
-    borderColor: Teumta.green,
+    backgroundColor: TeumtaHybrid.signalSoft,
+    borderColor: TeumtaHybrid.signal,
   },
   progressChipSkipped: {
-    backgroundColor: '#F4F5F4',
-    borderColor: Teumta.border,
+    backgroundColor: TeumtaHybrid.canvas,
+    borderColor: TeumtaHybrid.line,
   },
   progressChipLabel: {
-    color: Teumta.textTertiary,
+    color: TeumtaHybrid.faint,
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '800',
     lineHeight: 14,
   },
   progressChipLabelActive: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.navy,
   },
   progressChipLabelSkipped: {
-    color: Teumta.textTertiary,
+    color: TeumtaHybrid.faint,
     textDecorationLine: 'line-through',
   },
   stopActionRow: {
@@ -1149,74 +1201,78 @@ const styles = StyleSheet.create({
   },
   stopActionButton: {
     alignItems: 'center',
-    borderColor: Teumta.border,
-    borderRadius: 999,
+    borderColor: TeumtaHybrid.navy,
+    borderRadius: TeumtaHybrid.radius.small,
     borderWidth: 1,
     paddingHorizontal: 11,
-    paddingVertical: 6,
+    paddingVertical: 7,
   },
   stopActionButtonPrimary: {
-    backgroundColor: Teumta.greenLight,
-    borderColor: Teumta.green,
+    backgroundColor: TeumtaHybrid.navy,
+    borderColor: TeumtaHybrid.navy,
   },
   stopActionLabel: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.navy,
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '800',
     lineHeight: 14,
   },
   stopActionLabelPrimary: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.white,
   },
   noticeBox: {
-    backgroundColor: Teumta.greenLight,
-    borderColor: '#BFE7D7',
-    borderRadius: 13,
-    borderWidth: 1,
+    backgroundColor: TeumtaHybrid.canvas,
+    borderLeftColor: TeumtaHybrid.signal,
+    borderLeftWidth: 5,
     gap: 3,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
   },
   noticeTitle: {
-    color: Teumta.greenDark,
-    fontSize: 10,
-    fontWeight: '700',
-    lineHeight: 14,
+    color: TeumtaHybrid.navy,
+    fontSize: 11,
+    fontWeight: '900',
+    lineHeight: 15,
   },
   noticeBody: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.muted,
     fontSize: 10,
-    lineHeight: 14,
+    lineHeight: 15,
   },
   statsRow: {
+    borderBottomColor: TeumtaHybrid.line,
+    borderBottomWidth: 1,
+    borderTopColor: TeumtaHybrid.line,
+    borderTopWidth: 1,
     flexDirection: 'row',
-    gap: 7,
   },
   statTile: {
-    alignItems: 'center',
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 12,
-    borderWidth: 1,
+    alignItems: 'flex-start',
+    borderRightColor: TeumtaHybrid.line,
+    borderRightWidth: 1,
     flex: 1,
     gap: 2,
-    paddingHorizontal: 8,
+    paddingHorizontal: 9,
     paddingVertical: 9,
   },
+  statTileLast: {
+    borderRightWidth: 0,
+  },
   statLabel: {
-    color: Teumta.textTertiary,
+    color: TeumtaHybrid.muted,
     fontSize: 10,
+    fontWeight: '700',
     lineHeight: 13,
   },
   statValue: {
-    color: Teumta.textPrimary,
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 17,
+    color: TeumtaHybrid.navy,
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 18,
   },
   statValueCongestion: {
     fontSize: 14,
-    lineHeight: 20,
+    lineHeight: 19,
   },
   buttonRow: {
     flexDirection: 'row',
@@ -1224,24 +1280,24 @@ const styles = StyleSheet.create({
   },
   endButton: {
     alignItems: 'center',
-    backgroundColor: Teumta.surface,
-    borderColor: Teumta.border,
-    borderRadius: 14,
+    backgroundColor: TeumtaHybrid.paper,
+    borderColor: TeumtaHybrid.navy,
+    borderRadius: TeumtaHybrid.radius.small,
     borderWidth: 1,
     height: 48,
     justifyContent: 'center',
     width: 118,
   },
   endButtonLabel: {
-    color: Teumta.textSecondary,
-    fontSize: 11,
-    fontWeight: '700',
-    lineHeight: 15,
+    color: TeumtaHybrid.navy,
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
   },
   directionsButton: {
     alignItems: 'center',
-    backgroundColor: Teumta.green,
-    borderRadius: 14,
+    backgroundColor: TeumtaHybrid.navy,
+    borderRadius: TeumtaHybrid.radius.small,
     flex: 1,
     height: 48,
     justifyContent: 'center',
@@ -1250,63 +1306,63 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   directionsButtonLabel: {
-    color: Teumta.surface,
-    fontSize: 11,
-    fontWeight: '700',
-    lineHeight: 15,
+    color: TeumtaHybrid.white,
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
   },
   privacyStrip: {
     alignItems: 'center',
-    backgroundColor: '#F7F9F8',
-    borderRadius: 12,
+    borderTopColor: TeumtaHybrid.line,
+    borderTopWidth: 1,
     flexDirection: 'row',
     gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
+    paddingHorizontal: 2,
+    paddingTop: 9,
   },
   privacyDot: {
-    backgroundColor: Teumta.green,
-    borderRadius: 4,
-    height: 8,
-    width: 8,
+    backgroundColor: TeumtaHybrid.slate,
+    height: 6,
+    width: 6,
   },
   privacyText: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.muted,
     fontSize: 10,
     lineHeight: 14,
   },
   modalBackdrop: {
     alignItems: 'center',
-    backgroundColor: 'rgba(20, 28, 24, 0.42)',
+    backgroundColor: 'rgba(10, 18, 30, 0.62)',
     flex: 1,
     justifyContent: 'center',
     padding: 20,
   },
   modalCard: {
-    backgroundColor: Teumta.surface,
-    borderRadius: 20,
-    gap: 10,
+    backgroundColor: TeumtaHybrid.paper,
+    borderRadius: TeumtaHybrid.radius.large,
+    gap: 12,
     maxWidth: 360,
     padding: 20,
     width: '100%',
   },
   modalTitle: {
-    color: Teumta.textPrimary,
-    fontSize: 17,
-    fontWeight: '800',
-    lineHeight: 23,
+    color: TeumtaHybrid.navy,
+    fontSize: 19,
+    fontWeight: '900',
+    lineHeight: 25,
   },
   modalBody: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.muted,
     fontSize: 12,
     lineHeight: 18,
   },
   modalDetail: {
-    backgroundColor: '#F7F9F8',
-    borderRadius: 10,
-    color: Teumta.textSecondary,
-    fontSize: 10,
-    lineHeight: 15,
+    backgroundColor: TeumtaHybrid.canvas,
+    borderLeftColor: TeumtaHybrid.signal,
+    borderLeftWidth: 4,
+    color: TeumtaHybrid.muted,
+    fontSize: 11,
+    lineHeight: 16,
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
@@ -1317,14 +1373,14 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   alternativeStateText: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.muted,
     fontSize: 11,
     lineHeight: 16,
   },
   alternativeCard: {
     alignItems: 'center',
-    borderColor: Teumta.border,
-    borderRadius: 12,
+    borderColor: TeumtaHybrid.navy,
+    borderRadius: TeumtaHybrid.radius.small,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 10,
@@ -1336,24 +1392,24 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   alternativeName: {
-    color: Teumta.textPrimary,
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 17,
+    color: TeumtaHybrid.ink,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 18,
   },
   alternativeMeta: {
-    color: Teumta.textSecondary,
-    fontSize: 10,
-    lineHeight: 14,
+    color: TeumtaHybrid.muted,
+    fontSize: 11,
+    lineHeight: 15,
   },
   alternativeCaution: {
-    color: Teumta.congestion.medium.text,
-    fontSize: 9,
+    color: TeumtaHybrid.terracotta,
+    fontSize: 10,
     fontWeight: '700',
     lineHeight: 13,
   },
   alternativeApply: {
-    color: Teumta.greenDark,
+    color: TeumtaHybrid.navy,
     fontSize: 11,
     fontWeight: '800',
   },
@@ -1366,28 +1422,28 @@ const styles = StyleSheet.create({
   },
   modalSecondaryButton: {
     alignItems: 'center',
-    borderColor: Teumta.border,
-    borderRadius: 12,
+    borderColor: TeumtaHybrid.navy,
+    borderRadius: TeumtaHybrid.radius.small,
     borderWidth: 1,
     justifyContent: 'center',
     minHeight: 42,
     paddingHorizontal: 12,
   },
   modalSecondaryLabel: {
-    color: Teumta.textSecondary,
+    color: TeumtaHybrid.navy,
     fontSize: 11,
     fontWeight: '700',
   },
   modalPrimaryButton: {
     alignItems: 'center',
-    backgroundColor: Teumta.green,
-    borderRadius: 12,
+    backgroundColor: TeumtaHybrid.navy,
+    borderRadius: TeumtaHybrid.radius.small,
     justifyContent: 'center',
     minHeight: 42,
     paddingHorizontal: 15,
   },
   modalPrimaryLabel: {
-    color: Teumta.surface,
+    color: TeumtaHybrid.white,
     fontSize: 11,
     fontWeight: '800',
   },

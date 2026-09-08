@@ -361,6 +361,23 @@ describe('generateCourses', () => {
     expect(result.result.courses.every((course) => course.stops.length === 1)).toBe(true);
     expect(result.result.courses.every((course) => course.totalMinutes <= 60)).toBe(true);
   });
+
+  it('정류지 사이 실측에 실패한 다중 정류지 코스는 반환하지 않는다', async () => {
+    measureNearbyLocalPlacesMock.mockResolvedValue([
+      measured('첫곳', 5, '38'),
+      measured('둘째곳', 7, '14', 1),
+    ]);
+    fetchPedestrianRouteMock.mockRejectedValue(new Error('tmap unavailable'));
+
+    const result = await generateCourses({ contentId: '126508', availableMinutes: 90 });
+    if (result.status !== 'SUCCESS') {
+      throw new Error('expected success');
+    }
+
+    expect(result.result.courses.length).toBeGreaterThan(0);
+    expect(result.result.courses.every((course) => course.verified)).toBe(true);
+    expect(result.result.courses.every((course) => course.stops.length === 1)).toBe(true);
+  });
 });
 
 describe('generateCourseAlternatives', () => {

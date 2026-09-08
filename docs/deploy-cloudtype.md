@@ -37,6 +37,8 @@
    | `CONGESTION_API_BASE_URL` | `https://apis.openapi.sk.com/puzzle` |
    | `PREDICTION_INGEST_TARGETS` | `11:11110` (집중률 자동 적재. 실험 중엔 비워도 됨) |
    | `ADMIN_PASSWORD` | 관리자 웹 로그인 비밀번호. **미설정 시 `/api/admin/*` 전부 503**(fail closed). 변경 시 발급된 토큰 전부 무효화 |
+   | `CORS_ALLOWED_ORIGINS` | 허용할 브라우저 Origin의 쉼표 목록. native 앱은 Origin이 없어 영향 없음 |
+   | `ENABLE_LEGACY_TRIP_API` | 기본 `false`. 보존 중인 Trip API를 의도적으로 재개할 때만 `true` |
 
 4. 배포 로그에서 확인: `migrate deploy` 적용 로그(①) → `teumta-server listening` → health check 통과
 
@@ -71,7 +73,10 @@ time curl -s "$BASE/api/congestion?poiId=362105" > /dev/null
 - `mobile/.env`의 API 주소를 배포 주소로 교체 → 프론트 담당 전달
 - `PREDICTION_INGEST_TARGETS` 설정 → 집중률 자동 적재 활성
 
-## 6. 관리자 웹 배포 (2026-08-07 완료)
+## 6. 관리자 웹 보존(운영 폐기, 2026-09-08 확정)
+
+`admin/`은 삭제하지 않고 과거 구현을 보존하지만 더 이상 배포·CI·신규 개발 대상이 아니다.
+아래 내용은 재개 시 참고할 **과거 배포 기록**이다. 재개 전에 의존성·인증·CORS·배포 설정을 다시 검증한다.
 
 주소: `https://port-0-teumta-admin-web-msh476v8e47b3c7e.sel3.cloudtype.app`
 
@@ -86,7 +91,7 @@ time curl -s "$BASE/api/congestion?poiId=362105" > /dev/null
 | 환경변수 | `VITE_API_BASE_URL=https://<서버 주소>/api` |
 
 ⚠️ `VITE_API_BASE_URL`은 **빌드 시점에 번들에 들어간다** — 값을 바꾸면 재배포해야 반영됨.
-서버 코드가 바뀌어도 admin 웹은 별도 서비스라 **각각 "배포하기"** 눌러야 한다.
+현재는 admin 서비스의 재배포를 하지 않는다.
 
 ## 7. DB 백업 (2026-08-07 완료)
 
