@@ -27,7 +27,7 @@ export default function RootLayout() {
               contentStyle: { backgroundColor: TeumtaHybrid.paper },
             }}>
             <Stack.Screen name="index" options={{ title: 'teumta', headerShown: false }} />
-            <Stack.Screen name="search" options={{ title: '관광지 검색' }} />
+            <Stack.Screen name="search" options={{ title: '관광지 검색', headerShown: false }} />
             <Stack.Screen
               name="places/[id]"
               options={{ title: '관광지 상세', headerShown: false }}

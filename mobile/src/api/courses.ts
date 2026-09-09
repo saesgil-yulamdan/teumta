@@ -5,6 +5,39 @@ import type {
   DestinationIdentifier,
 } from '@/types/course';
 
+const COURSE_CACHE_TTL_MS = 30 * 1000;
+const COURSE_CACHE_MAX_ENTRIES = 40;
+
+type CourseCacheEntry = {
+  expiresAt: number;
+  value: CourseGenerationResult;
+};
+
+const courseCache = new Map<string, CourseCacheEntry>();
+const courseRequests = new Map<string, Promise<CourseGenerationResult>>();
+
+function courseRequestKey(
+  identifier: DestinationIdentifier,
+  availableMinutes: number,
+  variant: number,
+): string {
+  const destination = 'contentId' in identifier
+    ? `content:${identifier.contentId}`
+    : `poi:${identifier.poiId}`;
+  return `${destination}:${availableMinutes}:${variant}`;
+}
+
+function cacheCourse(key: string, value: CourseGenerationResult): void {
+  if (!courseCache.has(key) && courseCache.size >= COURSE_CACHE_MAX_ENTRIES) {
+    const oldestKey = courseCache.keys().next().value;
+    if (oldestKey !== undefined) {
+      courseCache.delete(oldestKey);
+    }
+  }
+  courseCache.delete(key);
+  courseCache.set(key, { expiresAt: Date.now() + COURSE_CACHE_TTL_MS, value });
+}
+
 /**
  * GET /api/courses — 목적지 주변에서 가용 시간에 맞는 우회 코스를 실시간 생성한다.
  *
@@ -16,10 +49,41 @@ export async function fetchCourses(
   availableMinutes: number,
   variant = 0,
 ): Promise<CourseGenerationResult> {
-  const response = await apiClient.get<{ data: CourseGenerationResult }>('/courses', {
-    params: { ...identifier, availableMinutes, variant },
-  });
-  return response.data.data;
+  const key = courseRequestKey(identifier, availableMinutes, variant);
+  const cached = courseCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value;
+  }
+  if (cached) {
+    courseCache.delete(key);
+  }
+
+  const pending = courseRequests.get(key);
+  if (pending) {
+    return pending;
+  }
+
+  const request = apiClient
+    .get<{ data: CourseGenerationResult }>('/courses', {
+      params: { ...identifier, availableMinutes, variant },
+    })
+    .then((response) => {
+      cacheCourse(key, response.data.data);
+      return response.data.data;
+    })
+    .finally(() => {
+      if (courseRequests.get(key) === request) {
+        courseRequests.delete(key);
+      }
+    });
+  courseRequests.set(key, request);
+  return request;
+}
+
+/** 테스트와 명시적인 앱 데이터 초기화에서만 사용한다. */
+export function clearCourseRequestCache(): void {
+  courseCache.clear();
+  courseRequests.clear();
 }
 
 /**

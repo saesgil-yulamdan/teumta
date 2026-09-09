@@ -121,14 +121,14 @@ export default function CourseMapScreen() {
       <View style={{ height: insets.top, backgroundColor: TeumtaHybrid.slateSoft }} />
 
       <View style={styles.topBar}>
-        <Pressable style={styles.topButton} onPress={() => router.back()}>
+        <Pressable accessibilityRole="button" accessibilityLabel="뒤로 가기" style={styles.topButton} onPress={() => router.back()}>
           <Image
             source={require('@/assets/images/icons/back.svg')}
             style={styles.topButtonIcon}
             contentFit="contain"
           />
         </Pressable>
-        <Pressable style={styles.shareButton} onPress={handleShare}>
+        <Pressable accessibilityRole="button" accessibilityLabel="코스 공유" style={styles.shareButton} onPress={handleShare}>
           <Text style={styles.shareLabel}>공유</Text>
         </Pressable>
       </View>
@@ -147,7 +147,7 @@ export default function CourseMapScreen() {
               {courseName}
             </Text>
             <Text style={styles.sheetSubtitle}>
-              {course.totalMinutes}분 · 도보 {distanceLabel}
+            {course.totalMinutes}분 · 도보 {distanceLabel}
             </Text>
           </View>
           <View style={styles.returnPill}>

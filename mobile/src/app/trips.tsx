@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PlaceThumbnail } from '@/components/place-thumbnail';
+import { TeumtaHeader } from '@/components/teumta-header';
 import { TeumtaTabBar } from '@/components/teumta-tab-bar';
 import { TeumtaHybrid } from '@/constants/theme';
 import { useBookmarks } from '@/hooks/use-bookmarks';
@@ -34,10 +35,7 @@ export default function TripsScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>내 여행</Text>
-          <Text style={styles.headerSubtitle}>최근 코스와 저장한 목적지</Text>
-        </View>
+        <TeumtaHeader title="내 여행" subtitle="최근 코스와 저장한 목적지" />
 
         <Text style={styles.sectionTitle}>최근 본 코스</Text>
         {entries.length === 0 ? (

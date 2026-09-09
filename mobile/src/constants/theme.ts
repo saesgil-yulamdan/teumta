@@ -57,11 +57,13 @@ export const TeumtaHybrid = {
   paper: '#FBFAF5',
   ink: '#191A17',
   muted: '#67685F',
-  faint: '#96978F',
+  // 보조 텍스트도 야외·저시력 환경에서 읽히도록 paper 대비를 확보한다.
+  faint: '#74766F',
   line: '#D3D0C5',
   forest: '#174F3D',
   forestSoft: '#DCE8DE',
-  terracotta: '#B85D45',
+  // 작은 강조 문구에도 쓸 수 있도록 paper 대비 4.5:1 이상을 유지한다.
+  terracotta: '#A64F3A',
   terracottaSoft: '#EFE1DA',
   navy: '#344454',
   navySoft: '#E2E6E8',

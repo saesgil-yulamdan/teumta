@@ -8,13 +8,14 @@ import { Onboarding } from '@/components/onboarding';
 import { QuietNow } from '@/components/quiet-now';
 import { TeumtaTabBar } from '@/components/teumta-tab-bar';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
+import { TeumtaWaymark } from '@/components/teumta-waymark';
 import {
   AVAILABLE_REGIONS,
   destinationsInRegion,
   type FeaturedDestination,
   type Region,
 } from '@/constants/destinations';
-import { TeumtaHybrid } from '@/constants/theme';
+import { Fonts, TeumtaHybrid } from '@/constants/theme';
 import { loadSelectedCourse, type SelectedCourse } from '@/stores/selected-course';
 
 /** 목적지 상세로 넘길 파라미터. 상세 화면이 이 식별자로 실시간 정보를 조회한다. */
@@ -33,12 +34,16 @@ function detailHref(destination: FeaturedDestination) {
 
 export default function HomeScreen() {
   const [activeCourse, setActiveCourse] = useState<SelectedCourse | null>(null);
+  const [activeCourseReady, setActiveCourseReady] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       let ignored = false;
       void loadSelectedCourse().then((course) => {
-        if (!ignored) setActiveCourse(course);
+        if (!ignored) {
+          setActiveCourse(course);
+          setActiveCourseReady(true);
+        }
       });
       return () => {
         ignored = true;
@@ -76,6 +81,7 @@ export default function HomeScreen() {
         }
         showsVerticalScrollIndicator={false}>
         <View style={styles.brandRow}>
+          <TeumtaWaymark />
           <Image
             source={require('@/assets/images/teumta-logo.svg')}
             style={styles.brandLogo}
@@ -86,8 +92,10 @@ export default function HomeScreen() {
 
         <View style={styles.intro}>
           <Text style={styles.eyebrow}>오늘의 여행</Text>
-          <Text style={styles.title}>어디로 떠나세요?</Text>
-          <Text style={styles.subtitle}>혼잡은 피하고, 여행은 이어가요.</Text>
+          <Text style={styles.title}>{activeCourse ? '여행을 이어가세요' : '어디로 떠나세요?'}</Text>
+          <Text style={styles.subtitle}>
+            {activeCourse ? '마지막 진행 지점부터 다시 시작해요.' : '혼잡은 피하고, 여행은 이어가요.'}
+          </Text>
         </View>
 
         <Link href={'/search' as Href} asChild>
@@ -101,11 +109,9 @@ export default function HomeScreen() {
           </Pressable>
         </Link>
 
-        <QuietNow refreshSignal={refreshSignal} onRefreshed={handleRefreshed} />
-
-        {activeCourse && (
+        {activeCourse ? (
           <Link href={'/trip' as Href} asChild>
-            <Pressable style={styles.resumeCard}>
+            <Pressable accessibilityRole="button" accessibilityLabel={`${activeCourse.destination.name} 진행 중인 코스 이어가기`} style={styles.resumeCard}>
               <View style={styles.resumeCopy}>
                 <Text style={styles.resumeEyebrow}>진행 중인 코스</Text>
                 <Text numberOfLines={1} style={styles.resumeTitle}>
@@ -116,13 +122,20 @@ export default function HomeScreen() {
               <Text style={styles.resumeAction}>이어가기</Text>
             </Pressable>
           </Link>
-        )}
+        ) : !activeCourseReady ? (
+          <View accessible accessibilityLabel="진행 중인 코스 불러오는 중" style={styles.resumePlaceholder} />
+        ) : null}
+
+        <QuietNow refreshSignal={refreshSignal} onRefreshed={handleRefreshed} />
 
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chipRow}>
           <Pressable
+            accessibilityRole="radio"
+            accessibilityState={{ checked: region === null }}
+            accessibilityLabel="전체 지역"
             onPress={() => setRegion(null)}
             style={[styles.chip, region === null && styles.chipSelected]}>
             <Text style={[styles.chipLabel, region === null && styles.chipLabelSelected]}>
@@ -134,6 +147,9 @@ export default function HomeScreen() {
             return (
               <Pressable
                 key={item}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: selected }}
+                accessibilityLabel={`${item} 지역`}
                 onPress={() => setRegion(item)}
                 style={[styles.chip, selected && styles.chipSelected]}>
                 <Text style={[styles.chipLabel, selected && styles.chipLabelSelected]}>{item}</Text>
@@ -197,7 +213,9 @@ export default function HomeScreen() {
                   <View style={styles.regionImage} />
                 )}
                 <View style={styles.regionBody}>
-                  <Text style={styles.regionName}>{destination.name}</Text>
+                  <Text numberOfLines={2} style={styles.regionName}>
+                    {destination.name}
+                  </Text>
                   <Text style={styles.regionMeta}>{destination.areaLabel}</Text>
                 </View>
               </Pressable>
@@ -254,8 +272,9 @@ const styles = StyleSheet.create({
   },
   title: {
     color: TeumtaHybrid.ink,
+    fontFamily: Fonts.sans,
     fontSize: 30,
-    fontWeight: '900',
+    fontWeight: '500',
     lineHeight: 39,
   },
   subtitle: {
@@ -294,6 +313,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 7,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   chipSelected: {
     backgroundColor: TeumtaHybrid.slateSoft,
@@ -325,6 +346,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     padding: 14,
+  },
+  resumePlaceholder: {
+    backgroundColor: TeumtaHybrid.navySoft,
+    borderColor: TeumtaHybrid.line,
+    borderRadius: TeumtaHybrid.radius.small,
+    borderWidth: 1,
+    height: 72,
   },
   resumeCopy: {
     flex: 1,
@@ -372,8 +400,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   featuredImage: {
+    aspectRatio: 16 / 9,
     backgroundColor: TeumtaHybrid.canvas,
-    height: 176,
   },
   featuredBody: {
     alignItems: 'center',
@@ -422,12 +450,13 @@ const styles = StyleSheet.create({
     width: '48%',
   },
   regionImage: {
+    aspectRatio: 4 / 3,
     backgroundColor: TeumtaHybrid.canvas,
     borderRadius: TeumtaHybrid.radius.small,
-    height: 104,
   },
   regionBody: {
     gap: 2,
+    minHeight: 68,
     paddingHorizontal: 10,
     paddingVertical: 7,
   },

@@ -1,7 +1,17 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  AppState,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -647,12 +657,19 @@ export default function TripScreen() {
   const skipActionLabel =
     currentIndex + 1 < plannedCourse.stops.length ? '건너뛰고 다음' : '건너뛰고 복귀';
 
+  const leaveTripScreen = () => {
+    Alert.alert('진행 화면을 나갈까요?', '코스는 진행 중으로 유지되며 홈에서 이어갈 수 있어요.', [
+      { text: '계속 보기', style: 'cancel' },
+      { text: '나가기', onPress: () => router.back() },
+    ]);
+  };
+
   return (
     <View style={styles.screen}>
       <View style={{ height: insets.top, backgroundColor: TeumtaHybrid.slateSoft }} />
 
       <View style={styles.topBar}>
-        <Pressable style={styles.topButton} onPress={() => router.back()}>
+        <Pressable accessibilityRole="button" accessibilityLabel="진행 화면 나가기" style={styles.topButton} onPress={leaveTripScreen}>
           <Image
             source={require('@/assets/images/icons/back.svg')}
             style={styles.topButtonIcon}
@@ -660,7 +677,7 @@ export default function TripScreen() {
           />
         </Pressable>
         <View style={styles.tripIdentity}>
-          <Text style={styles.tripEyebrow}>LIVE ROUTE</Text>
+          <Text style={styles.tripEyebrow}>진행 중인 코스</Text>
           <Text numberOfLines={1} style={styles.tripDestination}>
             {destination.name}
           </Text>
@@ -703,7 +720,11 @@ export default function TripScreen() {
         />
       </View>
 
-      <View style={[styles.sheet, { paddingBottom: 18 + insets.bottom }]}>
+      <ScrollView
+        style={styles.sheet}
+        contentContainerStyle={[styles.sheetContent, { paddingBottom: 18 + insets.bottom }]}
+        nestedScrollEnabled
+        showsVerticalScrollIndicator={false}>
         <Animated.View
           key={statusMomentKey}
           entering={FadeInDown.duration(280)}
@@ -856,6 +877,8 @@ export default function TripScreen() {
 
         <View style={styles.buttonRow}>
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="코스 종료 및 기록 저장"
             style={styles.endButton}
             onPress={() => {
               cancelReturnReminder();
@@ -888,7 +911,7 @@ export default function TripScreen() {
             위치는 이 기기에서만 사용합니다.
           </Text>
         </View>
-      </View>
+      </ScrollView>
 
       <Modal
         animationType="fade"
@@ -901,7 +924,11 @@ export default function TripScreen() {
         transparent
         visible={adjustmentPrompt !== null}>
         <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
+          <ScrollView
+            style={styles.modalCard}
+            contentContainerStyle={styles.modalCardContent}
+            nestedScrollEnabled
+            showsVerticalScrollIndicator={false}>
             <Text style={styles.modalTitle}>{adjustmentPrompt?.title}</Text>
             <Text style={styles.modalBody}>{adjustmentPrompt?.body}</Text>
             {operatingDetail ? (
@@ -969,7 +996,7 @@ export default function TripScreen() {
                 <Text style={styles.modalPrimaryLabel}>{skipActionLabel}</Text>
               </Pressable>
             </View>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -1057,11 +1084,15 @@ const styles = StyleSheet.create({
   },
   mapArea: {
     flex: 1,
+    minHeight: 120,
   },
   sheet: {
     backgroundColor: TeumtaHybrid.paper,
     borderTopColor: TeumtaHybrid.slate,
     borderTopWidth: 2,
+    maxHeight: '68%',
+  },
+  sheetContent: {
     gap: 10,
     paddingHorizontal: 20,
     paddingTop: 14,
@@ -1197,6 +1228,7 @@ const styles = StyleSheet.create({
   },
   stopActionRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 7,
   },
   stopActionButton: {
@@ -1204,6 +1236,10 @@ const styles = StyleSheet.create({
     borderColor: TeumtaHybrid.navy,
     borderRadius: TeumtaHybrid.radius.small,
     borderWidth: 1,
+    flexBasis: 116,
+    flexGrow: 1,
+    justifyContent: 'center',
+    minHeight: 40,
     paddingHorizontal: 11,
     paddingVertical: 7,
   },
@@ -1284,8 +1320,9 @@ const styles = StyleSheet.create({
     borderColor: TeumtaHybrid.navy,
     borderRadius: TeumtaHybrid.radius.small,
     borderWidth: 1,
-    height: 48,
     justifyContent: 'center',
+    minHeight: 48,
+    paddingVertical: 12,
     width: 118,
   },
   endButtonLabel: {
@@ -1299,8 +1336,9 @@ const styles = StyleSheet.create({
     backgroundColor: TeumtaHybrid.navy,
     borderRadius: TeumtaHybrid.radius.small,
     flex: 1,
-    height: 48,
     justifyContent: 'center',
+    minHeight: 48,
+    paddingVertical: 12,
   },
   directionsButtonDisabled: {
     opacity: 0.5,
@@ -1340,10 +1378,13 @@ const styles = StyleSheet.create({
   modalCard: {
     backgroundColor: TeumtaHybrid.paper,
     borderRadius: TeumtaHybrid.radius.large,
-    gap: 12,
+    maxHeight: '88%',
     maxWidth: 360,
-    padding: 20,
     width: '100%',
+  },
+  modalCardContent: {
+    gap: 12,
+    padding: 20,
   },
   modalTitle: {
     color: TeumtaHybrid.navy,
@@ -1425,26 +1466,34 @@ const styles = StyleSheet.create({
     borderColor: TeumtaHybrid.navy,
     borderRadius: TeumtaHybrid.radius.small,
     borderWidth: 1,
+    flexBasis: '45%',
+    flexGrow: 1,
     justifyContent: 'center',
     minHeight: 42,
     paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   modalSecondaryLabel: {
     color: TeumtaHybrid.navy,
     fontSize: 11,
     fontWeight: '700',
+    textAlign: 'center',
   },
   modalPrimaryButton: {
     alignItems: 'center',
     backgroundColor: TeumtaHybrid.navy,
     borderRadius: TeumtaHybrid.radius.small,
+    flexBasis: '45%',
+    flexGrow: 1,
     justifyContent: 'center',
     minHeight: 42,
     paddingHorizontal: 15,
+    paddingVertical: 10,
   },
   modalPrimaryLabel: {
     color: TeumtaHybrid.white,
     fontSize: 11,
     fontWeight: '800',
+    textAlign: 'center',
   },
 });

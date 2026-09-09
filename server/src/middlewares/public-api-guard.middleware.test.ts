@@ -69,6 +69,22 @@ describe('publicApiGuardMiddleware', () => {
     expect(allowed.statusCode).toBe(200);
   });
 
+  it('일반 조회 사용량이 코스 생성 한도를 잠식하지 않는다', () => {
+    const next = vi.fn();
+    for (let index = 0; index < PUBLIC_API_RATE_MAX_COST; index += 1) {
+      publicApiGuardMiddleware(request('/congestion'), response() as unknown as Response, next);
+    }
+
+    const courseResponse = response();
+    publicApiGuardMiddleware(
+      request('/courses'),
+      courseResponse as unknown as Response,
+      next,
+    );
+
+    expect(courseResponse.statusCode).toBe(200);
+  });
+
   it('관리자 경로는 제한과 계측에서 제외한다', () => {
     const next = vi.fn();
     publicApiGuardMiddleware(request('/admin/routes'), response() as unknown as Response, next);

@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TeumtaHybrid } from '@/constants/theme';
@@ -34,7 +34,9 @@ const STEPS = [
  * 저장값을 읽기 전에는 아무것도 띄우지 않는다(이미 본 사용자에게 깜빡임 방지).
  */
 export function Onboarding() {
+  const { height, width } = useWindowDimensions();
   const [visible, setVisible] = useState(false);
+  const compact = width <= 350 || height <= 700;
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
@@ -59,8 +61,11 @@ export function Onboarding() {
 
   return (
     <Modal animationType="fade" transparent={false} onRequestClose={dismiss}>
-      <SafeAreaView style={styles.screen}>
-        <View style={styles.content}>
+      <SafeAreaView style={[styles.screen, compact && styles.screenCompact]}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={[styles.content, compact && styles.contentCompact]}
+          showsVerticalScrollIndicator={false}>
           <View style={styles.brandRow}>
             <Image
               source={require('@/assets/images/teumta-logo.svg')}
@@ -70,7 +75,9 @@ export function Onboarding() {
             <Text style={styles.brandName}>틈타</Text>
           </View>
 
-          <Text style={styles.title}>붐비는 시간은 비켜가고,{'\n'}여행은 그대로.</Text>
+          <Text style={[styles.title, compact && styles.titleCompact]}>
+            붐비는 시간은 비켜가고,{'\n'}여행은 그대로.
+          </Text>
           <Text style={styles.subtitle}>
             혼잡한 목적지를 잠시 비켜 주변을 걷고 돌아옵니다.
           </Text>
@@ -95,7 +102,7 @@ export function Onboarding() {
               로그인 없이 사용 · 위치는 기기에서만 처리
             </Text>
           </View>
-        </View>
+        </ScrollView>
 
         <Pressable style={styles.ctaButton} onPress={dismiss}>
           <Text style={styles.ctaLabel}>시작하기</Text>
@@ -111,10 +118,21 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 24,
   },
-  content: {
+  screenCompact: {
+    paddingHorizontal: 20,
+  },
+  scroll: {
     flex: 1,
+  },
+  content: {
+    flexGrow: 1,
     gap: 14,
     justifyContent: 'center',
+    paddingVertical: 24,
+  },
+  contentCompact: {
+    gap: 11,
+    paddingVertical: 16,
   },
   brandRow: {
     alignItems: 'center',
@@ -136,6 +154,10 @@ const styles = StyleSheet.create({
     fontSize: 27,
     fontWeight: '900',
     lineHeight: 38,
+  },
+  titleCompact: {
+    fontSize: 24,
+    lineHeight: 34,
   },
   subtitle: {
     color: TeumtaHybrid.muted,
@@ -197,6 +219,7 @@ const styles = StyleSheet.create({
   },
   privacyText: {
     color: TeumtaHybrid.muted,
+    flex: 1,
     fontSize: 11,
     lineHeight: 15,
   },
@@ -204,9 +227,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: TeumtaHybrid.ink,
     borderRadius: TeumtaHybrid.radius.small,
-    height: 52,
     justifyContent: 'center',
     marginBottom: 12,
+    minHeight: 52,
+    paddingVertical: 14,
   },
   ctaLabel: {
     color: TeumtaHybrid.white,
