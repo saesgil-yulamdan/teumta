@@ -23,7 +23,7 @@ import { PlaceThumbnail } from '@/components/place-thumbnail';
 import { ReportModal } from '@/components/report-modal';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
 import { REALTIME_LEVEL_LABEL, REALTIME_LEVEL_TO_CONGESTION_LEVEL } from '@/constants/congestion';
-import { TeumtaHybrid, TeumtaHybridCongestion } from '@/constants/theme';
+import { Fonts, TeumtaHybrid, TeumtaHybridCongestion } from '@/constants/theme';
 import { useBookmarks } from '@/hooks/use-bookmarks';
 import type {
   CongestionLevel,
@@ -233,7 +233,11 @@ export default function PlaceDetailScreen() {
 
   if (!id || !source || !name) {
     return (
-      <View style={styles.emptyContainer}>
+      <View
+        style={[
+          styles.emptyContainer,
+          { paddingTop: 24 + insets.top, paddingBottom: 24 + insets.bottom },
+        ]}>
         <Text style={styles.emptyText}>관광지를 찾을 수 없습니다.</Text>
       </View>
     );
@@ -276,7 +280,7 @@ export default function PlaceDetailScreen() {
         }
         showsVerticalScrollIndicator={false}>
         <View style={styles.heroTopRow}>
-          <Pressable style={styles.heroButton} onPress={() => router.back()}>
+          <Pressable accessibilityRole="button" accessibilityLabel="뒤로 가기" style={styles.heroButton} onPress={() => router.back()}>
             <Image
               source={require('@/assets/images/icons/back.svg')}
               style={styles.heroButtonIcon}
@@ -284,6 +288,8 @@ export default function PlaceDetailScreen() {
             />
           </Pressable>
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={isPlaceBookmarked(source, id) ? '저장한 장소에서 삭제' : '장소 저장'}
             style={[styles.heroButton, isPlaceBookmarked(source, id) && styles.heroButtonSaved]}
             onPress={() =>
               togglePlaceBookmark({
@@ -312,7 +318,7 @@ export default function PlaceDetailScreen() {
           <View style={styles.heroImage} />
         )}
         <View style={styles.heroTitleBand}>
-          <Text style={styles.heroEyebrow}>PLACE NOTE</Text>
+          <Text style={styles.heroEyebrow}>장소 기록</Text>
           <Text style={styles.heroTitle}>{name}</Text>
           {address && <Text style={styles.heroSubtitle}>{address}</Text>}
         </View>
@@ -613,8 +619,10 @@ export default function PlaceDetailScreen() {
       <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
         <Pressable
           style={[styles.ctaButton, crowdedNow && styles.ctaButtonCrowded]}
+          accessibilityRole="button"
+          accessibilityLabel={crowdedNow ? '혼잡을 피해 코스 보기' : '주변 코스 보기'}
           onPress={goToDetours}>
-          <Text style={styles.ctaLabel}>틈타 코스 보기</Text>
+          <Text style={styles.ctaLabel}>{crowdedNow ? '혼잡을 피해 코스 보기' : '주변 코스 보기'}</Text>
         </Pressable>
       </View>
 
@@ -709,8 +717,8 @@ const styles = StyleSheet.create({
     width: 19,
   },
   heroImage: {
+    aspectRatio: 16 / 9,
     backgroundColor: TeumtaHybrid.line,
-    height: 212,
   },
   heroTitleBand: {
     backgroundColor: TeumtaHybrid.paper,
@@ -730,8 +738,9 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: TeumtaHybrid.ink,
+    fontFamily: Fonts.sans,
     fontSize: 31,
-    fontWeight: '800',
+    fontWeight: '500',
     letterSpacing: -1,
     lineHeight: 39,
   },

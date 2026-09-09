@@ -11,7 +11,6 @@ import { TourApiAttribution } from '@/components/tour-api-attribution';
 import { TeumtaHybrid } from '@/constants/theme';
 import type { LocalPlaceDetail } from '@/types/place';
 import { openDirections, openNaverMapPlace } from '@/utils/directions';
-import { withRoJosa } from '@/utils/text';
 
 const STATUS_BAR_TINT = TeumtaHybrid.paper;
 
@@ -79,7 +78,11 @@ export default function LocalPlaceDetailScreen() {
 
   if (!params.name || !hasCoordinate) {
     return (
-      <View style={styles.emptyContainer}>
+      <View
+        style={[
+          styles.emptyContainer,
+          { paddingTop: 24 + insets.top, paddingBottom: 24 + insets.bottom },
+        ]}>
         <Text style={styles.emptyText}>장소 정보를 불러올 수 없습니다.</Text>
         <Pressable style={styles.emptyButton} onPress={() => router.back()}>
           <Text style={styles.emptyButtonLabel}>돌아가기</Text>
@@ -97,7 +100,7 @@ export default function LocalPlaceDetailScreen() {
 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.heroTopRow}>
-          <Pressable style={styles.heroButton} onPress={() => router.back()}>
+          <Pressable accessibilityRole="button" accessibilityLabel="뒤로 가기" style={styles.heroButton} onPress={() => router.back()}>
             <Image
               source={require('@/assets/images/icons/back.svg')}
               style={styles.heroButtonIcon}
@@ -207,10 +210,12 @@ export default function LocalPlaceDetailScreen() {
           {/* 뒤로가기 아이콘만으로는 코스 화면으로 돌아갈 길이 안 보인다 — 엄지 위치에 명시. */}
           <Pressable style={styles.returnButton} onPress={() => router.back()}>
             <Text style={styles.returnLabel} numberOfLines={1}>
-              {params.destinationName ? `${withRoJosa(params.destinationName)} 돌아가기` : '돌아가기'}
+              {params.destinationName ? '코스로 돌아가기' : '돌아가기'}
             </Text>
           </Pressable>
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="이 장소로 코스 만들기"
             style={styles.ctaButton}
             onPress={() => {
               void openDirections({
@@ -294,8 +299,8 @@ const styles = StyleSheet.create({
     width: 19,
   },
   heroImage: {
+    aspectRatio: 16 / 9,
     backgroundColor: TeumtaHybrid.canvas,
-    height: 212,
   },
   heroTitleBand: {
     backgroundColor: TeumtaHybrid.paper,
@@ -455,9 +460,10 @@ const styles = StyleSheet.create({
     borderRadius: TeumtaHybrid.radius.small,
     borderWidth: 1,
     flex: 1,
-    height: 50,
     justifyContent: 'center',
+    minHeight: 50,
     paddingHorizontal: 10,
+    paddingVertical: 13,
   },
   returnLabel: {
     color: TeumtaHybrid.muted,
@@ -469,8 +475,10 @@ const styles = StyleSheet.create({
     backgroundColor: TeumtaHybrid.ink,
     borderRadius: TeumtaHybrid.radius.small,
     flex: 1,
-    height: 50,
     justifyContent: 'center',
+    minHeight: 50,
+    paddingHorizontal: 10,
+    paddingVertical: 13,
   },
   ctaLabel: {
     color: TeumtaHybrid.white,

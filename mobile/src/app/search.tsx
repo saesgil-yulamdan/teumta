@@ -9,9 +9,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { searchPlaces } from '@/api/places';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
+import { TeumtaHeader } from '@/components/teumta-header';
 import { TeumtaHybrid } from '@/constants/theme';
 import type { SearchPlaceResult } from '@/types/place';
 import {
@@ -100,7 +102,9 @@ export default function SearchScreen() {
   const showShortcuts = status === 'idle' && !hasSearched && results.length === 0;
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <SafeAreaView style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <TeumtaHeader title="탐색" subtitle="관광지·지역·테마를 찾아보세요" />
       <View style={styles.searchRow}>
         <TextInput
           value={keyword}
@@ -111,7 +115,7 @@ export default function SearchScreen() {
           placeholderTextColor={TeumtaHybrid.faint}
           style={styles.searchInput}
         />
-        <Pressable style={styles.searchButton} onPress={() => void runSearch(keyword)}>
+        <Pressable accessibilityRole="button" accessibilityLabel="검색 실행" style={styles.searchButton} onPress={() => void runSearch(keyword)}>
           <Text style={styles.searchButtonText}>검색</Text>
         </Pressable>
       </View>
@@ -122,13 +126,13 @@ export default function SearchScreen() {
             <View style={styles.shortcutSection}>
               <View style={styles.shortcutHeader}>
                 <Text style={styles.shortcutTitle}>최근 검색</Text>
-                <Pressable onPress={clearRecent} hitSlop={8}>
+                <Pressable accessibilityRole="button" accessibilityLabel="최근 검색어 모두 지우기" onPress={clearRecent} hitSlop={8}>
                   <Text style={styles.shortcutClear}>지우기</Text>
                 </Pressable>
               </View>
               <View style={styles.chipWrap}>
                 {recent.map((term) => (
-                  <Pressable key={term} style={styles.chip} onPress={() => void runSearch(term)}>
+                  <Pressable key={term} accessibilityRole="button" accessibilityLabel={`${term} 다시 검색`} style={styles.chip} onPress={() => void runSearch(term)}>
                     <Text style={styles.chipLabel}>{term}</Text>
                   </Pressable>
                 ))}
@@ -142,7 +146,7 @@ export default function SearchScreen() {
             </View>
             <View style={styles.chipWrap}>
               {SUGGESTED_KEYWORDS.map((term) => (
-                <Pressable key={term} style={styles.chip} onPress={() => void runSearch(term)}>
+                <Pressable key={term} accessibilityRole="button" accessibilityLabel={`${term} 검색`} style={styles.chip} onPress={() => void runSearch(term)}>
                   <Text style={styles.chipLabel}>{term}</Text>
                 </Pressable>
               ))}
@@ -202,12 +206,14 @@ export default function SearchScreen() {
       {results.some((place) => place.source === 'TOUR') && (
         <TourApiAttribution style={styles.attribution} />
       )}
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 // 다른 화면과 같은 Teumta 토큰만 쓴다 — 이 화면만 초기 프로토타입 색이 남아 이질적이었다.
 const styles = StyleSheet.create({
+  screen: { backgroundColor: TeumtaHybrid.paper, flex: 1 },
   container: {
     backgroundColor: TeumtaHybrid.paper,
     gap: 22,
@@ -272,6 +278,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 13,
     paddingVertical: 8,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   chipLabel: {
     color: TeumtaHybrid.slate,

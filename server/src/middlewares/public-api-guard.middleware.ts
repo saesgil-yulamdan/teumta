@@ -70,7 +70,12 @@ function shouldBypass(req: Request): boolean {
 }
 
 function clientKey(req: Request): string {
-  return req.ip ?? 'unknown';
+  // 코스 생성은 호출 비용이 크지만 홈·상세 화면의 일반 조회와 같은 버킷을 쓰면
+  // 정상적인 화면 탐색만으로 코스 요청이 막힌다. 외부 API 보호 한도는 유지하되
+  // 고비용 코스 생성과 일반 조회의 예산을 독립적으로 계산한다.
+  const bucket =
+    req.path === '/courses' || req.path === '/course-alternatives' ? 'course' : 'standard';
+  return `${req.ip ?? 'unknown'}:${bucket}`;
 }
 
 function endpointKey(req: Request): string {

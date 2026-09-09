@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PlaceThumbnail } from '@/components/place-thumbnail';
 import { ReportModal } from '@/components/report-modal';
+import { TeumtaHeader } from '@/components/teumta-header';
 import { TeumtaTabBar } from '@/components/teumta-tab-bar';
 import { TeumtaHybrid } from '@/constants/theme';
 import { useBookmarks } from '@/hooks/use-bookmarks';
@@ -72,10 +73,7 @@ export default function MyScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>마이</Text>
-          <Text style={styles.headerSubtitle}>기록과 저장한 장소</Text>
-        </View>
+        <TeumtaHeader title="마이" subtitle="기록과 저장한 장소" />
 
         <Text style={styles.sectionTitle}>다녀온 코스</Text>
         <Text style={styles.sectionCaption}>
@@ -424,21 +422,26 @@ const styles = StyleSheet.create({
   infoRow: {
     alignItems: 'center',
     flexDirection: 'row',
+    gap: 12,
     justifyContent: 'space-between',
   },
   infoRowLabel: {
     color: TeumtaHybrid.muted,
     fontSize: 11,
     lineHeight: 15,
+    flexShrink: 0,
   },
   infoRowValue: {
     color: TeumtaHybrid.ink,
+    flex: 1,
     fontSize: 11,
     fontWeight: '700',
-    lineHeight: 14,
+    lineHeight: 16,
+    textAlign: 'right',
   },
   infoRowLink: {
     color: TeumtaHybrid.slate,
+    flexShrink: 0,
     fontSize: 11,
     fontWeight: '700',
     lineHeight: 14,

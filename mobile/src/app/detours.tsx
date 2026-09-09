@@ -3,10 +3,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { isAxiosError } from 'axios';
 
 import { fetchCourses } from '@/api/courses';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
-import { TeumtaHybrid } from '@/constants/theme';
+import { Fonts, TeumtaHybrid } from '@/constants/theme';
 import { useCourseLog } from '@/hooks/use-course-log';
 import { setSelectedCourse } from '@/stores/selected-course';
 import {
@@ -23,7 +24,7 @@ import { timeLabelAfter } from '@/utils/time';
 /** 서버 지원 가용 시간 선택지(api-spec 3.10). */
 const DURATION_OPTIONS = [30, 60, 90] as const;
 
-type Status = 'loading' | 'idle' | 'error';
+type Status = 'loading' | 'idle' | 'error' | 'rate-limited';
 
 type DetoursParams = {
   /** 목적지 식별자 — tourApiContentId 또는 tmapPoiId 중 하나. */
@@ -71,7 +72,7 @@ function RouteCard({
         <View style={styles.routeHeaderTexts}>
           <Text style={styles.routeKind}>{selected ? '추천 경로' : '대안 경로'}</Text>
           <Text style={styles.headerDuration}>
-            {course.totalMinutes} MIN · {distanceLabel}
+            {course.totalMinutes}분 · {distanceLabel}
           </Text>
         </View>
         <View style={selected ? styles.radioOn : styles.radioOff} />
@@ -152,6 +153,7 @@ export default function DetoursScreen() {
   const [courses, setCourses] = useState<GeneratedCourse[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [status, setStatus] = useState<Status>('loading');
+  const [retryAfterSeconds, setRetryAfterSeconds] = useState<number | null>(null);
   const [variant, setVariant] = useState(0);
   const requestGuard = useMemo(() => createRequestGuard(), []);
 
@@ -175,6 +177,7 @@ export default function DetoursScreen() {
     }
 
     setStatus('loading');
+    setRetryAfterSeconds(null);
     try {
       const result = await fetchCourses(currentIdentifier, availableMinutes, variant);
       if (!requestGuard.isCurrent(requestId)) {
@@ -184,12 +187,18 @@ export default function DetoursScreen() {
       setCourses(result.courses);
       setSelectedIndex(0);
       setStatus('idle');
-    } catch {
+    } catch (error) {
       if (!requestGuard.isCurrent(requestId)) {
         return;
       }
       setCourses([]);
-      setStatus('error');
+      if (isAxiosError(error) && error.response?.status === 429) {
+        const retryAfter = Number(error.response.headers['retry-after']);
+        setRetryAfterSeconds(Number.isFinite(retryAfter) ? retryAfter : null);
+        setStatus('rate-limited');
+      } else {
+        setStatus('error');
+      }
     }
   }, [contentId, poiId, availableMinutes, variant, requestGuard]);
 
@@ -245,7 +254,7 @@ export default function DetoursScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
         <View style={styles.headerRow}>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
+          <Pressable accessibilityRole="button" accessibilityLabel="뒤로 가기" style={styles.backButton} onPress={() => router.back()}>
             <Image
               source={require('@/assets/images/icons/back.svg')}
               style={styles.backIcon}
@@ -290,15 +299,19 @@ export default function DetoursScreen() {
           </View>
         )}
 
-        {status === 'error' && (
+        {(status === 'error' || status === 'rate-limited') && (
           <View style={styles.stateBox}>
             <Text style={styles.stateText}>
-              {identifier
+              {status === 'rate-limited'
+                ? `코스 요청이 잠시 몰렸어요.${
+                    retryAfterSeconds ? ` ${retryAfterSeconds}초 후 다시 시도해 주세요.` : ' 잠시 후 다시 시도해 주세요.'
+                  }`
+                : identifier
                 ? '코스를 불러오지 못했어요.'
                 : '목적지 정보가 없어요.'}
             </Text>
             {identifier && (
-              <Pressable style={styles.retryButton} onPress={() => void load()}>
+              <Pressable accessibilityRole="button" accessibilityLabel="코스 다시 시도" style={styles.retryButton} onPress={() => void load()}>
                 <Text style={styles.retryLabel}>다시 시도</Text>
               </Pressable>
             )}
@@ -313,25 +326,30 @@ export default function DetoursScreen() {
           </View>
         )}
 
-        {status === 'idle' &&
-          destination &&
-          courses.map((course, index) => (
-            <RouteCard
-              key={`${index}-${courseTitle(course)}`}
-              course={course}
-              destination={destination}
-              routeIndex={index}
-              selected={index === selectedIndex}
-              onSelect={() => setSelectedIndex(index)}
-            />
-          ))}
+        {status === 'idle' && destination && courses.length > 0 && (
+          <View accessibilityRole="radiogroup" accessibilityLabel="코스 선택">
+            {courses.map((course, index) => (
+              <RouteCard
+                key={`${index}-${courseTitle(course)}`}
+                course={course}
+                destination={destination}
+                routeIndex={index}
+                selected={index === selectedIndex}
+                onSelect={() => setSelectedIndex(index)}
+              />
+            ))}
+          </View>
+        )}
 
         {status === 'idle' && courses.length > 0 && (
           <>
             <View style={styles.infoBox}>
               <Text style={styles.infoTitle}>추천 기준</Text>
               <Text style={styles.infoBody}>
-                실제 보행 경로와 권장 체류시간을 반영합니다.
+                {availableMinutes <= 30
+                  ? '잠깐 들렀다가 제시간에 돌아오기 좋은 짧은 코스예요.'
+                  : '동네를 한 곳 더 둘러보고도 목적지로 돌아올 수 있는 코스예요.'}
+                {'\n'}실제 보행 경로와 권장 체류시간을 반영합니다.
               </Text>
             </View>
 
@@ -410,8 +428,9 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: TeumtaHybrid.ink,
+    fontFamily: Fonts.sans,
     fontSize: 25,
-    fontWeight: '900',
+    fontWeight: '500',
     lineHeight: 31,
   },
   headerSubtitle: {

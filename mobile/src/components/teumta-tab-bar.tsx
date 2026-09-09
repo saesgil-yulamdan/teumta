@@ -61,7 +61,7 @@ export function TeumtaTabBar({ active }: { active: TeumtaTab }) {
       {TABS.map((tab) => {
         const isActive = tab.key === active;
         return (
-          <Pressable key={tab.key} style={styles.item} onPress={() => goTo(tab.key)}>
+          <Pressable key={tab.key} accessibilityRole="tab" accessibilityLabel={`${tab.label} 탭`} accessibilityState={{ selected: isActive }} style={styles.item} onPress={() => goTo(tab.key)}>
             <Image
               source={isActive ? tab.activeIcon : tab.inactiveIcon}
               style={[styles.icon, isActive && styles.iconActive]}

@@ -1,5 +1,15 @@
 import Constants from 'expo-constants';
-import { Alert, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Linking,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TeumtaHybrid } from '@/constants/theme';
@@ -58,15 +68,18 @@ export function ReportModal({ visible, onClose, kind, place }: ReportModalProps)
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="제보 창 닫기"
-        style={styles.backdrop}
-        onPress={onClose}>
+      <View style={styles.backdrop}>
         <Pressable
-          accessibilityRole="none"
-          style={[styles.sheet, { paddingBottom: 18 + insets.bottom }]}
-          onPress={() => {}}>
+          accessibilityRole="button"
+          accessibilityLabel="제보 창 닫기"
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+        />
+        <ScrollView
+          style={styles.sheet}
+          contentContainerStyle={[styles.sheetContent, { paddingBottom: 18 + insets.bottom }]}
+          nestedScrollEnabled
+          showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
             <View style={styles.headerTexts}>
               <Text style={styles.title}>
@@ -102,8 +115,8 @@ export function ReportModal({ visible, onClose, kind, place }: ReportModalProps)
           <Text style={styles.notice}>
             메일 앱에서 확인 후 보내주세요. 위치·기기 ID는 포함하지 않습니다.
           </Text>
-        </Pressable>
-      </Pressable>
+        </ScrollView>
+      </View>
     </Modal>
   );
 }
@@ -118,6 +131,10 @@ const styles = StyleSheet.create({
     backgroundColor: TeumtaHybrid.paper,
     borderTopLeftRadius: TeumtaHybrid.radius.large,
     borderTopRightRadius: TeumtaHybrid.radius.large,
+    maxHeight: '88%',
+    width: '100%',
+  },
+  sheetContent: {
     gap: 16,
     paddingHorizontal: 20,
     paddingTop: 18,
