@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
   },
   emptyButton: {
     backgroundColor: TeumtaHybrid.ink,
-    borderRadius: TeumtaHybrid.radius.small,
+    borderRadius: 4,
     marginTop: 12,
     paddingHorizontal: 18,
     paddingVertical: 10,
