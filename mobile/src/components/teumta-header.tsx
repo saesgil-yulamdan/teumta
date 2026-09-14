@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
     color: TeumtaHybrid.ink,
     fontFamily: Fonts.sans,
     fontSize: 27,
-    fontWeight: '500',
+    fontWeight: '800',
     lineHeight: 32,
   },
   subtitle: { color: TeumtaHybrid.muted, fontSize: 12, lineHeight: 18 },
