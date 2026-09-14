@@ -6,6 +6,7 @@ import {
   getRealtimeCongestion,
   getRealtimeCongestionByContentId,
 } from '../services/congestion.service';
+import { sendError, sendSuccess } from '../utils/api-response';
 
 function nonEmptyString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
@@ -22,14 +23,7 @@ export const getRealtimeCongestionController: RequestHandler = async (req, res, 
     const contentId = nonEmptyString(req.query.contentId);
 
     if ((poiId === null) === (contentId === null)) {
-      res.status(400).json({
-        success: false,
-        data: null,
-        error: {
-          code: 'INVALID_IDENTIFIER',
-          message: 'poiId 또는 contentId 중 정확히 하나를 전달해야 합니다.',
-        },
-      });
+      sendError(res, 400, 'INVALID_IDENTIFIER', 'poiId 또는 contentId 중 정확히 하나를 전달해야 합니다.');
       return;
     }
 
@@ -38,11 +32,7 @@ export const getRealtimeCongestionController: RequestHandler = async (req, res, 
         ? await getRealtimeCongestion(poiId)
         : await getRealtimeCongestionByContentId(contentId as string);
 
-    res.status(200).json({
-      success: true,
-      data: view,
-      error: null,
-    });
+    sendSuccess(res, view);
   } catch (error) {
     next(error);
   }
@@ -61,39 +51,25 @@ export const getConcentrationForecastByContentIdController: RequestHandler = asy
     const contentId = nonEmptyString(req.query.contentId);
 
     if (contentId === null) {
-      res.status(400).json({
-        success: false,
-        data: null,
-        error: {
-          code: 'INVALID_IDENTIFIER',
-          message: 'contentId는 비어 있지 않은 문자열이어야 합니다.',
-        },
-      });
+      sendError(res, 400, 'INVALID_IDENTIFIER', 'contentId는 비어 있지 않은 문자열이어야 합니다.');
       return;
     }
 
     const result = await getConcentrationForecastByContentId(contentId);
 
     if (result.status !== 'SUCCESS') {
-      res.status(404).json({
-        success: false,
-        data: null,
-        error: {
-          code: 'FORECAST_NOT_FOUND',
-          message:
-            result.status === 'DESTINATION_NOT_RESOLVED'
-              ? '목적지의 지역 정보를 확인할 수 없습니다.'
-              : '이 장소의 집중률 예측 데이터가 없습니다.',
-        },
-      });
+      sendError(
+        res,
+        404,
+        'FORECAST_NOT_FOUND',
+        result.status === 'DESTINATION_NOT_RESOLVED'
+          ? '목적지의 지역 정보를 확인할 수 없습니다.'
+          : '이 장소의 집중률 예측 데이터가 없습니다.',
+      );
       return;
     }
 
-    res.status(200).json({
-      success: true,
-      data: { ...result.data, isRealtime: false },
-      error: null,
-    });
+    sendSuccess(res, { ...result.data, isRealtime: false });
   } catch (error) {
     next(error);
   }

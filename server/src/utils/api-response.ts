@@ -1,0 +1,51 @@
+import type { Response } from 'express';
+
+/** 현재 모바일 앱이 사용하는 공개 API의 안정적인 오류 코드. */
+export const API_ERROR_CODE = {
+  INVALID_KEYWORD: 'INVALID_KEYWORD',
+  INVALID_PAGE: 'INVALID_PAGE',
+  INVALID_IDENTIFIER: 'INVALID_IDENTIFIER',
+  INVALID_RADIUS: 'INVALID_RADIUS',
+  INVALID_CONTENT_ID: 'INVALID_CONTENT_ID',
+  INVALID_AVAILABLE_MINUTES: 'INVALID_AVAILABLE_MINUTES',
+  INVALID_VARIANT: 'INVALID_VARIANT',
+  INVALID_ORIGIN: 'INVALID_ORIGIN',
+  DESTINATION_NOT_FOUND: 'DESTINATION_NOT_FOUND',
+  ORIGIN_NOT_FOUND: 'ORIGIN_NOT_FOUND',
+  LOCAL_PLACE_NOT_FOUND: 'LOCAL_PLACE_NOT_FOUND',
+  FORECAST_NOT_FOUND: 'FORECAST_NOT_FOUND',
+  CONGESTION_DATA_NOT_FOUND: 'CONGESTION_DATA_NOT_FOUND',
+  PUBLIC_API_RATE_LIMITED: 'PUBLIC_API_RATE_LIMITED',
+  API_NOT_FOUND: 'API_NOT_FOUND',
+  CONFIG_MISSING: 'CONFIG_MISSING',
+  INVALID_PARAM: 'INVALID_PARAM',
+  AUTH_FAILED: 'AUTH_FAILED',
+  RATE_LIMITED: 'RATE_LIMITED',
+  TIMEOUT: 'TIMEOUT',
+  NETWORK_ERROR: 'NETWORK_ERROR',
+  INVALID_RESPONSE: 'INVALID_RESPONSE',
+  EXTERNAL_API_ERROR: 'EXTERNAL_API_ERROR',
+  EXTERNAL_API_UNAVAILABLE: 'EXTERNAL_API_UNAVAILABLE',
+  NOT_FOUND: 'NOT_FOUND',
+  NOT_IMPLEMENTED: 'NOT_IMPLEMENTED',
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
+} as const;
+
+export type ApiErrorCode = (typeof API_ERROR_CODE)[keyof typeof API_ERROR_CODE] | string;
+
+export function sendSuccess<T>(res: Response, data: T, status = 200): Response {
+  return res.status(status).json({ success: true, data, error: null });
+}
+
+export function sendError(
+  res: Response,
+  status: number,
+  code: ApiErrorCode,
+  message: string,
+): Response {
+  return res.status(status).json({
+    success: false,
+    data: null,
+    error: { code, message },
+  });
+}

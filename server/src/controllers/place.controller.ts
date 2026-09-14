@@ -10,6 +10,7 @@ import {
   getNearbyLocalPlacesRealtime,
 } from '../services/nearby-local-place.service';
 import { searchDestinations } from '../services/place-search.service';
+import { sendError, sendSuccess } from '../utils/api-response';
 import {
   createPlace,
   deletePlace,
@@ -93,35 +94,19 @@ export const searchPlacesController: RequestHandler = async (req, res, next) => 
     const keyword = req.query.keyword;
 
     if (typeof keyword !== 'string' || keyword.trim().length === 0) {
-      res.status(400).json({
-        success: false,
-        data: null,
-        error: {
-          message: 'keyword는 비어 있지 않은 문자열이어야 합니다.',
-        },
-      });
+      sendError(res, 400, 'INVALID_KEYWORD', 'keyword는 비어 있지 않은 문자열이어야 합니다.');
       return;
     }
 
     const pageNo = req.query.pageNo === undefined ? 1 : Number(req.query.pageNo);
     if (!Number.isInteger(pageNo) || pageNo <= 0) {
-      res.status(400).json({
-        success: false,
-        data: null,
-        error: {
-          message: 'pageNo는 양의 정수여야 합니다.',
-        },
-      });
+      sendError(res, 400, 'INVALID_PAGE', 'pageNo는 양의 정수여야 합니다.');
       return;
     }
 
     const results = await searchDestinations({ keyword: keyword.trim(), pageNo });
 
-    res.status(200).json({
-      success: true,
-      data: results,
-      error: null,
-    });
+    sendSuccess(res, results);
   } catch (error) {
     next(error);
   }
@@ -144,13 +129,7 @@ export const getNearbyLocalPlacesByContentIdController: RequestHandler = async (
     const hasPoiId = typeof poiId === 'string' && poiId.trim().length > 0;
 
     if (hasContentId === hasPoiId) {
-      res.status(400).json({
-        success: false,
-        data: null,
-        error: {
-          message: 'contentId 또는 poiId 중 정확히 하나를 전달해야 합니다.',
-        },
-      });
+      sendError(res, 400, 'INVALID_IDENTIFIER', 'contentId 또는 poiId 중 정확히 하나를 전달해야 합니다.');
       return;
     }
 
@@ -163,13 +142,7 @@ export const getNearbyLocalPlacesByContentIdController: RequestHandler = async (
       radius <= 0 ||
       radius > MAX_RADIUS_METERS
     ) {
-      res.status(400).json({
-        success: false,
-        data: null,
-        error: {
-          message: `radius는 1 이상 ${MAX_RADIUS_METERS} 이하의 정수여야 합니다.`,
-        },
-      });
+      sendError(res, 400, 'INVALID_RADIUS', `radius는 1 이상 ${MAX_RADIUS_METERS} 이하의 정수여야 합니다.`);
       return;
     }
 
@@ -178,21 +151,11 @@ export const getNearbyLocalPlacesByContentIdController: RequestHandler = async (
       : await getNearbyLocalPlacesByPoiId((poiId as string).trim(), radius);
 
     if (result.status !== 'SUCCESS') {
-      res.status(404).json({
-        success: false,
-        data: null,
-        error: {
-          message: '목적지를 찾을 수 없습니다.',
-        },
-      });
+      sendError(res, 404, 'DESTINATION_NOT_FOUND', '목적지를 찾을 수 없습니다.');
       return;
     }
 
-    res.status(200).json({
-      success: true,
-      data: result.places,
-      error: null,
-    });
+    sendSuccess(res, result.places);
   } catch (error) {
     next(error);
   }
@@ -209,32 +172,18 @@ export const getLocalPlaceDetailController: RequestHandler = async (req, res, ne
     const contentId = req.query.contentId;
 
     if (typeof contentId !== 'string' || contentId.trim().length === 0) {
-      res.status(400).json({
-        success: false,
-        data: null,
-        error: {
-          code: 'INVALID_CONTENT_ID',
-          message: 'contentId는 비어 있지 않은 문자열이어야 합니다.',
-        },
-      });
+      sendError(res, 400, 'INVALID_CONTENT_ID', 'contentId는 비어 있지 않은 문자열이어야 합니다.');
       return;
     }
 
     const detail = await getLocalPlaceDetail(contentId.trim());
 
     if (!detail) {
-      res.status(404).json({
-        success: false,
-        data: null,
-        error: {
-          code: 'LOCAL_PLACE_NOT_FOUND',
-          message: '장소 정보를 찾을 수 없습니다.',
-        },
-      });
+      sendError(res, 404, 'LOCAL_PLACE_NOT_FOUND', '장소 정보를 찾을 수 없습니다.');
       return;
     }
 
-    res.status(200).json({ success: true, data: detail, error: null });
+    sendSuccess(res, detail);
   } catch (error) {
     next(error);
   }
