@@ -223,15 +223,21 @@ export async function fetchTourFestivals(
  * 동시 미스는 getOrCreate가 호출 1건으로 합친다. 실패는 캐시하지 않는다.
  */
 const DETAIL_CACHE_TTL_MS = 10 * 60 * 1000;
+const INTRO_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const DETAIL_CACHE_MAX_ENTRIES = 500;
-const detailCache = new TtlCache<TourApiDetailResponse>(
+const commonDetailCache = new TtlCache<TourApiDetailResponse>(
   DETAIL_CACHE_TTL_MS,
+  DETAIL_CACHE_MAX_ENTRIES,
+);
+const introDetailCache = new TtlCache<TourApiDetailResponse>(
+  INTRO_CACHE_TTL_MS,
   DETAIL_CACHE_MAX_ENTRIES,
 );
 
 /** 테스트용 캐시 초기화. */
 export function clearTourDetailCache(): void {
-  detailCache.clear();
+  commonDetailCache.clear();
+  introDetailCache.clear();
 }
 
 /** 공통정보 조회(detailCommon2). 기준 관광지 좌표 실시간 확보용. */
@@ -242,7 +248,7 @@ export async function fetchTourPlaceDetail(
   if (trimmed.length === 0) {
     throw new ExternalApiError(SERVICE, 'contentId is required', { code: 'INVALID_PARAM' });
   }
-  return detailCache.getOrCreate(`common:${trimmed}`, async () => {
+  return commonDetailCache.getOrCreate(trimmed, async () => {
     // v4.4에서 defaultYN/mapinfoYN 등 플래그는 폐지됨(전달 시 resultCode 10).
     const url = buildTourUrl('detailCommon2', { contentId: trimmed });
     const response = await requestJson<TourApiDetailResponse>({ service: SERVICE, url });
@@ -266,7 +272,7 @@ export async function fetchTourPlaceIntro(
       code: 'INVALID_PARAM',
     });
   }
-  return detailCache.getOrCreate(`intro:${trimmedId}:${trimmedTypeId}`, async () => {
+  return introDetailCache.getOrCreate(`${trimmedId}:${trimmedTypeId}`, async () => {
     const url = buildTourUrl('detailIntro2', {
       contentId: trimmedId,
       contentTypeId: trimmedTypeId,

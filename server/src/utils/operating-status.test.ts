@@ -1,0 +1,41 @@
+import { describe, expect, it } from 'vitest';
+
+import { evaluateOperatingStatus } from './operating-status';
+
+const MONDAY_NOON_KST = new Date('2026-09-07T03:00:00.000Z');
+
+describe('evaluateOperatingStatus', () => {
+  it('명확한 휴무일과 운영시간 밖을 닫힘으로 판정한다', () => {
+    expect(
+      evaluateOperatingStatus(
+        { openHours: '10:00 ~ 20:00', restDays: '매주 월요일' },
+        MONDAY_NOON_KST,
+      ).state,
+    ).toBe('closed');
+    expect(
+      evaluateOperatingStatus(
+        { openHours: '13:00 ~ 20:00', restDays: '연중무휴' },
+        MONDAY_NOON_KST,
+      ).state,
+    ).toBe('closed');
+  });
+
+  it('명시된 브레이크타임을 판정한다', () => {
+    expect(
+      evaluateOperatingStatus(
+        { openHours: '10:00~22:00 (브레이크타임 11:30~13:30)', restDays: '연중무휴' },
+        MONDAY_NOON_KST,
+      ).state,
+    ).toBe('break');
+  });
+
+  it('복합 문구와 누락 정보는 임의로 닫힘 처리하지 않는다', () => {
+    expect(
+      evaluateOperatingStatus(
+        { openHours: '월요일 10:00~18:00 / 화요일 12:00~20:00', restDays: null },
+        MONDAY_NOON_KST,
+      ).state,
+    ).toBe('unknown');
+    expect(evaluateOperatingStatus({ openHours: null, restDays: null }).state).toBe('unknown');
+  });
+});
