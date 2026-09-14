@@ -882,7 +882,7 @@ const styles = StyleSheet.create({
   },
   nearbyThumb: {
     backgroundColor: TeumtaHybrid.canvas,
-    borderRadius: 12,
+    borderRadius: 4,
     height: 66,
     width: 66,
   },

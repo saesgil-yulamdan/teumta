@@ -73,9 +73,9 @@ export const TeumtaHybrid = {
   slateSoft: '#E6EAEB',
   white: '#FFFFFF',
   radius: {
-    small: 3,
-    medium: 6,
-    large: 10,
+    small: 8,
+    medium: 14,
+    large: 20,
   },
 } as const;
 
