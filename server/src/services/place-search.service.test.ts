@@ -2,15 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /** 목적지 검색 서비스 테스트. 외부 API는 전부 mock. */
 
-const { fetchTourPlacesByKeywordMock, fetchPoiSearchMock, prismaMock } = vi.hoisted(
-  () => ({
-    fetchTourPlacesByKeywordMock: vi.fn(),
-    fetchPoiSearchMock: vi.fn(),
-    prismaMock: { place: { findMany: vi.fn() } },
-  }),
-);
-
-vi.mock('../utils/prisma', () => ({ prisma: prismaMock }));
+const { fetchTourPlacesByKeywordMock, fetchPoiSearchMock } = vi.hoisted(() => ({
+  fetchTourPlacesByKeywordMock: vi.fn(),
+  fetchPoiSearchMock: vi.fn(),
+}));
 
 vi.mock('../external/tour', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../external/tour')>();
@@ -69,8 +64,6 @@ const poiResponse = {
 beforeEach(() => {
   fetchTourPlacesByKeywordMock.mockReset();
   fetchPoiSearchMock.mockReset();
-  prismaMock.place.findMany.mockReset();
-  prismaMock.place.findMany.mockResolvedValue([]);
 });
 
 describe('searchDestinations', () => {
@@ -88,31 +81,13 @@ describe('searchDestinations', () => {
     expect(fetchPoiSearchMock).not.toHaveBeenCalled();
   });
 
-  it('적재된 관광지와 contentId가 일치하면 내부 placeId를 붙인다', async () => {
+  it('검색 결과를 DB와 매칭하지 않고 외부 식별자만 반환한다', async () => {
     fetchTourPlacesByKeywordMock.mockResolvedValue(
       tourResponse([tourItem, { ...tourItem, contentid: '999999', title: '미적재 관광지' }]),
     );
-    prismaMock.place.findMany.mockResolvedValue([
-      { id: 7, tourApiContentId: '126508' },
-    ]);
-
     const results = await searchDestinations({ keyword: '경복궁' });
 
-    expect(prismaMock.place.findMany).toHaveBeenCalledWith({
-      where: { tourApiContentId: { in: ['126508', '999999'] } },
-      select: { id: true, tourApiContentId: true },
-    });
-    expect(results.map((result) => result.placeId)).toEqual([7, null]);
-  });
-
-  it('내부 Place 조회가 실패해도 검색은 성공시키고 placeId만 null로 둔다', async () => {
-    fetchTourPlacesByKeywordMock.mockResolvedValue(tourResponse([tourItem]));
-    prismaMock.place.findMany.mockRejectedValue(new Error('db down'));
-
-    const results = await searchDestinations({ keyword: '경복궁' });
-
-    expect(results).toHaveLength(1);
-    expect(results[0].placeId).toBeNull();
+    expect(results.map((result) => result.placeId)).toEqual([null, null]);
   });
 
   it('TourAPI 결과가 없으면 TMAP POI 검색으로 폴백한다', async () => {
@@ -132,8 +107,6 @@ describe('searchDestinations', () => {
       imageUrl: null,
       placeId: null,
     });
-    // TMAP 결과는 이을 키가 없으므로 DB를 조회하지 않는다.
-    expect(prismaMock.place.findMany).not.toHaveBeenCalled();
   });
 
   it('TMAP 폴백에서 좌표 없는 POI는 제외한다', async () => {

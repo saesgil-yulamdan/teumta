@@ -6,6 +6,7 @@ import {
   generateCourseAlternatives,
   generateCourses,
 } from '../services/course-generation.service';
+import { sendError, sendSuccess } from '../utils/api-response';
 
 /**
  * 우회 코스 실시간 생성(3.10). 목적지 식별자 + 가용 시간만 받는다.
@@ -19,7 +20,7 @@ function nonEmptyString(value: unknown): string | null {
 }
 
 function badRequest(res: Parameters<RequestHandler>[1], code: string, message: string) {
-  res.status(400).json({ success: false, data: null, error: { code, message } });
+  return sendError(res, 400, code, message);
 }
 
 export const generateCoursesController: RequestHandler = async (req, res, next) => {
@@ -79,18 +80,11 @@ export const generateCoursesController: RequestHandler = async (req, res, next) 
     });
 
     if (result.status === 'DESTINATION_NOT_FOUND') {
-      res.status(404).json({
-        success: false,
-        data: null,
-        error: {
-          code: 'DESTINATION_NOT_FOUND',
-          message: '목적지를 찾을 수 없거나 좌표가 없습니다.',
-        },
-      });
+      sendError(res, 404, 'DESTINATION_NOT_FOUND', '목적지를 찾을 수 없거나 좌표가 없습니다.');
       return;
     }
 
-    res.status(200).json({ success: true, data: result.result, error: null });
+    sendSuccess(res, result.result);
   } catch (error) {
     next(error);
   }
@@ -144,21 +138,18 @@ export const generateCourseAlternativesController: RequestHandler = async (req, 
     });
 
     if (result.status !== 'SUCCESS') {
-      res.status(404).json({
-        success: false,
-        data: null,
-        error: {
-          code: result.status,
-          message:
-            result.status === 'ORIGIN_NOT_FOUND'
-              ? '현재 정류지를 찾을 수 없거나 좌표가 없습니다.'
-              : '복귀할 목적지를 찾을 수 없거나 좌표가 없습니다.',
-        },
-      });
+      sendError(
+        res,
+        404,
+        result.status,
+        result.status === 'ORIGIN_NOT_FOUND'
+          ? '현재 정류지를 찾을 수 없거나 좌표가 없습니다.'
+          : '복귀할 목적지를 찾을 수 없거나 좌표가 없습니다.',
+      );
       return;
     }
 
-    res.status(200).json({ success: true, data: result.result, error: null });
+    sendSuccess(res, result.result);
   } catch (error) {
     next(error);
   }

@@ -85,12 +85,15 @@ describe('publicApiGuardMiddleware', () => {
     expect(courseResponse.statusCode).toBe(200);
   });
 
-  it('관리자 경로는 제한과 계측에서 제외한다', () => {
+  it('마운트되지 않은 과거 관리자 경로도 일반 unknown 요청으로 계측한다', () => {
     const next = vi.fn();
     publicApiGuardMiddleware(request('/admin/routes'), response() as unknown as Response, next);
 
     expect(next).toHaveBeenCalledOnce();
-    expect(getPublicApiUsageSnapshot().requests).toBe(0);
+    expect(getPublicApiUsageSnapshot()).toMatchObject({
+      requests: 1,
+      byEndpoint: { 'GET /other': 1 },
+    });
   });
 
   it('endpoint별 요청 수와 가중 비용을 집계한다', () => {
@@ -111,8 +114,7 @@ describe('publicApiGuardMiddleware', () => {
     publicApiGuardMiddleware(request('/arbitrary/b'), response() as unknown as Response, vi.fn());
 
     expect(getPublicApiUsageSnapshot().byEndpoint).toEqual({
-      'GET /places/:id': 1,
-      'GET /other': 2,
+      'GET /other': 3,
     });
   });
 });

@@ -7,6 +7,7 @@ import {
   ExternalApiRateLimitError,
   ExternalApiTimeoutError,
 } from '../external/common/external-api.error';
+import { sendError } from '../utils/api-response';
 
 export interface ResolvedError {
   status: number;
@@ -61,9 +62,5 @@ export const errorMiddleware: ErrorRequestHandler = (error, _req, res, _next) =>
   const logMessage = error instanceof Error ? error.message : String(error);
   console.error(`Request failed [${code}]:`, logMessage);
 
-  res.status(status).json({
-    success: false,
-    data: null,
-    error: { code, message },
-  });
+  sendError(res, status, code, message);
 };
