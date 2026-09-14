@@ -233,17 +233,17 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: TeumtaHybrid.paper,
+    backgroundColor: TeumtaHybrid.canvas,
     flex: 1,
   },
   scroll: {
     flex: 1,
   },
   content: {
-    gap: 22,
+    gap: 18,
     paddingBottom: 24,
     paddingHorizontal: 20,
-    paddingTop: 8,
+    paddingTop: 14,
   },
   brandRow: {
     alignItems: 'center',
@@ -286,12 +286,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: TeumtaHybrid.paper,
     borderColor: TeumtaHybrid.line,
-    borderRadius: TeumtaHybrid.radius.small,
+    borderRadius: 14,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 10,
-    height: 52,
-    paddingHorizontal: 14,
+    height: 54,
+    paddingHorizontal: 16,
+    shadowColor: TeumtaHybrid.ink,
+    shadowOffset: { height: 2, width: 0 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
   },
   searchIcon: {
     height: 19,
@@ -309,7 +313,7 @@ const styles = StyleSheet.create({
   chip: {
     backgroundColor: TeumtaHybrid.paper,
     borderColor: TeumtaHybrid.line,
-    borderRadius: TeumtaHybrid.radius.small,
+    borderRadius: 999,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 7,
@@ -317,8 +321,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   chipSelected: {
-    backgroundColor: TeumtaHybrid.slateSoft,
-    borderColor: TeumtaHybrid.slate,
+    backgroundColor: TeumtaHybrid.forestSoft,
+    borderColor: TeumtaHybrid.forest,
   },
   chipLabel: {
     color: TeumtaHybrid.muted,
@@ -332,16 +336,16 @@ const styles = StyleSheet.create({
   sectionRow: {
     alignItems: 'center',
     borderTopColor: TeumtaHybrid.ink,
-    borderTopWidth: 1,
+    borderTopWidth: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingTop: 12,
+    paddingTop: 4,
   },
   resumeCard: {
     alignItems: 'center',
     backgroundColor: TeumtaHybrid.navySoft,
     borderColor: TeumtaHybrid.navy,
-    borderRadius: TeumtaHybrid.radius.small,
+    borderRadius: 16,
     borderWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -350,7 +354,7 @@ const styles = StyleSheet.create({
   resumePlaceholder: {
     backgroundColor: TeumtaHybrid.navySoft,
     borderColor: TeumtaHybrid.line,
-    borderRadius: TeumtaHybrid.radius.small,
+    borderRadius: 16,
     borderWidth: 1,
     height: 72,
   },
@@ -395,9 +399,15 @@ const styles = StyleSheet.create({
   },
   featuredCard: {
     backgroundColor: TeumtaHybrid.paper,
-    borderBottomColor: TeumtaHybrid.ink,
-    borderBottomWidth: 1,
+    borderColor: TeumtaHybrid.line,
+    borderRadius: 18,
+    borderWidth: 1,
+    elevation: 2,
     overflow: 'hidden',
+    shadowColor: TeumtaHybrid.ink,
+    shadowOffset: { height: 2, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
   },
   featuredImage: {
     aspectRatio: 16 / 9,
@@ -407,7 +417,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
   },
   featuredTexts: {
     gap: 1,
@@ -443,8 +454,10 @@ const styles = StyleSheet.create({
   },
   regionCard: {
     backgroundColor: TeumtaHybrid.paper,
-    borderBottomColor: TeumtaHybrid.line,
-    borderBottomWidth: 1,
+    borderColor: TeumtaHybrid.line,
+    borderRadius: 14,
+    borderWidth: 1,
+    elevation: 1,
     // flex:1은 줄바꿈과 함께 쓰면 한 줄에 전부 밀어넣는다. 2열 격자라 폭을 고정한다.
     overflow: 'hidden',
     width: '48%',
@@ -452,13 +465,13 @@ const styles = StyleSheet.create({
   regionImage: {
     aspectRatio: 4 / 3,
     backgroundColor: TeumtaHybrid.canvas,
-    borderRadius: TeumtaHybrid.radius.small,
+    borderRadius: 0,
   },
   regionBody: {
     gap: 2,
     minHeight: 68,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   regionName: {
     color: TeumtaHybrid.ink,
