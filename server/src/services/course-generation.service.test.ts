@@ -7,11 +7,13 @@ const {
   measureNearbyLocalPlacesMock,
   measureNearbyFestivalsMock,
   fetchPedestrianRouteMock,
+  fetchTourPlaceIntroMock,
 } = vi.hoisted(() => ({
   resolveDestinationByContentIdMock: vi.fn(),
   measureNearbyLocalPlacesMock: vi.fn(),
   measureNearbyFestivalsMock: vi.fn(),
   fetchPedestrianRouteMock: vi.fn(),
+  fetchTourPlaceIntroMock: vi.fn(),
 }));
 
 vi.mock('./nearby-local-place.service', async (importOriginal) => {
@@ -28,13 +30,20 @@ vi.mock('../external/tmap', async (importOriginal) => {
   return { ...actual, fetchPedestrianRoute: fetchPedestrianRouteMock };
 });
 
+vi.mock('../external/tour', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../external/tour')>();
+  return { ...actual, fetchTourPlaceIntro: fetchTourPlaceIntroMock };
+});
+
 vi.mock('./nearby-festival.service', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./nearby-festival.service')>();
   return { ...actual, measureNearbyFestivals: measureNearbyFestivalsMock };
 });
 
 import {
+  MAX_OPERATING_LOOKUPS,
   MIN_STAY_MINUTES,
+  clearGeneratedCourseCache,
   estimateWalkMinutes,
   generateCourseAlternatives,
   generateCourses,
@@ -82,6 +91,7 @@ function measured(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  clearGeneratedCourseCache();
   resolveDestinationByContentIdMock.mockResolvedValue(DESTINATION);
   measureNearbyLocalPlacesMock.mockResolvedValue([]);
   measureNearbyFestivalsMock.mockResolvedValue([]);
@@ -100,6 +110,17 @@ beforeEach(() => {
         properties: {},
       },
     ],
+  });
+  fetchTourPlaceIntroMock.mockResolvedValue({
+    response: {
+      header: { resultCode: '0000', resultMsg: 'OK' },
+      body: {
+        items: { item: [{ usetime: '24시간', restdate: '연중무휴' }] },
+        numOfRows: 1,
+        pageNo: 1,
+        totalCount: 1,
+      },
+    },
   });
 });
 
@@ -377,6 +398,64 @@ describe('generateCourses', () => {
     expect(result.result.courses.length).toBeGreaterThan(0);
     expect(result.result.courses.every((course) => course.verified)).toBe(true);
     expect(result.result.courses.every((course) => course.stops.length === 1)).toBe(true);
+  });
+
+  it('예상 방문 시각에 명확히 휴무인 장소는 코스에서 제외한다', async () => {
+    measureNearbyLocalPlacesMock.mockResolvedValue([
+      measured('휴무 장소', 5, '39'),
+      measured('운영 장소', 6, '38', 1),
+    ]);
+    fetchTourPlaceIntroMock.mockImplementation(async (contentId: string) => ({
+      response: {
+        header: { resultCode: '0000', resultMsg: 'OK' },
+        body: {
+          items: {
+            item: [
+              contentId === '휴무 장소'
+                ? { opentimefood: '10:00~20:00', restdatefood: '매주 월요일' }
+                : { opentime: '24시간', restdateshopping: '연중무휴' },
+            ],
+          },
+          numOfRows: 1,
+          pageNo: 1,
+          totalCount: 1,
+        },
+      },
+    }));
+
+    const result = await generateCourses({
+      contentId: '126508',
+      availableMinutes: 90,
+      now: new Date('2026-09-07T03:00:00.000Z'),
+    });
+
+    if (result.status !== 'SUCCESS') throw new Error('expected success');
+    expect(result.result.courses.length).toBeGreaterThan(0);
+    expect(result.result.courses.flatMap((course) => course.stops).map((stop) => stop.name))
+      .not.toContain('휴무 장소');
+  });
+
+  it('같은 코스 요청은 서버 캐시에서 공유한다', async () => {
+    measureNearbyLocalPlacesMock.mockResolvedValue([measured('통인시장', 10, '38')]);
+
+    await generateCourses({ contentId: '126508', availableMinutes: 60, variant: 3 });
+    await generateCourses({ contentId: '126508', availableMinutes: 60, variant: 3 });
+
+    expect(measureNearbyLocalPlacesMock).toHaveBeenCalledTimes(1);
+    expect(fetchTourPlaceIntroMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('운영정보 조회는 코스 요청당 최대 5곳으로 제한한다', async () => {
+    measureNearbyLocalPlacesMock.mockResolvedValue(
+      Array.from({ length: 7 }, (_, index) =>
+        measured(`장소 ${index + 1}`, 3 + index, index % 2 === 0 ? '38' : '39', index),
+      ),
+    );
+
+    await generateCourses({ contentId: '126508', availableMinutes: 90 });
+
+    expect(MAX_OPERATING_LOOKUPS).toBe(5);
+    expect(fetchTourPlaceIntroMock).toHaveBeenCalledTimes(MAX_OPERATING_LOOKUPS);
   });
 });
 

@@ -4,7 +4,10 @@ import {
   extractRouteTotals,
   fetchPedestrianRoute,
 } from '../external/tmap';
+import { fetchTourPlaceIntro, mapLocalPlaceIntro } from '../external/tour';
 import { distanceMeters } from '../utils/geo';
+import { evaluateOperatingStatus } from '../utils/operating-status';
+import { TtlCache } from '../utils/ttl-cache';
 import {
   DEFAULT_RADIUS_METERS,
   TMAP_CONCURRENCY,
@@ -57,6 +60,15 @@ const MAX_CANDIDATE_POOL = 10;
 const MAX_COURSES = 3;
 /** TMAP으로 정류지 사이 구간까지 검증할 계획 수. 다양화 이후 탈락 여지를 둔다. */
 const MAX_VERIFICATION_PLANS = 8;
+/** 상위 코스에서 운영정보를 확인할 고유 장소 수. TourAPI 일일 쿼터 보호용 상한. */
+export const MAX_OPERATING_LOOKUPS = 5;
+const OPERATING_LOOKUP_CONCURRENCY = 3;
+/** 완성 코스는 같은 입력의 동시·반복 요청이 TMAP 검증을 재실행하지 않도록 짧게 캐시한다. */
+export const GENERATED_COURSE_CACHE_TTL_MS = 2 * 60 * 1000;
+const generatedCourseCache = new TtlCache<CourseGenerationLookup>(
+  GENERATED_COURSE_CACHE_TTL_MS,
+  300,
+);
 
 /** 보행 속도(m/분), 4km/h 기준 — 정류지 사이 구간 어림용. */
 const WALKING_METERS_PER_MINUTE = 67;
@@ -149,6 +161,68 @@ interface CoursePlan {
   stayMinutes: number[];
   totalMinutes: number;
   verified: boolean;
+}
+
+type OperatingInfo = { openHours: string | null; restDays: string | null };
+
+async function loadOperatingInfo(plans: CoursePlan[]): Promise<Map<string, OperatingInfo>> {
+  const candidates: NearbyLocalPlaceCandidate[] = [];
+  const seen = new Set<string>();
+  for (const plan of plans) {
+    for (const stop of plan.stops) {
+      const candidate = stop.candidate;
+      if (
+        candidate.kind === 'FESTIVAL' ||
+        !candidate.contentTypeId ||
+        seen.has(candidate.tourApiContentId)
+      ) {
+        continue;
+      }
+      seen.add(candidate.tourApiContentId);
+      candidates.push(candidate);
+      if (candidates.length >= MAX_OPERATING_LOOKUPS) break;
+    }
+    if (candidates.length >= MAX_OPERATING_LOOKUPS) break;
+  }
+
+  const loaded = await mapWithConcurrency(
+    candidates,
+    OPERATING_LOOKUP_CONCURRENCY,
+    async (candidate) => ({
+      contentId: candidate.tourApiContentId,
+      info: mapLocalPlaceIntro(
+        await fetchTourPlaceIntro(candidate.tourApiContentId, candidate.contentTypeId as string),
+      ),
+    }),
+  );
+  return new Map(
+    loaded.flatMap((entry) => (entry ? [[entry.contentId, entry.info] as const] : [])),
+  );
+}
+
+/** 예상 도착 시각에 명확히 휴무·브레이크타임인 정류지가 있는 코스를 제외한다. */
+function isPlanAvailable(
+  plan: CoursePlan,
+  operatingInfo: Map<string, OperatingInfo>,
+  startedAt: Date,
+): boolean {
+  let elapsedMinutes = 0;
+  for (let index = 0; index < plan.stops.length; index += 1) {
+    const stop = plan.stops[index];
+    elapsedMinutes += index === 0 ? stop.travelMinutes : plan.legs[index - 1].travelMinutes;
+    const info = operatingInfo.get(stop.candidate.tourApiContentId);
+    if (info) {
+      const status = evaluateOperatingStatus(
+        info,
+        new Date(startedAt.getTime() + elapsedMinutes * 60_000),
+      );
+      if (status.state === 'closed' || status.state === 'break') {
+        return false;
+      }
+    }
+    elapsedMinutes += plan.stayMinutes[index];
+  }
+  return true;
 }
 
 /** 목적지 → 정류지들 → 목적지 이동시간 합(체류 제외). */
@@ -582,10 +656,19 @@ export interface GenerateCoursesParams {
   radiusMeters?: number;
   /** 같은 날짜·목적지·시간 조건에서 다른 추천 조합을 요청하기 위한 클라이언트 variant. */
   variant?: number;
+  /** 테스트에서 KST 운영시간·날짜 seed를 고정하기 위한 값. API 입력으로 받지 않는다. */
+  now?: Date;
 }
 
 /** 목적지 주변에서 가용 시간에 맞는 우회 코스 생성. 저장 없음 — 요청 시점 결과. */
-export async function generateCourses(
+export function generateCourses(
+  params: GenerateCoursesParams,
+): Promise<CourseGenerationLookup> {
+  const key = generatedCourseCacheKey(params);
+  return generatedCourseCache.getOrCreate(key, () => generateCoursesUncached(params));
+}
+
+async function generateCoursesUncached(
   params: GenerateCoursesParams,
 ): Promise<CourseGenerationLookup> {
   const base = await resolveDestination(params);
@@ -603,14 +686,24 @@ export async function generateCourses(
   ).catch(() => []);
   const measured = [...localMeasured, ...festivalMeasured];
 
-  const diversitySeed = buildDailyDiversitySeed(base, params);
+  const now = params.now ?? new Date();
+  const diversitySeed = buildDailyDiversitySeed(base, params, now);
   const planned = planCourses(measured, params.availableMinutes, { diversitySeed });
-  const verified = await Promise.all(planned.slice(0, MAX_VERIFICATION_PLANS).map(verifyPlan));
+  const operatingInfo = await loadOperatingInfo(planned);
+  const availablePlans = planned.filter((plan) => isPlanAvailable(plan, operatingInfo, now));
+  const verified = await Promise.all(
+    availablePlans.slice(0, MAX_VERIFICATION_PLANS).map(verifyPlan),
+  );
 
   // 전 구간 실측 완료 + 실측 후 제한시간 이내인 코스만 추천한다.
   // 추정 구간을 조용히 노출하면 사용자가 약속한 시간 안에 복귀하지 못할 수 있다.
   const courses = rankCourses(
-    verified.filter((plan) => plan.verified && plan.totalMinutes <= params.availableMinutes),
+    verified.filter(
+      (plan) =>
+        plan.verified &&
+        plan.totalMinutes <= params.availableMinutes &&
+        isPlanAvailable(plan, operatingInfo, now),
+    ),
     params.availableMinutes,
     diversitySeed,
   )
@@ -630,14 +723,29 @@ export async function generateCourses(
 function buildDailyDiversitySeed(
   base: DestinationBase,
   params: GenerateCoursesParams,
+  now: Date,
 ): string {
   const destinationKey = params.contentId ?? params.poiId ?? base.contentId;
-  return `${todayKstYmd()}:${destinationKey}:${params.availableMinutes}:${params.variant ?? 0}`;
+  return `${todayKstYmd(now)}:${destinationKey}:${params.availableMinutes}:${params.variant ?? 0}`;
 }
 
-function todayKstYmd(): string {
-  const now = new Date();
+function todayKstYmd(now: Date = new Date()): string {
   return new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function generatedCourseCacheKey(params: GenerateCoursesParams): string {
+  const identifier = params.contentId ? `content:${params.contentId}` : `poi:${params.poiId ?? ''}`;
+  return [
+    todayKstYmd(params.now),
+    identifier,
+    params.availableMinutes,
+    params.radiusMeters ?? DEFAULT_RADIUS_METERS,
+    params.variant ?? 0,
+  ].join(':');
+}
+
+export function clearGeneratedCourseCache(): void {
+  generatedCourseCache.clear();
 }
 
 async function resolveDestination(
