@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  AppState,
   Modal,
   Pressable,
   ScrollView,
@@ -21,8 +20,10 @@ import { TeumtaHybrid } from '@/constants/theme';
 import { useCourseLog } from '@/hooks/use-course-log';
 import { useCourseProgress, type CourseStop } from '@/hooks/use-course-progress';
 import { useCurrentLocation } from '@/hooks/use-current-location';
+import { useDestinationCongestion } from '@/hooks/use-destination-congestion';
+import { useTripNotifications } from '@/hooks/use-trip-notifications';
 import { fetchCourseAlternatives } from '@/api/courses';
-import { getLocalPlaceDetail, getRealtimeCongestion } from '@/api/places';
+import { getLocalPlaceDetail } from '@/api/places';
 import {
   clearSelectedCourse,
   getSelectedCourse,
@@ -32,17 +33,11 @@ import {
   type SelectedCourse,
 } from '@/stores/selected-course';
 import type { GeneratedCourse } from '@/types/course';
-import type { LocalPlaceDetail, RealtimeCongestion } from '@/types/place';
+import type { LocalPlaceDetail } from '@/types/place';
 import { buildCourseRoutePath } from '@/utils/course-path';
 import { openDirections, openNaverMapPlace } from '@/utils/directions';
 import { distanceInMeters } from '@/utils/distance';
 import { evaluateOperatingStatus, type OperatingStatus } from '@/utils/operating-status';
-import {
-  cancelScheduledCourseNotification,
-  ensureNotificationPermission,
-  presentCourseNotification,
-  scheduleReturnReminder,
-} from '@/utils/notifications';
 import { withRoJosa } from '@/utils/text';
 import { timeLabelAt } from '@/utils/time';
 import {
@@ -53,8 +48,6 @@ import {
 } from '@/utils/trip-plan';
 
 const WALK_METERS_PER_MINUTE = 67;
-/** 서버 혼잡도 캐시가 5분 — 같은 주기면 폴링해도 외부 호출이 거의 늘지 않는다. */
-const CONGESTION_POLL_INTERVAL_MS = 5 * 60 * 1000;
 const CLOCK_TICK_MS = 30 * 1000;
 
 function formatDistance(meters: number) {
@@ -146,8 +139,6 @@ export default function TripScreen() {
     [plannedCourse, destination],
   );
 
-  const [congestion, setCongestion] = useState<RealtimeCongestion | null>(null);
-
   const { location, status, start: startLocation } = useCurrentLocation({ watch: true });
   const {
     phase,
@@ -167,12 +158,6 @@ export default function TripScreen() {
   const { markCourseCompleted } = useCourseLog();
   // 완료 기록은 코스당 1회 — 기록이 상태를 바꾸고 상태가 다시 기록을 부르는 순환 방지.
   const completionLogged = useRef(false);
-
-  const returnReminderId = useRef<string | null>(null);
-  const notificationsGranted = useRef(false);
-  const notificationRevision = useRef(0);
-  const [notificationsReady, setNotificationsReady] = useState(false);
-  const [returnAlarmSet, setReturnAlarmSet] = useState(false);
 
   const completed = phase === 'completed';
   const currentCourseStop = plannedCourse?.stops[currentIndex] ?? null;
@@ -207,101 +192,31 @@ export default function TripScreen() {
   const routePath =
     plannedCourse && destination ? buildCourseRoutePath(destination, plannedCourse) : [];
 
-  const cancelReturnReminder = useCallback(() => {
-    notificationRevision.current += 1;
-    if (returnReminderId.current) {
-      void cancelScheduledCourseNotification(returnReminderId.current);
-      returnReminderId.current = null;
-    }
-    setReturnAlarmSet(false);
-  }, []);
-
   const refreshClock = useCallback(() => {
     setTimeout(() => setNowMs(Date.now()), 0);
   }, []);
 
-  useEffect(() => {
-    if (!plannedCourse || !destination) {
-      return;
-    }
-    let cancelled = false;
+  const { returnAlarmSet, cancelReturnReminder, notify } = useTripNotifications({
+    enabled: Boolean(plannedCourse && destination),
+    active: phase === 'in_progress',
+    destinationName: destination?.name ?? null,
+    totalMinutesUntilReturn: Math.max(
+      0,
+      expectedReturnMinute - Math.floor(nowMs / 60_000),
+    ),
+    returnWalkMinutes: reminderReturnWalkMinutes,
+  });
 
-    // 예약·발송 모두 단말 안 — 권한을 거부하면 화면 안내만으로 진행.
-    void (async () => {
-      const granted = await ensureNotificationPermission();
-      if (!granted || cancelled) {
-        return;
-      }
-      notificationsGranted.current = true;
-      setNotificationsReady(true);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [plannedCourse, destination]);
-
-  useEffect(() => {
-    if (
-      !notificationsReady ||
-      !destination ||
-      phase !== 'in_progress'
-    ) {
-      return;
-    }
-    const revision = ++notificationRevision.current;
-    void (async () => {
-      setReturnAlarmSet(false);
-      if (returnReminderId.current) {
-        await cancelScheduledCourseNotification(returnReminderId.current);
-        returnReminderId.current = null;
-      }
-      const totalMinutesUntilReturn = Math.max(
-        0,
-        expectedReturnMinute - Math.floor(Date.now() / 60_000),
-      );
-      const id = await scheduleReturnReminder({
-        destinationName: destination.name,
-        totalMinutes: totalMinutesUntilReturn,
-        returnWalkMinutes: reminderReturnWalkMinutes,
-      });
-      if (revision !== notificationRevision.current) {
-        if (id) {
-          await cancelScheduledCourseNotification(id);
-        }
-        return;
-      }
-      returnReminderId.current = id;
-      setReturnAlarmSet(id !== null);
-    })();
-  }, [
-    notificationsReady,
-    destination,
-    phase,
-    expectedReturnMinute,
-    reminderReturnWalkMinutes,
-  ]);
-
-  useEffect(
-    () => () => {
-      notificationRevision.current += 1;
-      if (returnReminderId.current) {
-        void cancelScheduledCourseNotification(returnReminderId.current);
-        returnReminderId.current = null;
-      }
-    },
-    [],
-  );
+  const { congestion, congestionEased } = useDestinationCongestion({
+    identifier: selected?.destinationParams,
+    destinationName: selected?.destination.name,
+    onEased: notify,
+    onForeground: refreshClock,
+  });
 
   useEffect(() => {
     if (phase !== 'completed') {
       return;
-    }
-    // 복귀를 마쳤으면 예약 알림은 필요 없다.
-    notificationRevision.current += 1;
-    if (returnReminderId.current) {
-      void cancelScheduledCourseNotification(returnReminderId.current);
-      returnReminderId.current = null;
     }
     // 마지막 복귀 지점 도착 판정이 나면 "다녀온 코스"로 기기에만 남긴다.
     if (selected && !completionLogged.current) {
@@ -364,69 +279,6 @@ export default function TripScreen() {
       ignored = true;
     };
   }, [currentCourseStop, returning, completed]);
-
-  const destinationParams = selected?.destinationParams;
-  const lastCongestionLevel = useRef<RealtimeCongestion['level'] | null>(null);
-  const easedNotified = useRef(false);
-  const [congestionEased, setCongestionEased] = useState(false);
-
-  useEffect(() => {
-    if (!destinationParams) {
-      return;
-    }
-    let ignored = false;
-
-    // 복귀 판단용 목적지 혼잡도. "풀리면 복귀"가 핵심 루프인데 진입 시 1회 조회로는
-    // 풀린 걸 알 수 없다 — 앱이 떠 있는 동안 서버 캐시와 같은 주기로 갱신한다.
-    const fetchCongestion = () => {
-      getRealtimeCongestion(destinationParams)
-        .then((data) => {
-          if (ignored) {
-            return;
-          }
-          setCongestion(data);
-          const previous = lastCongestionLevel.current;
-          lastCongestionLevel.current = data.level;
-          // 회복 = 우회 트리거 단계(CROWDED 이상, congestion-rules §5)에서 그 아래로 내려옴
-          const wasCrowded = previous === 'CROWDED' || previous === 'VERY_CROWDED';
-          const nowCalm = data.level === 'RELAXED' || data.level === 'NORMAL';
-          if (wasCrowded && nowCalm && !easedNotified.current) {
-            easedNotified.current = true;
-            setCongestionEased(true);
-            if (notificationsGranted.current) {
-              void presentCourseNotification(
-                '목적지 혼잡이 풀렸어요',
-                `${selected?.destination.name ?? '목적지'} 지금 ${REALTIME_LEVEL_LABEL[data.level]} — 돌아가기 좋은 타이밍이에요.`,
-              );
-            }
-          }
-        })
-        .catch(() => {
-          // 혼잡도 조회 실패해도 코스 진행은 계속
-        });
-    };
-
-    fetchCongestion();
-    const timer = setInterval(() => {
-      // iOS는 백그라운드에서 JS 타이머가 멈춘다 — 사실상 포그라운드 전용 폴링.
-      if (AppState.currentState === 'active') {
-        fetchCongestion();
-      }
-    }, CONGESTION_POLL_INTERVAL_MS);
-    // 백그라운드에 오래 있다 돌아오면 다음 틱까지 최대 5분 낡은 값 — 복귀 즉시 한 번 갱신.
-    const appStateSubscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        setNowMs(Date.now());
-        fetchCongestion();
-      }
-    });
-
-    return () => {
-      ignored = true;
-      clearInterval(timer);
-      appStateSubscription.remove();
-    };
-  }, [destinationParams, selected]);
 
   if (!selectionReady || !progressReady) {
     return (

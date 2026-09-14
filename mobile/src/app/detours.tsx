@@ -1,30 +1,20 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { isAxiosError } from 'axios';
 
-import { fetchCourses } from '@/api/courses';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
+import { CourseRouteCard } from '@/components/course-route-card';
 import { Fonts, TeumtaHybrid } from '@/constants/theme';
 import { useCourseLog } from '@/hooks/use-course-log';
+import { useGeneratedCourses } from '@/hooks/use-generated-courses';
 import { setSelectedCourse } from '@/stores/selected-course';
-import {
-  courseDistanceMeters,
-  courseStayMinutes,
-  type CourseDestination,
-  type DestinationIdentifier,
-  type GeneratedCourse,
-} from '@/types/course';
-import { courseCompositionLabel, courseTitle, formatKilometers } from '@/utils/course-labels';
-import { createRequestGuard } from '@/utils/request-guard';
-import { timeLabelAfter } from '@/utils/time';
+import { type DestinationIdentifier } from '@/types/course';
+import { courseTitle } from '@/utils/course-labels';
 
 /** 서버 지원 가용 시간 선택지(api-spec 3.10). */
 const DURATION_OPTIONS = [30, 60, 90] as const;
-
-type Status = 'loading' | 'idle' | 'error' | 'rate-limited';
 
 type DetoursParams = {
   /** 목적지 식별자 — tourApiContentId 또는 tmapPoiId 중 하나. */
@@ -32,114 +22,6 @@ type DetoursParams = {
   poiId?: string;
   name?: string;
 };
-
-type RouteCardProps = {
-  course: GeneratedCourse;
-  destination: CourseDestination;
-  routeIndex: number;
-  selected: boolean;
-  onSelect: () => void;
-};
-
-function RouteCard({
-  course,
-  destination,
-  routeIndex,
-  selected,
-  onSelect,
-}: RouteCardProps) {
-  const distanceLabel = formatKilometers(courseDistanceMeters(course));
-  const stats = [
-    { value: timeLabelAfter(course.totalMinutes), label: '예상 복귀' },
-    { value: `${courseStayMinutes(course)}분`, label: '추천 체류' },
-    { value: distanceLabel, label: '걷는 거리' },
-  ];
-  const stopNames = [...course.stops.map((stop) => stop.name), `${destination.name} 복귀`];
-  const recommendationTags = course.recommendationTags ?? [];
-
-  return (
-    <Pressable
-      accessibilityRole="radio"
-      accessibilityState={{ checked: selected }}
-      onPress={onSelect}
-      style={[styles.card, selected ? styles.cardSelected : styles.cardAlternative]}>
-      <View style={styles.cardHeader}>
-        <View style={[styles.routeCode, selected && styles.routeCodeSelected]}>
-          <Text style={[styles.routeCodeLabel, selected && styles.routeCodeLabelSelected]}>
-            R{routeIndex + 1}
-          </Text>
-        </View>
-        <View style={styles.routeHeaderTexts}>
-          <Text style={styles.routeKind}>{selected ? '추천 경로' : '대안 경로'}</Text>
-          <Text style={styles.headerDuration}>
-            {course.totalMinutes}분 · {distanceLabel}
-          </Text>
-        </View>
-        <View style={selected ? styles.radioOn : styles.radioOff} />
-      </View>
-
-      <View style={[styles.cardBody, selected ? styles.cardBodySelected : styles.cardBodyAlternative]}>
-        <View style={styles.cardTitleRow}>
-          <View style={selected ? styles.cardTexts : styles.cardTextsAlternative}>
-            <Text
-              numberOfLines={1}
-              style={selected ? styles.cardName : styles.cardNameAlternative}>
-              {courseTitle(course)}
-            </Text>
-            <Text
-              numberOfLines={1}
-              style={selected ? styles.cardDescription : styles.cardDescriptionAlternative}>
-              {courseCompositionLabel(course)}
-            </Text>
-          </View>
-        </View>
-
-        {recommendationTags.length > 0 && (
-          <View style={styles.reasonRow}>
-            {recommendationTags.map((tag, index) => (
-              <View key={tag} style={styles.reasonChip}>
-                {index > 0 && <Text style={styles.reasonDivider}>/</Text>}
-                <Text style={styles.reasonChipLabel}>{tag}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-
-        <View style={styles.stopsRow}>
-          {stopNames.map((stop, index) => (
-            <View key={`${stop}-${index}`} style={styles.stopRow}>
-              <View style={styles.stopCode}>
-                <Text style={styles.stopCodeLabel}>
-                  {index === stopNames.length - 1 ? 'D' : String(index + 1).padStart(2, '0')}
-                </Text>
-              </View>
-              <Text style={styles.stopName}>{stop}</Text>
-            </View>
-          ))}
-        </View>
-
-        <View style={styles.statsRow}>
-          {stats.map((stat, index) => (
-            <View
-              key={stat.label}
-              style={[
-                styles.statTile,
-                index === stats.length - 1 && styles.statTileLast,
-                selected ? styles.statTileSelected : styles.statTileAlternative,
-              ]}>
-              <Text style={selected ? styles.statValue : styles.statValueAlternative}>
-                {stat.value}
-              </Text>
-              <Text style={selected ? styles.statLabel : styles.statLabelAlternative}>
-                {stat.label}
-              </Text>
-            </View>
-          ))}
-        </View>
-      </View>
-    </Pressable>
-  );
-}
 
 export default function DetoursScreen() {
   const { contentId, poiId, name } = useLocalSearchParams<DetoursParams>();
@@ -149,70 +31,19 @@ export default function DetoursScreen() {
 
   const [availableMinutes, setAvailableMinutes] =
     useState<(typeof DURATION_OPTIONS)[number]>(60);
-  const [destination, setDestination] = useState<CourseDestination | null>(null);
-  const [courses, setCourses] = useState<GeneratedCourse[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [status, setStatus] = useState<Status>('loading');
-  const [retryAfterSeconds, setRetryAfterSeconds] = useState<number | null>(null);
   const [variant, setVariant] = useState(0);
-  const requestGuard = useMemo(() => createRequestGuard(), []);
 
-  const identifier: DestinationIdentifier | null = contentId
-    ? { contentId }
-    : poiId
-      ? { poiId }
-      : null;
+  const identifier = useMemo<DestinationIdentifier | null>(
+    () => (contentId ? { contentId } : poiId ? { poiId } : null),
+    [contentId, poiId],
+  );
 
-  const load = useCallback(async () => {
-    const currentIdentifier: DestinationIdentifier | null = contentId
-      ? { contentId }
-      : poiId
-        ? { poiId }
-        : null;
-    const requestId = requestGuard.start();
-
-    if (!currentIdentifier) {
-      setStatus('error');
-      return;
-    }
-
-    setStatus('loading');
-    setRetryAfterSeconds(null);
-    try {
-      const result = await fetchCourses(currentIdentifier, availableMinutes, variant);
-      if (!requestGuard.isCurrent(requestId)) {
-        return;
-      }
-      setDestination(result.destination);
-      setCourses(result.courses);
-      setSelectedIndex(0);
-      setStatus('idle');
-    } catch (error) {
-      if (!requestGuard.isCurrent(requestId)) {
-        return;
-      }
-      setCourses([]);
-      if (isAxiosError(error) && error.response?.status === 429) {
-        const retryAfter = Number(error.response.headers['retry-after']);
-        setRetryAfterSeconds(Number.isFinite(retryAfter) ? retryAfter : null);
-        setStatus('rate-limited');
-      } else {
-        setStatus('error');
-      }
-    }
-  }, [contentId, poiId, availableMinutes, variant, requestGuard]);
-
-  useEffect(() => {
-    // 코스 생성은 외부 API 다중 호출 → 화면 전환 뒤 늦게 온 응답이 상태를 덮어쓰지 않게
-    const timer = setTimeout(() => {
-      void load();
-    }, 0);
-
-    return () => {
-      clearTimeout(timer);
-      requestGuard.invalidate();
-    };
-  }, [load, requestGuard]);
+  const { destination, courses, status, retryAfterSeconds, reload } = useGeneratedCourses({
+    identifier,
+    availableMinutes,
+    variant,
+  });
 
   const handleStart = () => {
     const course = courses[selectedIndex];
@@ -234,6 +65,7 @@ export default function DetoursScreen() {
 
   const handleChangeMinutes = (minutes: (typeof DURATION_OPTIONS)[number]) => {
     setAvailableMinutes(minutes);
+    setSelectedIndex(0);
     setVariant(0);
   };
 
@@ -241,6 +73,7 @@ export default function DetoursScreen() {
     if (status === 'loading') {
       return;
     }
+    setSelectedIndex(0);
     setVariant((current) => current + 1);
   };
 
@@ -299,19 +132,21 @@ export default function DetoursScreen() {
           </View>
         )}
 
-        {(status === 'error' || status === 'rate-limited') && (
+        {(status === 'error' || status === 'timeout' || status === 'rate-limited') && (
           <View style={styles.stateBox}>
             <Text style={styles.stateText}>
               {status === 'rate-limited'
                 ? `코스 요청이 잠시 몰렸어요.${
                     retryAfterSeconds ? ` ${retryAfterSeconds}초 후 다시 시도해 주세요.` : ' 잠시 후 다시 시도해 주세요.'
                   }`
+                : status === 'timeout'
+                  ? '코스 계산이 오래 걸리고 있어요. 잠시 후 다시 시도해 주세요.'
                 : identifier
                 ? '코스를 불러오지 못했어요.'
                 : '목적지 정보가 없어요.'}
             </Text>
             {identifier && (
-              <Pressable accessibilityRole="button" accessibilityLabel="코스 다시 시도" style={styles.retryButton} onPress={() => void load()}>
+              <Pressable accessibilityRole="button" accessibilityLabel="코스 다시 시도" style={styles.retryButton} onPress={() => void reload()}>
                 <Text style={styles.retryLabel}>다시 시도</Text>
               </Pressable>
             )}
@@ -329,7 +164,7 @@ export default function DetoursScreen() {
         {status === 'idle' && destination && courses.length > 0 && (
           <View accessibilityRole="radiogroup" accessibilityLabel="코스 선택">
             {courses.map((course, index) => (
-              <RouteCard
+              <CourseRouteCard
                 key={`${index}-${courseTitle(course)}`}
                 course={course}
                 destination={destination}
@@ -472,222 +307,6 @@ const styles = StyleSheet.create({
   },
   chipLabelSelected: {
     color: TeumtaHybrid.navy,
-  },
-  card: {
-    backgroundColor: TeumtaHybrid.paper,
-    borderColor: TeumtaHybrid.line,
-    borderRadius: TeumtaHybrid.radius.small,
-    overflow: 'hidden',
-  },
-  cardSelected: {
-    borderColor: TeumtaHybrid.slate,
-    borderWidth: 2,
-  },
-  cardAlternative: {
-    borderWidth: 1,
-  },
-  cardHeader: {
-    alignItems: 'center',
-    borderBottomColor: TeumtaHybrid.line,
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    minHeight: 64,
-  },
-  routeCode: {
-    alignItems: 'center',
-    alignSelf: 'stretch',
-    backgroundColor: TeumtaHybrid.slateSoft,
-    justifyContent: 'center',
-    width: 58,
-  },
-  routeCodeSelected: {
-    backgroundColor: TeumtaHybrid.signalSoft,
-  },
-  routeCodeLabel: {
-    color: TeumtaHybrid.navy,
-    fontSize: 20,
-    fontWeight: '900',
-    letterSpacing: -0.5,
-  },
-  routeCodeLabelSelected: {
-    color: TeumtaHybrid.navy,
-  },
-  routeHeaderTexts: {
-    flex: 1,
-    gap: 2,
-    paddingHorizontal: 13,
-  },
-  routeKind: {
-    color: TeumtaHybrid.muted,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.9,
-    lineHeight: 14,
-  },
-  headerDuration: {
-    color: TeumtaHybrid.navy,
-    fontSize: 13,
-    fontWeight: '900',
-    lineHeight: 18,
-  },
-  cardBody: {
-    backgroundColor: TeumtaHybrid.paper,
-    paddingHorizontal: 16,
-  },
-  cardBodySelected: {
-    gap: 14,
-    paddingVertical: 16,
-  },
-  cardBodyAlternative: {
-    gap: 12,
-    paddingVertical: 14,
-  },
-  cardTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  cardTexts: {
-    flex: 1,
-    gap: 3,
-  },
-  cardTextsAlternative: {
-    flex: 1,
-    gap: 3,
-  },
-  cardName: {
-    color: TeumtaHybrid.ink,
-    fontSize: 18,
-    fontWeight: '800',
-    lineHeight: 24,
-  },
-  cardNameAlternative: {
-    color: TeumtaHybrid.ink,
-    fontSize: 17,
-    fontWeight: '800',
-    lineHeight: 23,
-  },
-  cardDescription: {
-    color: TeumtaHybrid.muted,
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  cardDescriptionAlternative: {
-    color: TeumtaHybrid.muted,
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  reasonRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 7,
-  },
-  reasonChip: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 7,
-  },
-  reasonChipLabel: {
-    color: TeumtaHybrid.slate,
-    fontSize: 11,
-    fontWeight: '700',
-    lineHeight: 15,
-  },
-  reasonDivider: {
-    color: TeumtaHybrid.line,
-    fontSize: 11,
-  },
-  radioOn: {
-    backgroundColor: TeumtaHybrid.slate,
-    borderColor: TeumtaHybrid.signalSoft,
-    borderWidth: 5,
-    height: 20,
-    marginRight: 14,
-    width: 20,
-  },
-  radioOff: {
-    borderColor: TeumtaHybrid.slate,
-    borderWidth: 1,
-    height: 20,
-    marginRight: 14,
-    width: 20,
-  },
-  stopsRow: {
-    borderBottomColor: TeumtaHybrid.line,
-    borderTopColor: TeumtaHybrid.line,
-    borderTopWidth: 1,
-  },
-  stopRow: {
-    alignItems: 'center',
-    borderBottomColor: TeumtaHybrid.line,
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    minHeight: 38,
-  },
-  stopCode: {
-    alignItems: 'center',
-    borderRightColor: TeumtaHybrid.line,
-    borderRightWidth: 1,
-    justifyContent: 'center',
-    width: 40,
-  },
-  stopCodeLabel: {
-    color: TeumtaHybrid.terracotta,
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.7,
-  },
-  stopName: {
-    color: TeumtaHybrid.ink,
-    flex: 1,
-    fontSize: 12,
-    fontWeight: '600',
-    lineHeight: 17,
-    paddingHorizontal: 11,
-  },
-  statsRow: {
-    borderBottomColor: TeumtaHybrid.line,
-    borderBottomWidth: 1,
-    borderTopColor: TeumtaHybrid.line,
-    borderTopWidth: 1,
-    flexDirection: 'row',
-  },
-  statTile: {
-    borderRightColor: TeumtaHybrid.line,
-    borderRightWidth: 1,
-    flex: 1,
-    gap: 2,
-    paddingHorizontal: 10,
-  },
-  statTileLast: {
-    borderRightWidth: 0,
-  },
-  statTileSelected: {
-    paddingVertical: 10,
-  },
-  statTileAlternative: {
-    paddingVertical: 9,
-  },
-  statValue: {
-    color: TeumtaHybrid.slate,
-    fontSize: 13,
-    fontWeight: '900',
-    lineHeight: 18,
-  },
-  statValueAlternative: {
-    color: TeumtaHybrid.slate,
-    fontSize: 12,
-    fontWeight: '900',
-    lineHeight: 17,
-  },
-  statLabel: {
-    color: TeumtaHybrid.muted,
-    fontSize: 10,
-    lineHeight: 14,
-  },
-  statLabelAlternative: {
-    color: TeumtaHybrid.muted,
-    fontSize: 10,
-    lineHeight: 14,
   },
   infoBox: {
     borderLeftColor: TeumtaHybrid.signal,

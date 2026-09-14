@@ -13,24 +13,14 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import {
-  getConcentrationForecast,
-  getNearbyFestivals,
-  getNearbyLocalPlaces,
-  getRealtimeCongestion,
-} from '@/api/places';
 import { PlaceThumbnail } from '@/components/place-thumbnail';
 import { ReportModal } from '@/components/report-modal';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
 import { REALTIME_LEVEL_LABEL, REALTIME_LEVEL_TO_CONGESTION_LEVEL } from '@/constants/congestion';
 import { Fonts, TeumtaHybrid, TeumtaHybridCongestion } from '@/constants/theme';
 import { useBookmarks } from '@/hooks/use-bookmarks';
-import type {
-  CongestionLevel,
-  ConcentrationForecast,
-  NearbyLocalPlaceResult,
-  RealtimeCongestion,
-} from '@/types/place';
+import { usePlaceLiveData } from '@/hooks/use-place-live-data';
+import type { CongestionLevel } from '@/types/place';
 import { shouldShowDetourPrompt } from '@/utils/congestion-prompt';
 import {
   chartRatio,
@@ -93,8 +83,6 @@ const LEGEND_STEPS = [
   { key: 'veryHigh', label: '매우 혼잡' },
 ] as const;
 
-type Status = 'idle' | 'loading' | 'error' | 'unavailable';
-
 type PlaceDetailParams = {
   id: string;
   source: 'TOUR' | 'TMAP';
@@ -111,112 +99,20 @@ export default function PlaceDetailScreen() {
   const insets = useSafeAreaInsets();
   const { isPlaceBookmarked, togglePlaceBookmark } = useBookmarks();
 
-  const [congestion, setCongestion] = useState<RealtimeCongestion | null>(null);
-  const [congestionStatus, setCongestionStatus] = useState<Status>('idle');
-
-  const [nearby, setNearby] = useState<NearbyLocalPlaceResult[]>([]);
-  const [nearbyStatus, setNearbyStatus] = useState<Status>('loading');
-
-  const [festivals, setFestivals] = useState<NearbyLocalPlaceResult[]>([]);
-  const [festivalStatus, setFestivalStatus] = useState<Status>('loading');
-
-  const [forecast, setForecast] = useState<ConcentrationForecast | null>(null);
-
-  // 당겨서 새로고침 — 값이 바뀌면 아래 효과가 전부 다시 조회한다(서버 5분 캐시가 흡수).
-  const [refreshNonce, setRefreshNonce] = useState(0);
-  const [refreshing, setRefreshing] = useState(false);
+  const {
+    congestion,
+    congestionStatus,
+    nearby,
+    nearbyStatus,
+    festivals,
+    festivalStatus,
+    forecast,
+    refreshing,
+    refresh,
+  } = usePlaceLiveData({ id, source });
 
   const [showCrowdedAlert, setShowCrowdedAlert] = useState(false);
   const [showReport, setShowReport] = useState(false);
-
-  useEffect(() => {
-    if (!id || !source) return;
-
-    let ignored = false;
-    let deferredLoad: ReturnType<typeof setTimeout> | null = null;
-
-    const startLoad = setTimeout(() => {
-      if (ignored) {
-        return;
-      }
-
-      setCongestion(null);
-      setNearby([]);
-      setFestivals([]);
-      setForecast(null);
-      setShowCrowdedAlert(false);
-
-      // TOUR 목적지도 서버가 TMAP POI로 매칭해 조회(api-spec 3.4a)
-      setCongestionStatus('loading');
-      getRealtimeCongestion(source === 'TOUR' ? { contentId: id } : { poiId: id })
-        .then((data) => {
-          // 당김 스피너는 대표 조회(혼잡도)가 끝나면 내린다 — 반영 여부와 무관.
-          setRefreshing(false);
-          if (ignored) return;
-          setCongestion(data);
-          setCongestionStatus('idle');
-        })
-        .catch((error: unknown) => {
-          setRefreshing(false);
-          if (ignored) return;
-          // 404는 SK 미커버 장소 — 장애가 아니라 원래 없는 데이터
-          const status = (error as { response?: { status?: number } }).response?.status;
-          setCongestionStatus(status === 404 ? 'unavailable' : 'error');
-        });
-
-      setNearbyStatus('loading');
-      setFestivalStatus('loading');
-      const identifier = source === 'TOUR' ? { contentId: id } : { poiId: id };
-      deferredLoad = setTimeout(() => {
-        if (ignored) {
-          return;
-        }
-
-        // 첫 화면 혼잡도 표시를 우선한다. 아래 섹션 데이터는 짧게 늦춰 외부 API 호출 폭주를 줄인다.
-        if (source === 'TOUR') {
-          getConcentrationForecast(id)
-            .then((data) => {
-              if (!ignored) {
-                setForecast(data);
-              }
-            })
-            .catch(() => {
-              // 예측 없는 장소도 많음 → 실패 시 해당 섹션만 숨김
-            });
-        }
-
-        getNearbyLocalPlaces(identifier)
-          .then((data) => {
-            if (ignored) return;
-            setNearby(data);
-            setNearbyStatus('idle');
-          })
-          .catch(() => {
-            if (ignored) return;
-            setNearbyStatus('error');
-          });
-
-        getNearbyFestivals(identifier)
-          .then((data) => {
-            if (ignored) return;
-            setFestivals(data);
-            setFestivalStatus('idle');
-          })
-          .catch(() => {
-            if (ignored) return;
-            setFestivalStatus('error');
-          });
-      }, 350);
-    }, 0);
-
-    return () => {
-      ignored = true;
-      clearTimeout(startLoad);
-      if (deferredLoad !== null) {
-        clearTimeout(deferredLoad);
-      }
-    };
-  }, [id, source, refreshNonce]);
 
   useEffect(() => {
     if (!congestion) return;
@@ -271,10 +167,7 @@ export default function PlaceDetailScreen() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              setRefreshNonce((nonce) => nonce + 1);
-            }}
+            onRefresh={refresh}
             tintColor={TeumtaHybrid.terracotta}
           />
         }
