@@ -104,7 +104,7 @@ export default function SearchScreen() {
   return (
     <SafeAreaView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <TeumtaHeader title="탐색" subtitle="관광지·지역·테마를 찾아보세요" />
+        <TeumtaHeader showBack title="탐색" subtitle="관광지·지역·테마를 찾아보세요" />
       <View style={styles.searchRow}>
         <TextInput
           value={keyword}
@@ -213,11 +213,11 @@ export default function SearchScreen() {
 
 // 다른 화면과 같은 Teumta 토큰만 쓴다 — 이 화면만 초기 프로토타입 색이 남아 이질적이었다.
 const styles = StyleSheet.create({
-  screen: { backgroundColor: TeumtaHybrid.paper, flex: 1 },
+  screen: { backgroundColor: TeumtaHybrid.canvas, flex: 1 },
   container: {
-    backgroundColor: TeumtaHybrid.paper,
-    gap: 22,
+    gap: 18,
     padding: 20,
+    paddingTop: 14,
   },
   searchRow: {
     flexDirection: 'row',
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
   searchInput: {
     backgroundColor: TeumtaHybrid.paper,
     borderColor: TeumtaHybrid.line,
-    borderRadius: TeumtaHybrid.radius.small,
+    borderRadius: 14,
     borderWidth: 1,
     color: TeumtaHybrid.ink,
     flex: 1,
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
   searchButton: {
     alignItems: 'center',
     backgroundColor: TeumtaHybrid.ink,
-    borderRadius: TeumtaHybrid.radius.small,
+    borderRadius: 14,
     justifyContent: 'center',
     paddingHorizontal: 17,
   },

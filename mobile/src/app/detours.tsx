@@ -162,7 +162,7 @@ export default function DetoursScreen() {
         )}
 
         {status === 'idle' && destination && courses.length > 0 && (
-          <View accessibilityRole="radiogroup" accessibilityLabel="코스 선택">
+          <View accessibilityRole="radiogroup" accessibilityLabel="코스 선택" style={styles.courseList}>
             {courses.map((course, index) => (
               <CourseRouteCard
                 key={`${index}-${courseTitle(course)}`}
@@ -280,6 +280,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 8,
     padding: 14,
+  },
+  courseList: {
+    gap: 16,
   },
   durationLabel: {
     color: TeumtaHybrid.muted,
