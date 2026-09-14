@@ -1,129 +1,73 @@
-# 틈타 서비스 전체 구조
+# 틈타 서비스 구조
 
-**목적: 오버투어리즘 완화.** 붐비는 관광지의 수요를 걸어서 갈 수 있는 로컬 장소로 분산시킨다.
-혼잡도(실시간)와 집중률 예측(날짜별)이 판단 근거, 우회 코스가 분산 수단이다.
+## 사용자 흐름
 
-상세 명세는 [api-spec.md](./api-spec.md), 담당별 할 일은 [team-todo.md](./team-todo.md).
-
----
-
-## 1. 유저플로우
-
-```
-[검색]              [상세]                      [우회 코스]              [진행]
-관광지·장소 검색  →  혼잡도 + 30일 집중률   →   가용 시간 선택          →  지도 따라 이동
-(TOUR/TMAP 통합)     주변 로컬 장소 목록        30/60/90분 코스 후보       도착 판정은 단말
-                     ↑ 혼잡하면 우회 강조       ↑ 요청 시 실시간 생성      ↑ 서버에 기록 안 함
+```text
+장소 검색 → 실시간 혼잡도/30일 집중률 확인 → 30·60·90분 코스 생성 → 단말에서 코스 진행
 ```
 
-| 단계 | 호출 |
+| 단계 | 현재 API |
 |---|---|
-| 검색 | `GET /api/search/places?keyword=` |
-| 실시간 혼잡도 | `GET /api/congestion?contentId=` 또는 `?poiId=` |
-| 날짜별 집중률 | `GET /api/concentration-forecast?contentId=` |
-| 주변 로컬 장소 | `GET /api/local-places?contentId=` 또는 `?poiId=` |
-| 우회 코스 | `GET /api/courses?contentId=&availableMinutes=` |
-| 코스 진행 | 서버 호출 없음 — 단말 local state |
+| 검색 | `GET /api/search/places` |
+| 실시간 혼잡도 | `GET /api/congestion` |
+| 날짜별 집중률 | `GET /api/concentration-forecast` |
+| 주변 장소/행사 | `GET /api/local-places`, `GET /api/festivals/nearby` |
+| 장소 소개 | `GET /api/local-places/detail` |
+| 코스 | `GET /api/courses`, `GET /api/course-alternatives` |
+| 진행 | 서버 호출 없음. GPS·진행 상태는 단말에서 처리 |
 
-**전국에서 동작한다.** 검색·혼잡도·집중률·주변 장소·코스 전부 요청 시점에 외부 API로 해석한다.
+## 데이터 흐름과 DB
 
----
+현재 모바일 경로는 모두 DB 비의존입니다.
 
-## 2. 데이터 흐름 — 실시간과 적재의 구분
-
-공모전 데이터 활용 기준: **관광정보(장소명·주소·좌표·이미지)는 요청 시 조회하고 DB에 저장하지 않는다.**
-
-### 실시간 경로 (DB 미저장) — 앱이 쓰는 경로 전부
-
-```
-앱 → teumta 서버 → 외부 API → 변환 → 응답 (저장 없음)
-
- 검색       TourAPI searchKeyword2 → 결과 없으면 TMAP POI 검색 폴백
- 주변 장소   TourAPI detailCommon2(기준 좌표) + locationBasedList2(14/38/39)
-            → 중복 제거·선별(최대 10) → TMAP 보행자 경로(동시 3) → 거리순
- 혼잡도      SK 퍼즐 실시간 (서버 5분 캐시)
- 집중률      TourAPI detailCommon2로 법정동 코드 확보 → KTO 지역 예측 (지역 단위 6시간 캐시)
- 우회 코스   주변 장소의 실측 보행거리를 재조합 → 반환 코스만 구간 실측 검증
+```text
+Mobile → Express 공개 API → TourAPI/TMAP/SK/KTO → 변환·메모리 캐시 → Mobile
 ```
 
-### 적재 경로 (DB 저장 — 팀 관리 내부 데이터만)
+- 서버는 시작할 때 Prisma 연결, migration, 예측 적재 스케줄러를 실행하지 않습니다.
+- `/health`는 프로세스 상태만 확인하고 DB를 조회하지 않습니다.
+- 검색 결과의 과거 내부 `placeId` 연결을 제거했으며 `placeId`는 호환성을 위해 `null`입니다.
+- `Route`, `Trip`, 관리자 API, DB 적재 코드는 소스에 보존되어 있지만 라우터에 마운트되지 않습니다.
+- 따라서 현재 서비스 운영에는 MySQL이 필요하지 않습니다. 보존 스크립트나 과거 데이터를 다시 쓸 때만 필요합니다.
 
-```
- Place       ingest:tour 스크립트(수동). 현재 종로구 528곳
-             → 저장형 코스의 정류지, 집중률 매칭 참조용
- Congestion  집중률 예측 스케줄러(자동, 매일 05시 KST) — MATCHED만 저장
-             미매칭은 로그로 확인. alias 관리 구현은 보존만 함
- Route/Trip  과거 저장형 코스·방문 구현. 앱은 현재 사용하지 않는다
-```
+## 코스 생성
 
-> ⚠️ **DB에는 종로구 528곳뿐이다.** 전국 장소는 어디에도 저장돼 있지 않다.
-> "전국이 되었다"는 적재를 늘린 것이 아니라 실시간 해석으로 바꾼 결과다.
+1. 식별자(`contentId` 또는 `poiId`)로 목적지와 주변 후보를 조회합니다.
+2. 후보를 최대 10곳으로 줄이고 최대 3개 정류지 조합을 만듭니다.
+3. TourAPI 운영정보를 최대 5곳, 동시 3개씩 조회합니다.
+4. 예상 도착 시각에 명확히 휴무 또는 브레이크타임인 장소가 든 코스는 제외합니다. 정보가 없거나 자유문자를 확실히 해석하지 못하면 `unknown`으로 두어 과잉 제외하지 않습니다.
+5. 상위 후보의 전 구간을 TMAP 보행 경로로 검증하고 제한시간을 넘는 코스를 제외합니다.
+6. 시간 활용도·정류지 수·거리·다양성에 가중치를 둔 점수로 정렬해 최대 3개를 반환합니다.
 
-### 개인정보 원칙 ([location-privacy.md](./location-privacy.md))
+완성된 코스 응답은 서버 메모리에 2분(최대 300건), 모바일에 30초(최대 40건) 캐시합니다. 서버가 여러 인스턴스가 되면 캐시는 인스턴스별입니다.
 
-- 서버 API는 **좌표를 입력으로 받지 않는다** — 식별자(contentId/poiId)만 받고 서버가 좌표로 해석
-- 사용자 GPS는 단말 내부에서만 처리, 서버 전송·저장 금지
-- 도착·복귀 판정도 단말에서 — 서버는 방문 장소·시각을 알지 않는다
+## timeout과 오류
 
----
+- 외부 API 1회 호출: 서버 `EXTERNAL_API_TIMEOUT_MS`, 기본 5초
+- 일반 모바일 API: 10초
+- 코스 생성/대체 코스 모바일 API: 30초
+- 모든 JSON 응답: `{ success, data, error }`
+- 실패 응답: `data: null`, `error: { code, message }`
 
-## 3. 외부 API 호출량 (쿼터)
+코스만 30초로 둔 이유는 단일 요청 안에서 여러 외부 조회와 경로 검증이 직렬·병렬로 섞이기 때문입니다. 일반 조회까지 늘리면 장애 감지가 늦어집니다.
 
-| 사용자 액션 | TourAPI | TMAP | 퍼즐 |
-|---|---|---|---|
-| 검색 1회 | 1 | 0~1 (폴백 시) | — |
-| 주변 장소 1회 (contentId) | 4 | 10 | — |
-| 주변 장소 1회 (poiId) | 3 | 11 | — |
-| 우회 코스 1회 | 목적지·후보 조회 수 건 | 캐시 미스 시 최대 32, 상세 직후 후보 측정 최대 16회 재사용 | — |
-| 혼잡도 1회 | — | — | 0~1 (5분 캐시) |
-| 집중률 1회 | 1 | — | — (KTO 별도, 지역 6시간 캐시) |
+## 캐시와 Redis 판단
 
-**한도** — TourAPI 일 1,000 · TMAP 보행자 일 1,000 / POI 검색 일 20,000 · 퍼즐 월 3,000
-→ **병목은 TMAP 보행자 경로다.** 로컬·행사 후보 측정은 서버 TTL 캐시로 상세와 코스 생성이
-공유되지만, 코스 정류지 사이 검증은 variant마다 다시 호출된다. 공개 API 비용 가중 rate limit과
-`public_api_usage` 구조화 로그로 호출을 보호·계측한다.
-프론트는 검색 자동완성 금지(버튼 또는 500ms+ debounce).
+현재는 단일 서버 인스턴스와 짧은 TTL, 작은 상한의 메모리 캐시가 맞습니다. Redis를 추가하면 공유 캐시·재시작 간 유지·분산 rate limit을 얻지만 네트워크 장애점, 운영비, 직렬화와 무효화 복잡도가 늘어납니다.
 
----
+다음 중 하나가 실제로 생기기 전에는 Redis를 도입하지 않습니다.
 
-## 4. 배포 (Cloudtype, 서울 리전)
+- 서버를 2개 이상으로 수평 확장
+- 인스턴스별 캐시 미스로 외부 API 쿼터가 부족
+- 재시작 때 캐시 소실이 사용자 장애로 관측
+- 인스턴스 전체에서 정확한 rate limit이 필요
 
-```
-org main 머지 → Cloudtype 콘솔 "배포하기" → 반영
-```
+우선 `public_api_usage`, 외부 API rate-limit/timeout, 코스 응답시간과 캐시 hit ratio를 관측합니다.
 
-- 서버 `https://port-0-teumta-server-msh476v8e47b3c7e.sel3.cloudtype.app`
-  (기동 시 `prisma migrate deploy` 자동 실행)
-- 관리자 웹은 2026-09-08 운영 폐기. 소스와 API는 참고용으로 보존하지만 배포·CI·신규 개발 대상이 아니다.
-- DB: MariaDB 11.2, 영구 볼륨 · 백업은 GitHub Actions 매일 05:30 KST(artifact 30일)
-- 서버·DB 유료 리소스, 상시 실행. 관리자 웹은 더 이상 배포하지 않는다.
-- 상세: [deploy-cloudtype.md](./deploy-cloudtype.md)
+## 코드 경계
 
----
-
-## 5. 코드 구조
-
-```
-server/src/
-├── external/           [B] 외부 API 클라이언트·매퍼 (tour / tmap / congestion / prediction / common)
-├── services/
-│   ├── place.service.ts                  [A] 장소 도메인
-│   ├── route.service.ts                  [A] 저장형 코스 조회 + [B] 관리자 쓰기
-│   ├── trip.service.ts                   [A] Trip (앱 미사용)
-│   ├── course-generation.service.ts      [B] 실시간 코스 생성 (DB 미사용)
-│   ├── nearby-local-place.service.ts     [B] 실시간 주변 장소
-│   ├── place-search.service.ts           [B] 목적지 검색
-│   ├── congestion.service.ts             [B] 실시간 혼잡도
-│   ├── concentration-forecast.service.ts [B] 실시간 집중률
-│   ├── concentration-matching.service.ts [B] 집중률 매칭·alias (보존)
-│   ├── *-ingestion.service.ts            [B] 적재
-│   ├── prediction-scheduler.service.ts   [B] 일일 적재 스케줄러
-│   └── route-calculation.service.ts      [B 제공 → A 소비] TMAP 경로 계산
-├── middlewares/        error · public-api-guard · admin-auth · login-rate-limit
-├── controllers/ routes/
-└── prisma/             [A] 스키마 — 변경은 A에게 요청
-```
-
-- `mobile/` Expo(React Native) — 사용자 앱
-- `admin/` React + Vite — **운영 폐기, 삭제하지 않고 보존만 함**([team-todo.md](./team-todo.md))
-- `web/` 지원·개인정보처리방침 정적 페이지(GitHub Pages)
+- `server/src/routes/public.routes.ts`: 현재 공개 표면
+- `server/src/services/course-generation.service.ts`: 코스 계획·휴무 필터·검증·캐시
+- `mobile/src/app`: 화면 조합
+- `mobile/src/hooks`: 장소 상세 조회, 코스 조회, 진행, 혼잡도 polling, 알림
+- `admin/`: 보존 전용이며 본 문서의 운영 구조에 포함하지 않음

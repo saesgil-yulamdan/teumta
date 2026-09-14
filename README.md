@@ -1,134 +1,59 @@
 # teumta
 
-틈타(teumta)는 오버투어리즘 완화를 목표로 하는 관광객 분산 모바일 서비스입니다. 실시간 혼잡도와 날짜별 집중률 예측을 근거로, 붐비는 대형 관광지의 수요를 주변 로컬 장소(음식점·쇼핑·문화시설)로 우회시키는 코스와 진행 지도를 제공합니다. 관광객에게는 덜 붐비는 경험을, 지역에는 관광 수요의 분산을 제공합니다.
+틈타(teumta)는 붐비는 관광지의 수요를 걸어서 갈 수 있는 주변 장소로 분산하는 Expo 모바일 서비스입니다. 목적지의 실시간 혼잡도와 날짜별 집중률을 보여주고, 사용자가 고른 30/60/90분 안에 복귀하는 보행 코스를 요청 시 생성합니다.
 
-## 기술 스택
+## 현재 운영 구조
 
-- Mobile: React Native, Expo, TypeScript, Expo Router, Axios, expo-location, expo-notifications, react-native-maps
-- Server: Node.js, Express, TypeScript, Prisma ORM, MySQL, Zod, dotenv, cors
-- Database: MySQL 8.4, Docker Compose, Prisma migration
-
-## 폴더 구조
+- Mobile: React Native, Expo 57, TypeScript, Expo Router, Axios
+- Server: Node.js 22+, Express, TypeScript
+- Data: TourAPI, TMAP, SK Puzzle, KTO 집중률 API를 요청 시 조회하며 짧은 메모리 캐시를 사용
+- Database: 현재 모바일 공개 API와 서버 기동에는 불필요. Prisma/MySQL 코드는 과거 적재·관리 기능 보존용
+- `admin/`: 운영·배포·CI·신규 개발 대상이 아닌 보존 폴더
 
 ```text
 teumta/
-├── mobile/
-├── server/
-├── admin/              # 보존 전용(운영 폐기, 신규 개발·배포·CI 제외)
-├── docs/
-├── compose.yaml
-├── .gitignore
-├── .env.example
-└── README.md
+├── mobile/       # 사용자 앱
+├── server/       # 현재 공개 API + 보존된 과거 DB 코드
+├── admin/        # 보존 전용
+├── web/          # 지원/개인정보처리방침 정적 페이지
+└── docs/
 ```
 
-현재 모바일 앱은 기존 Expo 설정을 유지해 `mobile/src/app` 아래에 Expo Router 화면을 둡니다.
-
-## 사전 설치 항목
-
-- Node.js 22 이상 권장
-- npm
-- Docker Compose v2
-- macOS: OrbStack 또는 Docker Desktop
-- Windows: Docker Desktop
-- 모바일 실행용 Expo Go 또는 시뮬레이터
-
-## 환경변수 설정
-
-루트:
-
-```sh
-cp .env.example .env
-```
+## 실행
 
 서버:
 
 ```sh
-cp server/.env.example server/.env
-```
-
-모바일:
-
-```sh
-cp mobile/.env.example mobile/.env
-```
-
-실제 비밀번호와 API 키는 `.env` 파일에만 작성합니다. `.env` 파일은 Git에 올리지 않습니다.
-
-## MySQL 실행
-
-macOS OrbStack:
-
-1. OrbStack을 실행합니다.
-2. 프로젝트 루트에서 실행합니다.
-
-```sh
-docker compose up -d
-docker compose ps
-```
-
-Windows Docker Desktop:
-
-1. Docker Desktop을 실행합니다.
-2. WSL 또는 PowerShell에서 프로젝트 루트로 이동합니다.
-3. 실행합니다.
-
-```sh
-docker compose up -d
-docker compose ps
-```
-
-종료:
-
-```sh
-docker compose stop
-```
-
-데이터까지 삭제되는 `docker compose down -v`는 필요한 경우에만 실행합니다.
-
-## 백엔드 실행
-
-```sh
 cd server
 npm install
-npm run db:generate
-npm run db:migrate
+cp .env.example .env
 npm run dev
 ```
 
-헬스체크:
+공개 기능을 실행할 때 `DATABASE_URL`, MySQL, migration은 필요하지 않습니다. 외부 API 키는 실제로 해당 API를 호출할 때 필요합니다.
 
 ```sh
 curl http://localhost:3000/health
 ```
 
-정상 응답:
-
 ```json
 {
   "success": true,
-  "data": {
-    "status": "ok",
-    "service": "teumta-server",
-    "database": "connected"
-  },
+  "data": { "status": "ok", "service": "teumta-server" },
   "error": null
 }
 ```
 
-공개 API는 외부 API 쿼터 보호를 위해 IP별 비용 가중 rate limit을 적용합니다. 브라우저에서
-호출해야 하면 `server/.env`의 `CORS_ALLOWED_ORIGINS`에 Origin을 명시합니다. 모바일 native
-요청은 Origin 헤더가 없어 별도 등록이 필요 없습니다.
-
-## 모바일 앱 실행
+모바일:
 
 ```sh
 cd mobile
 npm install
+cp .env.example .env
 npm run start
 ```
 
-Expo Go에서 QR 코드를 스캔하거나 iOS/Android 시뮬레이터로 실행합니다.
+`EXPO_PUBLIC_API_BASE_URL`은 `/api` 앞의 서버 주소입니다. 네이티브 앱은 Origin 헤더가 없고, 웹 빌드는 서버의 `CORS_ALLOWED_ORIGINS`에 Origin을 등록해야 합니다.
 
 ## 검증
 
@@ -137,65 +62,17 @@ cd server && npm run test:run && npm run build
 cd mobile && npm test && npm run typecheck && npm run lint
 ```
 
-PR과 `main` push에서는 `.github/workflows/ci.yml`이 서버·모바일 검사를 실행합니다.
-폐기된 `admin/`은 CI 대상이 아닙니다.
-
-실제 배포 서버와 외부 API를 점검할 때는 호출 쿼터를 확인한 뒤 순차 스모크 테스트를 실행합니다.
+실배포·외부 API 스모크 테스트는 쿼터를 소비합니다.
 
 ```sh
 cd server
 SMOKE_BASE_URL=https://<server> SMOKE_DESTINATION_LIMIT=5 npm run smoke:live
 ```
 
-5곳 실행은 공개 API rate limit을 존중해 목적지 사이를 기본 61초 대기합니다.
-보호 미적용 격리 환경에서만 `SMOKE_INTERVAL_MS=0`으로 덮어쓸 수 있습니다.
+## DB 보존 기능
 
-스토어 심사·기능설명서·백업 확인 현황은
-[`docs/release-readiness.md`](docs/release-readiness.md)에 기록합니다.
+`server/prisma`, `compose.yaml`, 적재 스크립트와 일부 과거 서비스/테스트는 이력과 데이터 보존을 위해 남아 있습니다. 이를 별도로 실행할 때만 MySQL을 띄우고 `DATABASE_URL`을 설정한 뒤 `npm run db:migrate`를 사용합니다. 현재 서버의 `start:deploy`는 migration이나 DB 연결을 수행하지 않습니다.
 
-## Prisma migration 적용
+운영 DB를 실제로 종료하기 전에는 백업과 복원 가능 여부를 확인하고, 더 이상 과거 적재 데이터가 필요 없다는 운영 결정을 별도로 내려야 합니다.
 
-```sh
-cd server
-npm run db:migrate
-```
-
-새 모델을 추가한 뒤에는 migration 파일을 생성해 Git으로 공유합니다.
-
-```sh
-npx prisma migrate dev --name <migration_name>
-```
-
-## 자주 발생하는 오류
-
-### Docker daemon이 실행되지 않음
-
-`Cannot connect to the Docker daemon`이 나오면 OrbStack 또는 Docker Desktop이 켜져 있는지 확인합니다.
-
-### 3306 포트 충돌
-
-로컬 MySQL이 이미 3306을 쓰고 있으면 `Bind for 0.0.0.0:3306 failed`가 발생합니다. 루트 `.env`에서 `MYSQL_PORT=3307`처럼 바꾼 뒤 `server/.env`의 `DATABASE_URL` 포트도 같이 바꿉니다.
-
-### MySQL healthcheck 대기
-
-처음 실행 시 MySQL 초기화 때문에 `starting` 상태가 30초 이상 유지될 수 있습니다.
-
-```sh
-docker compose ps
-docker logs teumta-mysql
-```
-
-### 기존 volume 때문에 계정 정보가 반영되지 않음
-
-MySQL 공식 이미지는 데이터 디렉터리가 이미 있으면 초기 DB와 사용자를 다시 만들지 않습니다. 비밀번호를 바꿨는데 적용되지 않으면 기존 named volume 때문일 수 있습니다. 이 경우 데이터 삭제 위험이 있으므로 팀과 확인한 뒤 처리합니다.
-
-### Docker 저장공간 부족
-
-`no space left on device`가 나오면 자동 정리하지 말고 먼저 사용량을 확인합니다.
-
-```sh
-df -h /
-docker system df
-```
-
-이미지, 빌드 캐시, 중지된 컨테이너는 삭제 후보가 될 수 있지만 volume 삭제는 DB 데이터 손실 위험이 있습니다.
+상세 구조는 [서비스 구조](docs/service-overview.md), 현재 API는 [API 명세](docs/api-spec.md), 배포 전 확인사항은 [릴리스 체크리스트](docs/release-readiness.md)를 참고합니다.

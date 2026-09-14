@@ -1,56 +1,38 @@
-# Welcome to your Expo app 👋
+# teumta mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Expo Router 기반 틈타 사용자 앱입니다. 장소 검색, 혼잡도·집중률 확인, 시간 맞춤 코스 생성, 지도 기반 코스 진행을 제공합니다.
 
-## Get started
+## 실행
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```sh
+npm install
+cp .env.example .env
+npm run start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+`EXPO_PUBLIC_API_BASE_URL`에는 `/api`를 제외한 서버 주소를 설정합니다. Expo Go 또는 iOS/Android 시뮬레이터에서 실행할 수 있습니다.
 
-### Other setup steps
+## 구조
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+```text
+src/
+├── app/          # Expo Router 화면과 화면 조합
+├── api/          # Axios API 함수, 응답 타입, timeout 정책
+├── components/   # 재사용 UI
+├── hooks/        # 코스 진행·조회·알림·위치 등 도메인 상태
+├── stores/       # AsyncStorage 기반 단말 상태
+├── types/
+└── utils/
+```
 
-## Learn more
+기본 API timeout은 10초이고, 여러 외부 API와 보행 경로 계산이 필요한 코스 생성·대체 코스 요청만 30초입니다. 전체 요청의 timeout을 늘리지 않습니다.
 
-To learn more about developing your project with Expo, look at the following resources:
+사용자 GPS는 foreground에서 단말 내부 도착 판정에만 사용하며 서버로 보내지 않습니다. 자세한 원칙은 [위치정보 처리 구조](../docs/location-privacy.md)를 참고합니다.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## 검증
 
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```sh
+npm test
+npm run typecheck
+npm run lint
+```
