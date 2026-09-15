@@ -5,78 +5,94 @@ import type { Coordinate, DetourCourse } from '@/types/place';
 
 type CourseMapViewProps = {
   detour?: DetourCourse;
-  /** 네이티브 전용 옵션 — 웹 폴백에서는 사용하지 않는다. */
   routePath?: Coordinate[];
   showsUserLocation?: boolean;
   skippedStopIndexes?: number[];
 };
 
-export function CourseMapView({ detour, skippedStopIndexes = [] }: CourseMapViewProps) {
-  const coordinates = detour?.coordinates ?? [];
+/** 좌표로 그린 동선도. 지도 타일·도로를 가장하지 않으며 외부 조회를 추가하지 않는다. */
+export function CourseMapView({ detour, routePath, skippedStopIndexes = [] }: CourseMapViewProps) {
+  const valid = (point: Coordinate) => Number.isFinite(point.latitude) && Number.isFinite(point.longitude);
+  const coordinates = (detour?.coordinates ?? []).filter(valid);
+  const path = (routePath && routePath.length > 1 ? routePath : coordinates).filter(valid);
+  const all = [...path, ...coordinates];
+  const bounds = all.reduce((box, point) => ({
+    minLat: Math.min(box.minLat, point.latitude), maxLat: Math.max(box.maxLat, point.latitude),
+    minLon: Math.min(box.minLon, point.longitude), maxLon: Math.max(box.maxLon, point.longitude),
+  }), { minLat: Infinity, maxLat: -Infinity, minLon: Infinity, maxLon: -Infinity });
+  const centerLat = all.length ? (bounds.minLat + bounds.maxLat) / 2 : 0;
+  const centerLon = all.length ? (bounds.minLon + bounds.maxLon) / 2 : 0;
+  const longitudeScale = Math.max(Math.cos(centerLat * Math.PI / 180), 0.01);
+  const scale = all.length ? Math.min(
+    264 / Math.max((bounds.maxLon - bounds.minLon) * longitudeScale, 0.00001),
+    114 / Math.max(bounds.maxLat - bounds.minLat, 0.00001),
+  ) : 1;
+  const project = (point: Coordinate) => ({
+    x: 180 + (point.longitude - centerLon) * longitudeScale * scale,
+    y: 86 - (point.latitude - centerLat) * scale,
+  });
+  const points = path.map((point) => {
+    const { x, y } = project(point);
+    return `${x},${y}`;
+  }).join(' ');
+  const returnsToStart = coordinates.length > 1 &&
+    coordinates[0].latitude === coordinates[coordinates.length - 1].latitude &&
+    coordinates[0].longitude === coordinates[coordinates.length - 1].longitude;
+  const markers = returnsToStart ? coordinates.slice(0, -1) : coordinates;
 
   return (
-    <View style={styles.webFallback}>
-      <Text style={styles.eyebrow}>ROUTE PREVIEW</Text>
-      <Text style={styles.title}>{detour?.name}</Text>
-      <Text style={styles.description}>웹 지도 준비 중 · 경로 지점 미리보기</Text>
-      {coordinates.map((coordinate, index) => (
-        <View
-          key={`${index}-${coordinate.latitude}-${coordinate.longitude}`}
-          style={styles.coordinateRow}>
-          <Text style={styles.coordinateIndex}>{String(index + 1).padStart(2, '0')}</Text>
-          <Text style={styles.coordinate}>
-            {coordinate.latitude.toFixed(5)}, {coordinate.longitude.toFixed(5)}
-            {index > 0 && skippedStopIndexes.includes(index - 1) ? ' · 건너뜀' : ''}
-          </Text>
-        </View>
-      ))}
+    <View style={styles.preview}>
+      <View style={styles.heading}>
+        <Text style={styles.title}>동선 미리보기</Text>
+        <Text style={styles.caption}>출발 · 방문 · 복귀</Text>
+      </View>
+      <svg viewBox="0 0 360 170" width="100%" style={{ flex: 1, minHeight: 0 }}
+        role="img" aria-label={`배경 지도 없는 코스 동선: ${detour?.stops?.join(' → ') ?? '선택한 코스 없음'}`}>
+        <title>방문 순서와 이동 동선</title>
+        <polyline points={points} fill="none" stroke={TeumtaHybrid.white} strokeWidth="10" strokeLinejoin="round" strokeLinecap="round" />
+        <polyline points={points} fill="none" stroke={TeumtaHybrid.navy} strokeWidth="4" strokeLinejoin="round" strokeLinecap="round" />
+        {markers.map((coordinate, index) => {
+          const { x, y } = project(coordinate);
+          const skipped = index > 0 && skippedStopIndexes.includes(index - 1);
+          return (
+            <g key={index}>
+              <title>{detour?.stops?.[index] ?? `${index}번째 장소`}{skipped ? ' · 건너뜀' : ''}</title>
+              <circle cx={x} cy={y} r="15" fill={index === 0 ? TeumtaHybrid.ink : skipped ? TeumtaHybrid.muted : TeumtaHybrid.navy} stroke="white" strokeWidth="3" />
+              <text x={x} y={y} dy="0.35em" textAnchor="middle" fill="white" fontSize="12" fontWeight="700">
+                {index === 0 ? '출' : skipped ? '−' : index}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      <Text style={styles.caption}>동선만 표시해요. 실제 배경 지도는 앱에서 볼 수 있어요.</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  webFallback: {
-    backgroundColor: TeumtaHybrid.canvas,
+  preview: {
     flex: 1,
-    paddingHorizontal: 24,
-    paddingVertical: 20,
+    backgroundColor: TeumtaHybrid.canvas,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    gap: 8,
   },
-  eyebrow: {
-    color: TeumtaHybrid.terracotta,
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1.4,
-    lineHeight: 14,
+  heading: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
   },
   title: {
     color: TeumtaHybrid.ink,
-    fontSize: 22,
-    fontWeight: '900',
-    marginTop: 2,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 20,
   },
-  description: {
+  caption: {
     color: TeumtaHybrid.muted,
-    fontSize: 12,
-    lineHeight: 18,
-    marginBottom: 14,
-    marginTop: 4,
-  },
-  coordinateRow: {
-    alignItems: 'center',
-    borderTopColor: TeumtaHybrid.line,
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    minHeight: 34,
-  },
-  coordinateIndex: {
-    color: TeumtaHybrid.terracotta,
-    fontSize: 10,
-    fontWeight: '900',
-    width: 34,
-  },
-  coordinate: {
-    color: TeumtaHybrid.slate,
     fontSize: 11,
-    lineHeight: 15,
+    lineHeight: 17,
   },
 });

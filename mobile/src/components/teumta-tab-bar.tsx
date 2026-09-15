@@ -64,7 +64,7 @@ export function TeumtaTabBar({ active }: { active: TeumtaTab }) {
           <Pressable key={tab.key} accessibilityRole="tab" accessibilityLabel={`${tab.label} 탭`} accessibilityState={{ selected: isActive }} style={styles.item} onPress={() => goTo(tab.key)}>
             <Image
               source={isActive ? tab.activeIcon : tab.inactiveIcon}
-              style={[styles.icon, isActive && styles.iconActive]}
+              style={styles.icon}
               contentFit="contain"
             />
             <Text style={[styles.label, isActive && styles.labelActive]}>{tab.label}</Text>
@@ -85,10 +85,6 @@ const styles = StyleSheet.create({
     height: 76,
     justifyContent: 'space-around',
     paddingHorizontal: 24,
-    shadowColor: TeumtaHybrid.ink,
-    shadowOffset: { height: -2, width: 0 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
   },
   item: {
     alignItems: 'center',
@@ -99,19 +95,17 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   icon: {
-    height: 20,
-    width: 20,
-  },
-  iconActive: {
-    tintColor: TeumtaHybrid.forest,
+    height: 24,
+    width: 24,
   },
   label: {
     color: TeumtaHybrid.faint,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
-    lineHeight: 14,
+    lineHeight: 18,
   },
   labelActive: {
     color: TeumtaHybrid.forest,
+    fontWeight: '800',
   },
 });

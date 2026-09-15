@@ -15,7 +15,7 @@ export function TeumtaWaymark() {
 
 const styles = StyleSheet.create({
   mark: { flexDirection: 'row', gap: 3, height: 18, width: 18 },
-  bar: { backgroundColor: TeumtaHybrid.terracotta, width: 3 },
+  bar: { backgroundColor: TeumtaHybrid.navy, borderRadius: 2, width: 3 },
   short: { height: 8, marginTop: 5 },
   long: { backgroundColor: TeumtaHybrid.forest, height: 18 },
   offset: { marginTop: 0 },

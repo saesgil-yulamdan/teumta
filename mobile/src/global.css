@@ -7,3 +7,14 @@
   --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
   --font-serif: Georgia, 'Times New Roman', serif;
 }
+
+/* 데스크톱에서도 모바일의 읽기 폭을 유지한다. 작은 화면은 전체 폭을 쓴다. */
+@media (min-width: 600px) {
+  body {
+    background: #F6F7F9;
+  }
+  #root {
+    max-width: 520px;
+    margin-inline: auto;
+  }
+}

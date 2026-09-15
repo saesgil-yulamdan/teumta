@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { Image } from 'expo-image';
 import { Link, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -24,6 +25,7 @@ export default function MyScreen() {
   const { places: savedPlaces, clearBookmarks } = useBookmarks();
   const { completedEntries, clearCourseLog } = useCourseLog();
   const [showReport, setShowReport] = useState(false);
+  const [showCompleted, setShowCompleted] = useState(false);
 
   const confirmClear = () => {
     Alert.alert('저장 데이터 삭제', '저장한 장소, 코스 기록, 최근 검색어가 모두 삭제됩니다.', [
@@ -69,158 +71,129 @@ export default function MyScreen() {
 
   return (
     <SafeAreaView style={styles.screen}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}>
-        <TeumtaHeader title="마이" subtitle="기록과 저장한 장소" />
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <TeumtaHeader title="마이" subtitle="여행의 취향과 기록을 모아두세요." />
 
-        <Text style={styles.sectionTitle}>다녀온 코스</Text>
-        <Text style={styles.sectionCaption}>
-          로컬을 다녀온 기록
-        </Text>
-        {completedEntries.length > 0 && (
-          <View style={styles.statsCard}>
-            <Text style={styles.statsTitle}>{statsLabel} 분산 참여</Text>
-            <View style={styles.statsRow}>
-              <View style={styles.statsColumn}>
-                <Text style={styles.statsValue}>{statsEntries.length}번</Text>
-                <Text style={styles.statsLabel}>다녀온 코스</Text>
+        <View style={styles.summary}>
+          <Text style={styles.summaryCaption}>{statsLabel} 나의 여행</Text>
+          <Text style={styles.summaryTitle}>차곡차곡 쌓이는 발걸음</Text>
+          <View style={styles.statsRow}>
+            {[
+              { value: statsEntries.length, unit: '번', label: '다녀온 코스' },
+              { value: statsLocalCount, unit: '곳', label: '들른 장소' },
+              { value: statsMinutes, unit: '분', label: '여행한 시간' },
+            ].map((stat) => (
+              <View key={stat.label} style={styles.statsColumn}>
+                <Text style={styles.statsValue}>{stat.value}<Text style={styles.statsUnit}> {stat.unit}</Text></Text>
+                <Text style={styles.statsLabel}>{stat.label}</Text>
               </View>
-              <View style={styles.statsColumn}>
-                <Text style={styles.statsValue}>{statsLocalCount}곳</Text>
-                <Text style={styles.statsLabel}>들른 로컬</Text>
-              </View>
-              <View style={styles.statsColumn}>
-                <Text style={styles.statsValue}>{statsMinutes}분</Text>
-                <Text style={styles.statsLabel}>비켜간 시간</Text>
-              </View>
-            </View>
-          </View>
-        )}
-        {completedEntries.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>
-              아직 다녀온 코스가 없어요.{'\n'}코스를 마치면 이 기기에만 기록돼요.
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.list}>
-            {completedEntries.map((entry) => (
-              <Pressable key={entry.key} style={styles.rowCard} onPress={() => openEntry(entry)}>
-                <View style={styles.minutesTile}>
-                  <Text style={styles.minutesValue}>{entry.selected.course.totalMinutes}</Text>
-                  <Text style={styles.minutesUnit}>분</Text>
-                </View>
-                <View style={styles.rowTexts}>
-                  <Text style={styles.rowName} numberOfLines={1}>
-                    {entry.selected.course.stops.map((stop) => stop.name).join(' · ')}
-                  </Text>
-                  <Text style={styles.rowMeta} numberOfLines={1}>
-                    {entry.selected.destination.name} ·{' '}
-                    {dateLabel(entry.completedAt ?? entry.viewedAt)}
-                  </Text>
-                </View>
-                <View style={styles.doneBadge}>
-                  <Text style={styles.doneBadgeLabel}>
-                    {entry.completedAll ? '완주' : '다녀옴'}
-                  </Text>
-                </View>
-              </Pressable>
             ))}
           </View>
-        )}
+        </View>
 
-        <Text style={styles.sectionTitle}>저장한 장소</Text>
-        {savedPlaces.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>
-              아직 저장한 장소가 없어요.{'\n'}관광지 상세 화면의 북마크 버튼으로 저장할 수 있어요.
-            </Text>
+        <View style={styles.section}>
+          <View style={styles.sectionHeading}>
+            <Text style={styles.sectionTitle}>저장한 장소</Text>
+            <Text style={styles.sectionCount}>{savedPlaces.length}곳</Text>
           </View>
-        ) : (
-          <View style={styles.list}>
-            {savedPlaces.map((place) => (
-              <Link
-                key={`${place.source}-${place.id}`}
-                href={{
-                  pathname: '/places/[id]',
-                  params: {
-                    id: place.id,
-                    source: place.source,
-                    name: place.name,
-                    ...(place.address ? { address: place.address } : {}),
-                    ...(place.imageUrl ? { imageUrl: place.imageUrl } : {}),
-                  },
-                }}
-                asChild>
-                <Pressable style={styles.rowCard}>
-                  {/* 저장 시점 이미지를 그대로 쓴다. 목적지는 분류가 없어 중립 배경으로 떨어진다. */}
-                  <PlaceThumbnail
-                    imageUrl={place.imageUrl}
-                    variant="card"
-                    style={styles.rowThumb}
-                  />
+          {savedPlaces.length === 0 ? (
+            <View style={styles.emptyBox}>
+              <View style={styles.emptyIcon}>
+                <Image source={require('@/assets/images/icons/bookmark.svg')} style={styles.icon} contentFit="contain" />
+              </View>
+              <Text style={styles.emptyTitle}>다음에 가고 싶은 곳을 모아보세요</Text>
+              <Text style={styles.emptyText}>장소 상세에서 북마크를 누르면{ '\n' }여기에서 다시 찾을 수 있어요.</Text>
+              <Link href="/search" asChild>
+                <Pressable accessibilityRole="button" style={styles.discoverButton}>
+                  <Text style={styles.discoverLabel}>장소 둘러보기</Text>
+                </Pressable>
+              </Link>
+            </View>
+          ) : (
+            <View style={styles.list}>
+              {savedPlaces.map((place) => (
+                <Link
+                  key={`${place.source}-${place.id}`}
+                  href={{
+                    pathname: '/places/[id]',
+                    params: {
+                      id: place.id, source: place.source, name: place.name,
+                      ...(place.address ? { address: place.address } : {}),
+                      ...(place.imageUrl ? { imageUrl: place.imageUrl } : {}),
+                    },
+                  }} asChild>
+                  <Pressable accessibilityRole="button" style={styles.rowCard}>
+                    <PlaceThumbnail imageUrl={place.imageUrl} variant="card" style={styles.rowThumb} />
+                    <View style={styles.rowTexts}>
+                      <Text style={styles.rowName}>{place.name}</Text>
+                      <Text style={styles.rowMeta} numberOfLines={2}>{place.address ?? '주소 정보 없음'}</Text>
+                    </View>
+                    <Text style={styles.rowChevron}>›</Text>
+                  </Pressable>
+                </Link>
+              ))}
+            </View>
+          )}
+        </View>
+
+        <View style={styles.section}>
+          <Pressable accessibilityRole="button" accessibilityState={{ expanded: showCompleted }}
+            onPress={() => setShowCompleted((value) => !value)} style={styles.historyButton}>
+            <View style={styles.rowTexts}>
+              <Text style={styles.sectionTitle}>다녀온 코스</Text>
+              <Text style={styles.rowMeta}>완료한 여행 {completedEntries.length}개</Text>
+            </View>
+            <Text style={styles.historyAction}>{showCompleted ? '접기 −' : '기록 보기 +'}</Text>
+          </Pressable>
+          {showCompleted && (completedEntries.length === 0 ? (
+            <Text style={styles.emptyText}>아직 완료한 코스가 없어요. 코스를 마치면 여기에 기록돼요.</Text>
+          ) : (
+            <View style={styles.list}>
+              {completedEntries.map((entry) => (
+                <Pressable key={entry.key} accessibilityRole="button" style={styles.rowCard} onPress={() => openEntry(entry)}>
+                  <View style={styles.minutesTile}>
+                    <Text style={styles.minutesValue}>{entry.selected.course.totalMinutes}</Text>
+                    <Text style={styles.minutesUnit}>분 코스</Text>
+                  </View>
                   <View style={styles.rowTexts}>
-                    <Text style={styles.rowName}>{place.name}</Text>
-                    <Text style={styles.rowMeta} numberOfLines={1}>
-                      {place.address ?? '주소 정보 없음'}
-                    </Text>
+                    <Text style={styles.rowName} numberOfLines={2}>{entry.selected.course.stops.map((stop) => stop.name).join(' · ')}</Text>
+                    <Text style={styles.rowMeta}>{entry.selected.destination.name} · {dateLabel(entry.completedAt ?? entry.viewedAt)}</Text>
+                    <Text style={styles.completionLabel}>{entry.completedAll ? '완주' : '다녀옴'}</Text>
                   </View>
                   <Text style={styles.rowChevron}>›</Text>
                 </Pressable>
-              </Link>
-            ))}
-          </View>
-        )}
-
-        <Text style={styles.sectionTitle}>위치·개인정보</Text>
-        <View style={styles.infoCard}>
-          <Text style={styles.infoCardTitle}>위치는 기기에서만 처리</Text>
-          <Text style={styles.infoCardBody}>
-            이동 경로, 저장 장소, 코스 기록을 서버로 보내지 않습니다.
-          </Text>
-          <Pressable onPress={confirmClear} hitSlop={8}>
-            <Text style={styles.dangerAction}>저장 데이터 전체 삭제</Text>
-          </Pressable>
+              ))}
+            </View>
+          ))}
         </View>
 
-        <Text style={styles.sectionTitle}>앱 정보</Text>
-        <View style={styles.infoCard}>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoRowLabel}>버전</Text>
-            <Text style={styles.infoRowValue}>{Constants.expoConfig?.version ?? '1.0.0'}</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>설정과 도움</Text>
+          <View style={styles.settingsGroup}>
+            <Pressable accessibilityRole="button" style={styles.settingRow} onPress={() => setShowReport(true)}>
+              <Text style={styles.settingLabel}>버그·의견 보내기</Text><Text style={styles.rowChevron}>›</Text>
+            </Pressable>
+            <Pressable accessibilityRole="link" style={styles.settingRow} onPress={() => void Linking.openURL(SUPPORT_URL)}>
+              <Text style={styles.settingLabel}>지원·문의</Text><Text style={styles.rowChevron}>›</Text>
+            </Pressable>
+            <Pressable accessibilityRole="link" style={styles.settingRow} onPress={() => void Linking.openURL(PRIVACY_URL)}>
+              <Text style={styles.settingLabel}>개인정보처리방침</Text><Text style={styles.rowChevron}>›</Text>
+            </Pressable>
           </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoRowLabel}>데이터 출처</Text>
-            <Text style={styles.infoRowValue}>한국관광공사 · SK open API · TMAP</Text>
+          <View style={styles.privacyNote}>
+            <Text style={styles.noteTitle}>내 기기에 보관되는 여행 기록</Text>
+            <Text style={styles.noteText}>이동 경로, 저장 장소, 코스 기록을 서버로 보내지 않습니다.</Text>
+            <Pressable accessibilityRole="button" onPress={confirmClear} style={styles.deleteButton}>
+              <Text style={styles.dangerAction}>저장 데이터 전체 삭제</Text>
+            </Pressable>
           </View>
-          <Pressable style={styles.infoRow} onPress={() => setShowReport(true)} hitSlop={4}>
-            <Text style={styles.infoRowLabel}>버그·의견 보내기</Text>
-            <Text style={styles.infoRowLink}>제보하기 ›</Text>
-          </Pressable>
-          <Pressable
-            style={styles.infoRow}
-            onPress={() => void Linking.openURL(SUPPORT_URL)}
-            hitSlop={4}>
-            <Text style={styles.infoRowLabel}>지원·문의</Text>
-            <Text style={styles.infoRowLink}>열기 ›</Text>
-          </Pressable>
-          <Pressable
-            style={styles.infoRow}
-            onPress={() => void Linking.openURL(PRIVACY_URL)}
-            hitSlop={4}>
-            <Text style={styles.infoRowLabel}>개인정보처리방침</Text>
-            <Text style={styles.infoRowLink}>열기 ›</Text>
-          </Pressable>
+        </View>
+        <View style={styles.appInfo}>
+          <Text style={styles.noteText}>틈타 · 버전 {Constants.expoConfig?.version ?? '1.0.0'}</Text>
+          <Text style={styles.noteText}>한국관광공사 · SK open API · TMAP</Text>
         </View>
       </ScrollView>
-
-      <ReportModal
-        visible={showReport}
-        onClose={() => setShowReport(false)}
-        kind="app"
-      />
+      <ReportModal visible={showReport} onClose={() => setShowReport(false)} kind="app" />
       <TeumtaTabBar active="my" />
     </SafeAreaView>
   );
@@ -228,222 +201,246 @@ export default function MyScreen() {
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: TeumtaHybrid.paper,
+    backgroundColor: TeumtaHybrid.canvas,
     flex: 1,
   },
   scroll: {
     flex: 1,
   },
   content: {
-    gap: 18,
-    paddingBottom: 24,
+    gap: 32,
     paddingHorizontal: 20,
-    paddingTop: 8,
+    paddingTop: 18,
+    paddingBottom: 32,
   },
-  header: {
-    gap: 1,
-    marginBottom: 2,
-  },
-  headerTitle: {
-    color: TeumtaHybrid.ink,
-    fontSize: 28,
-    fontWeight: '900',
-    lineHeight: 28,
-  },
-  headerSubtitle: {
-    color: TeumtaHybrid.muted,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  sectionTitle: {
-    borderTopColor: TeumtaHybrid.ink,
-    borderTopWidth: 1,
-    color: TeumtaHybrid.ink,
-    fontSize: 17,
-    fontWeight: '800',
-    lineHeight: 23,
-    marginTop: 2,
-    paddingTop: 12,
-  },
-  sectionCaption: {
-    color: TeumtaHybrid.muted,
-    fontSize: 11,
-    lineHeight: 15,
-    marginTop: -8,
-  },
-  statsCard: {
-    backgroundColor: TeumtaHybrid.canvas,
-    borderLeftColor: TeumtaHybrid.signal,
-    borderLeftWidth: 4,
+  summary: {
+    backgroundColor: TeumtaHybrid.navy,
+    borderRadius: 24,
+    padding: 24,
     gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
   },
-  statsTitle: {
-    color: TeumtaHybrid.navy,
-    fontSize: 11,
-    fontWeight: '700',
-    lineHeight: 15,
+  summaryCaption: {
+    color: TeumtaHybrid.white,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  summaryTitle: {
+    color: TeumtaHybrid.white,
+    fontSize: 21,
+    fontWeight: '800',
+    lineHeight: 30,
   },
   statsRow: {
     flexDirection: 'row',
+    gap: 12,
+    marginTop: 16,
+    flexWrap: 'wrap',
   },
   statsColumn: {
     flex: 1,
-    gap: 1,
+    minWidth: 70,
+    gap: 6,
   },
   statsValue: {
-    color: TeumtaHybrid.ink,
-    fontSize: 16,
+    color: TeumtaHybrid.white,
+    fontSize: 28,
     fontWeight: '800',
-    lineHeight: 22,
+    lineHeight: 38,
+  },
+  statsUnit: {
+    fontSize: 13,
+    fontWeight: '500',
   },
   statsLabel: {
-    color: TeumtaHybrid.muted,
-    fontSize: 10,
-    lineHeight: 14,
+    color: TeumtaHybrid.white,
+    fontSize: 12,
+    lineHeight: 18,
   },
-  minutesTile: {
-    alignItems: 'center',
-    backgroundColor: TeumtaHybrid.signalSoft,
-    borderRadius: TeumtaHybrid.radius.small,
+  section: {
+    gap: 16,
+  },
+  sectionHeading: {
     flexDirection: 'row',
-    gap: 1,
-    height: 52,
-    justifyContent: 'center',
-    width: 52,
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  minutesValue: {
-    color: TeumtaHybrid.navy,
-    fontSize: 16,
+  sectionTitle: {
+    color: TeumtaHybrid.ink,
+    fontSize: 20,
     fontWeight: '800',
-    lineHeight: 22,
+    lineHeight: 28,
   },
-  minutesUnit: {
+  sectionCount: {
     color: TeumtaHybrid.navy,
-    fontSize: 10,
+    fontSize: 14,
     fontWeight: '700',
-    lineHeight: 14,
-    marginTop: 5,
-  },
-  doneBadge: {
-    backgroundColor: TeumtaHybrid.slateSoft,
-    borderRadius: TeumtaHybrid.radius.small,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  doneBadgeLabel: {
-    color: TeumtaHybrid.navy,
-    fontSize: 10,
-    fontWeight: '700',
-    lineHeight: 14,
   },
   emptyBox: {
-    backgroundColor: TeumtaHybrid.canvas,
-    borderLeftColor: TeumtaHybrid.slate,
-    borderLeftWidth: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 14,
+    alignItems: 'center',
+    backgroundColor: TeumtaHybrid.paper,
+    borderRadius: 22,
+    gap: 12,
+    paddingVertical: 28,
+    paddingHorizontal: 20,
+  },
+  emptyIcon: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 52,
+    height: 52,
+    backgroundColor: TeumtaHybrid.navySoft,
+    borderRadius: 26,
+    marginBottom: 4,
+  },
+  icon: {
+    height: 24,
+    width: 24,
+  },
+  emptyTitle: {
+    color: TeumtaHybrid.ink,
+    fontSize: 16,
+    fontWeight: '700',
+    lineHeight: 24,
+    textAlign: 'center',
   },
   emptyText: {
     color: TeumtaHybrid.muted,
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 14,
+    lineHeight: 23,
     textAlign: 'center',
   },
+  discoverButton: {
+    backgroundColor: TeumtaHybrid.navySoft,
+    borderRadius: 14,
+    paddingHorizontal: 22,
+    paddingVertical: 13,
+    marginTop: 4,
+    minHeight: 48,
+  },
+  discoverLabel: {
+    color: TeumtaHybrid.navy,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 22,
+  },
   list: {
-    borderTopColor: TeumtaHybrid.line,
-    borderTopWidth: 1,
+    gap: 16,
   },
   rowCard: {
     alignItems: 'center',
-    borderBottomColor: TeumtaHybrid.line,
-    borderBottomWidth: 1,
     flexDirection: 'row',
-    gap: 10,
-    paddingLeft: 8,
-    paddingRight: 10,
-    paddingVertical: 10,
+    gap: 14,
+    paddingVertical: 4,
+    minHeight: 80,
   },
   rowThumb: {
-    backgroundColor: TeumtaHybrid.canvas,
-    borderRadius: TeumtaHybrid.radius.small,
-    height: 52,
-    width: 52,
+    backgroundColor: TeumtaHybrid.line,
+    borderRadius: 4,
+    height: 72,
+    width: 72,
   },
   rowTexts: {
     flex: 1,
-    gap: 2,
+    gap: 5,
   },
   rowName: {
     color: TeumtaHybrid.ink,
-    fontSize: 13,
-    fontWeight: '800',
-    lineHeight: 18,
+    fontSize: 16,
+    fontWeight: '700',
+    lineHeight: 24,
   },
   rowMeta: {
     color: TeumtaHybrid.muted,
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 13,
+    lineHeight: 21,
   },
   rowChevron: {
     color: TeumtaHybrid.faint,
-    fontSize: 20,
-    fontWeight: '500',
-    lineHeight: 28,
+    fontSize: 24,
+    lineHeight: 30,
   },
-  infoCard: {
-    borderBottomColor: TeumtaHybrid.line,
-    borderBottomWidth: 1,
-    borderTopColor: TeumtaHybrid.line,
-    borderTopWidth: 1,
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  infoCardTitle: {
-    color: TeumtaHybrid.ink,
-    fontSize: 13,
-    fontWeight: '800',
-    lineHeight: 18,
-  },
-  infoCardBody: {
-    color: TeumtaHybrid.muted,
-    fontSize: 11,
-    lineHeight: 16,
-  },
-  dangerAction: {
-    color: TeumtaHybrid.terracotta,
-    fontSize: 11,
-    fontWeight: '700',
-    lineHeight: 15,
-    marginTop: 2,
-  },
-  infoRow: {
+  historyButton: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: 12,
-    justifyContent: 'space-between',
+    minHeight: 64,
   },
-  infoRowLabel: {
+  historyAction: {
+    color: TeumtaHybrid.navy,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  minutesTile: {
+    backgroundColor: TeumtaHybrid.navySoft,
+    borderRadius: 18,
+    width: 72,
+    height: 72,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  minutesValue: {
+    color: TeumtaHybrid.navy,
+    fontSize: 24,
+    fontWeight: '800',
+    lineHeight: 30,
+  },
+  minutesUnit: {
+    color: TeumtaHybrid.navy,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  completionLabel: {
     color: TeumtaHybrid.muted,
-    fontSize: 11,
-    lineHeight: 15,
-    flexShrink: 0,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 18,
   },
-  infoRowValue: {
+  settingsGroup: {
+    backgroundColor: TeumtaHybrid.paper,
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 4,
+  },
+  settingRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    minHeight: 58,
+    gap: 12,
+  },
+  settingLabel: {
     color: TeumtaHybrid.ink,
-    flex: 1,
-    fontSize: 11,
-    fontWeight: '700',
-    lineHeight: 16,
-    textAlign: 'right',
+    fontSize: 15,
+    lineHeight: 23,
   },
-  infoRowLink: {
-    color: TeumtaHybrid.slate,
-    flexShrink: 0,
-    fontSize: 11,
+  privacyNote: {
+    paddingHorizontal: 4,
+    gap: 6,
+  },
+  noteTitle: {
+    color: TeumtaHybrid.ink,
+    fontSize: 14,
     fontWeight: '700',
-    lineHeight: 14,
+    lineHeight: 22,
+  },
+  noteText: {
+    color: TeumtaHybrid.muted,
+    fontSize: 12,
+    lineHeight: 20,
+  },
+  deleteButton: {
+    alignSelf: 'flex-start',
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  dangerAction: {
+    color: TeumtaHybrid.terracotta,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  appInfo: {
+    alignItems: 'center',
+    gap: 4,
   },
 });

@@ -1,29 +1,46 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CourseMapView } from '@/components/course-map-view';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
 import { TeumtaHybrid } from '@/constants/theme';
-import { getSelectedCourse } from '@/stores/selected-course';
+import { getSelectedCourse, loadSelectedCourse } from '@/stores/selected-course';
 import { courseDistanceMeters, courseStayMinutes } from '@/types/course';
 import { buildCourseRoutePath } from '@/utils/course-path';
 import { withRoJosa } from '@/utils/text';
 import { timeLabelAfter } from '@/utils/time';
 
-const DOT_START = TeumtaHybrid.terracotta;
+const DOT_START = TeumtaHybrid.ink;
 
 export default function CourseMapScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const selected = getSelectedCourse();
+  const [selected, setSelected] = useState(getSelectedCourse);
+  const [loading, setLoading] = useState(!selected);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadSelectedCourse().then((value) => {
+      if (!cancelled) {
+        setSelected(value);
+        setLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  if (loading) {
+    return <View style={styles.emptyContainer}><ActivityIndicator color={TeumtaHybrid.navy} accessibilityLabel="코스 불러오는 중" /></View>;
+  }
 
   if (!selected) {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>선택한 코스 정보가 없어요.</Text>
-        <Pressable style={styles.emptyButton} onPress={() => router.back()}>
+        <Pressable style={styles.emptyButton} onPress={() => router.canGoBack() ? router.back() : router.replace('/search')}>
           <Text style={styles.emptyButtonLabel}>코스 다시 고르기</Text>
         </Pressable>
       </View>
@@ -88,6 +105,7 @@ export default function CourseMapScreen() {
     title: string;
     subtitle: string;
     time: string;
+    imageUrl?: string | null;
   }[] = [
     {
       key: 'start',
@@ -103,6 +121,7 @@ export default function CourseMapScreen() {
       dot: TeumtaHybrid.navy,
       // 지도 마커와 같은 번호 — 목록과 지도 대조용
       order: index + 1,
+      imageUrl: stop.imageUrl,
       title: stop.name,
       subtitle: `권장 체류 ${stop.stayMinutes}분${stop.address ? ` · ${stop.address}` : ''}`,
       time: timeLabelAfter(arrivalMinutes[index]),
@@ -117,333 +136,323 @@ export default function CourseMapScreen() {
   ];
 
   return (
-    <View style={styles.screen}>
-      <View style={{ height: insets.top, backgroundColor: TeumtaHybrid.slateSoft }} />
-
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
       <View style={styles.topBar}>
-        <Pressable accessibilityRole="button" accessibilityLabel="뒤로 가기" style={styles.topButton} onPress={() => router.back()}>
-          <Image
-            source={require('@/assets/images/icons/back.svg')}
-            style={styles.topButtonIcon}
-            contentFit="contain"
-          />
+        <Pressable accessibilityRole="button" accessibilityLabel="뒤로 가기" style={styles.topButton}
+          onPress={() => router.canGoBack() ? router.back() : router.replace('/search')}>
+          <Image source={require('@/assets/images/icons/back.svg')} style={styles.topButtonIcon} contentFit="contain" />
         </Pressable>
+        <Text style={styles.navigationTitle}>코스 상세</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="코스 공유" style={styles.shareButton} onPress={handleShare}>
           <Text style={styles.shareLabel}>공유</Text>
         </Pressable>
       </View>
 
-      <View style={styles.mapArea}>
-        <CourseMapView detour={mapDetour} routePath={buildCourseRoutePath(destination, course)} />
-      </View>
-
-      <ScrollView
-        style={styles.sheet}
-        contentContainerStyle={[styles.sheetContent, { paddingBottom: 18 + insets.bottom }]}
-        showsVerticalScrollIndicator={false}>
-        <View style={styles.sheetHeader}>
-          <View style={styles.sheetTitleTexts}>
-            <Text style={styles.sheetTitle} numberOfLines={1}>
-              {courseName}
-            </Text>
-            <Text style={styles.sheetSubtitle}>
-            {course.totalMinutes}분 · 도보 {distanceLabel}
-            </Text>
-          </View>
-          <View style={styles.returnPill}>
-            <Text style={styles.returnPillLabel}>예상 복귀</Text>
-            <Text style={styles.returnPillTime}>{returnTimeLabel}</Text>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.mapArea}>
+          <CourseMapView detour={mapDetour} routePath={buildCourseRoutePath(destination, course)} />
+        </View>
+        <View style={styles.intro}>
+          <Text style={styles.eyebrow}>{destination.name} 주변</Text>
+          <Text style={styles.courseTitle}>{courseName || '주변을 걷는 코스'}</Text>
+          <Text style={styles.description}>잠깐 들렀다, 다시 목적지로 돌아오는 여행</Text>
+          <View style={styles.metrics}>
+            {[
+              { value: `${course.totalMinutes}분`, label: '총 소요 시간' },
+              { value: distanceLabel, label: '걷는 거리' },
+              { value: `${courseStayMinutes(course)}분`, label: '추천 체류' },
+            ].map((metric) => (
+              <View key={metric.label} style={styles.metric}>
+                <Text style={styles.metricValue}>{metric.value}</Text>
+                <Text style={styles.metricLabel}>{metric.label}</Text>
+              </View>
+            ))}
           </View>
         </View>
 
-        <View style={styles.timeline}>
-          {timeline.map((entry) => (
-            <View key={entry.key} style={styles.timelineRow}>
-              <View style={[styles.timelineDot, { backgroundColor: entry.dot }]}>
-                {entry.order !== undefined && (
-                  <Text style={styles.timelineDotLabel}>{entry.order}</Text>
+        <View style={styles.itinerary}>
+          <View style={styles.sectionHeading}>
+            <Text style={styles.sectionTitle}>이렇게 걸어요</Text>
+            <Text style={styles.sectionMeta}>{course.stops.length}곳 방문</Text>
+          </View>
+          <View>
+            {timeline.map((entry, index) => (
+              <View key={entry.key} style={styles.timelineRow}>
+                <View style={styles.timelineRail}>
+                  <View style={[styles.timelineDot, { backgroundColor: entry.dot }]}>
+                    <Text style={styles.timelineDotLabel}>{entry.order ?? (index === 0 ? '출' : '도')}</Text>
+                  </View>
+                  {index < timeline.length - 1 && <View style={styles.timelineLine} />}
+                </View>
+                <View style={styles.timelineTexts}>
+                  <Text style={styles.timelineTime}>{entry.time} {index === 0 ? '출발' : '도착 예정'}</Text>
+                  <Text style={styles.timelineTitle}>{entry.title}</Text>
+                  <Text style={styles.timelineSubtitle}>{entry.subtitle}</Text>
+                </View>
+                {entry.imageUrl && (
+                  <Image source={{ uri: entry.imageUrl }} recyclingKey={entry.imageUrl} contentFit="cover" style={styles.stopPhoto} />
                 )}
               </View>
-              <View style={styles.timelineTexts}>
-                <Text style={styles.timelineTitle}>{entry.title}</Text>
-                <Text style={styles.timelineSubtitle} numberOfLines={1}>
-                  {entry.subtitle}
-                </Text>
-              </View>
-              <Text style={styles.timelineTime}>{entry.time}</Text>
-            </View>
-          ))}
-        </View>
-
-        <View style={styles.statusStrip}>
-          <View style={styles.statusColumn}>
-            <Text style={styles.statusLabel}>들르는 곳</Text>
-            <Text style={styles.statusNow}>{course.stops.length}곳</Text>
+            ))}
           </View>
-          <Text style={styles.statusArrow}>·</Text>
-          <View style={[styles.statusColumn, styles.statusColumnEnd]}>
-            <Text style={styles.statusLabel}>머무는 시간</Text>
-            <Text style={styles.statusRecheck}>{courseStayMinutes(course)}분</Text>
-          </View>
-        </View>
-
-        <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>복귀 안내</Text>
           <Text style={styles.infoBody}>
-            {returnTimeLabel} 복귀 기준 · 실제 보행 경로와 권장 체류시간 반영
+            {course.verified
+              ? '실제 보행 경로와 추천 체류시간을 반영했어요. 현장 상황에 따라 소요시간이 달라질 수 있어요.'
+              : '일부 이동 구간은 추정한 시간이에요. 출발 전 현장 경로를 확인해 주세요.'}
           </Text>
+          <TourApiAttribution />
         </View>
-
-        <TourApiAttribution style={styles.attribution} />
-
-        <Pressable style={styles.ctaButton} onPress={() => router.push('/trip')}>
-          <Text style={styles.ctaLabel}>이 코스로 출발하기</Text>
-        </Pressable>
       </ScrollView>
+
+      <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
+        <Text style={styles.returnText}>지금 출발하면 <Text style={styles.returnTime}>{returnTimeLabel}</Text> 복귀 예상</Text>
+        <Pressable accessibilityRole="button" style={styles.ctaButton} onPress={() => router.push('/trip')}>
+          <Text style={styles.ctaLabel}>이 코스로 출발하기</Text>
+          <Text style={styles.ctaArrow}>→</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: TeumtaHybrid.canvas,
+    backgroundColor: TeumtaHybrid.paper,
     flex: 1,
   },
   emptyContainer: {
+    backgroundColor: TeumtaHybrid.canvas,
     alignItems: 'center',
-    flex: 1,
     justifyContent: 'center',
+    flex: 1,
     padding: 24,
   },
   emptyText: {
     color: TeumtaHybrid.muted,
     fontSize: 16,
+    lineHeight: 24,
   },
   emptyButton: {
     backgroundColor: TeumtaHybrid.navy,
-    borderRadius: TeumtaHybrid.radius.small,
-    marginTop: 12,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
+    borderRadius: 16,
+    marginTop: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
   },
   emptyButtonLabel: {
     color: TeumtaHybrid.white,
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '700',
   },
-  attribution: {
-    marginTop: 2,
-  },
   topBar: {
-    alignItems: 'center',
-    backgroundColor: TeumtaHybrid.slateSoft,
-    borderBottomColor: TeumtaHybrid.line,
-    borderBottomWidth: 1,
     flexDirection: 'row',
-    height: 50,
+    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    gap: 12,
   },
   topButton: {
+    backgroundColor: TeumtaHybrid.canvas,
+    borderRadius: 22,
+    height: 44,
+    width: 44,
     alignItems: 'center',
-    backgroundColor: TeumtaHybrid.paper,
-    borderColor: TeumtaHybrid.line,
-    borderRadius: TeumtaHybrid.radius.small,
-    borderWidth: 1,
-    height: 38,
     justifyContent: 'center',
-    width: 38,
-  },
-  topButtonSaved: {
-    backgroundColor: TeumtaHybrid.signalSoft,
-    borderColor: TeumtaHybrid.signal,
   },
   topButtonIcon: {
-    height: 19,
-    width: 19,
+    height: 20,
+    width: 20,
+  },
+  navigationTitle: {
+    color: TeumtaHybrid.ink,
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 26,
   },
   shareButton: {
+    minHeight: 44,
+    minWidth: 44,
     alignItems: 'center',
-    backgroundColor: TeumtaHybrid.paper,
-    borderColor: TeumtaHybrid.line,
-    borderRadius: TeumtaHybrid.radius.small,
-    borderWidth: 1,
-    height: 38,
     justifyContent: 'center',
-    paddingHorizontal: 14,
   },
   shareLabel: {
     color: TeumtaHybrid.navy,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
-    lineHeight: 17,
+  },
+  scroll: {
+    flex: 1,
+  },
+  content: {
+    paddingTop: 8,
+    paddingBottom: 24,
+    gap: 28,
   },
   mapArea: {
-    height: 256,
+    height: 248,
+    marginHorizontal: 20,
+    borderRadius: 24,
+    overflow: 'hidden',
+    backgroundColor: TeumtaHybrid.canvas,
   },
-  sheet: {
-    backgroundColor: TeumtaHybrid.paper,
-    borderTopColor: TeumtaHybrid.slate,
-    borderTopWidth: 2,
-    flex: 1,
+  intro: {
+    paddingHorizontal: 24,
+    gap: 8,
   },
-  sheetContent: {
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-  },
-  sheetHeader: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    gap: 10,
-    justifyContent: 'space-between',
-  },
-  sheetTitleTexts: {
-    flex: 1,
-    gap: 2,
-    minWidth: 0,
-  },
-  sheetTitle: {
-    color: TeumtaHybrid.ink,
-    fontSize: 19,
-    fontWeight: '900',
-    lineHeight: 27,
-  },
-  sheetSubtitle: {
-    color: TeumtaHybrid.muted,
-    fontSize: 11,
-    lineHeight: 15,
-  },
-  returnPill: {
-    alignItems: 'flex-end',
-    backgroundColor: TeumtaHybrid.signalSoft,
-    borderRadius: TeumtaHybrid.radius.small,
-    flexShrink: 0,
-    minWidth: 64,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  returnPillLabel: {
-    color: TeumtaHybrid.muted,
-    fontSize: 10,
-    lineHeight: 13,
-  },
-  returnPillTime: {
+  eyebrow: {
     color: TeumtaHybrid.navy,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     lineHeight: 20,
   },
-  timeline: {
-    gap: 6,
+  courseTitle: {
+    color: TeumtaHybrid.ink,
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: -0.7,
+    lineHeight: 38,
+  },
+  description: {
+    color: TeumtaHybrid.muted,
+    fontSize: 14,
+    lineHeight: 23,
+  },
+  metrics: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 16,
+  },
+  metric: {
+    flex: 1,
+    gap: 5,
+  },
+  metricValue: {
+    color: TeumtaHybrid.ink,
+    fontSize: 22,
+    fontWeight: '800',
+    lineHeight: 30,
+  },
+  metricLabel: {
+    color: TeumtaHybrid.muted,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  itinerary: {
+    paddingHorizontal: 24,
+    gap: 20,
+  },
+  sectionHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  sectionTitle: {
+    color: TeumtaHybrid.ink,
+    fontSize: 20,
+    fontWeight: '800',
+    lineHeight: 28,
+  },
+  sectionMeta: {
+    color: TeumtaHybrid.muted,
+    fontSize: 13,
+    lineHeight: 20,
   },
   timelineRow: {
-    alignItems: 'center',
     flexDirection: 'row',
-    gap: 9,
+    alignItems: 'stretch',
+    gap: 12,
+  },
+  timelineRail: {
+    alignItems: 'center',
+    width: 30,
   },
   timelineDot: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
-    borderRadius: TeumtaHybrid.radius.small,
-    height: 20,
     justifyContent: 'center',
-    width: 20,
   },
   timelineDotLabel: {
     color: TeumtaHybrid.white,
-    fontSize: 10,
-    fontWeight: '800',
-    lineHeight: 13,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  timelineLine: {
+    width: 2,
+    flex: 1,
+    backgroundColor: TeumtaHybrid.line,
+    marginVertical: 5,
   },
   timelineTexts: {
     flex: 1,
-    gap: 1,
+    gap: 5,
+    paddingBottom: 28,
+  },
+  timelineTime: {
+    color: TeumtaHybrid.navy,
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 18,
   },
   timelineTitle: {
     color: TeumtaHybrid.ink,
-    fontSize: 12,
-    fontWeight: '800',
-    lineHeight: 17,
+    fontSize: 17,
+    fontWeight: '700',
+    lineHeight: 25,
   },
   timelineSubtitle: {
     color: TeumtaHybrid.muted,
-    fontSize: 10,
-    lineHeight: 13,
-  },
-  timelineTime: {
-    color: TeumtaHybrid.slate,
-    fontSize: 10,
-    fontWeight: '700',
-    lineHeight: 14,
-  },
-  statusStrip: {
-    alignItems: 'center',
-    borderBottomColor: TeumtaHybrid.line,
-    borderBottomWidth: 1,
-    borderTopColor: TeumtaHybrid.line,
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-  },
-  statusColumn: {
-    gap: 1,
-  },
-  statusColumnEnd: {
-    alignItems: 'flex-end',
-  },
-  statusLabel: {
-    color: TeumtaHybrid.muted,
-    fontSize: 10,
-    lineHeight: 13,
-  },
-  statusNow: {
-    color: TeumtaHybrid.navy,
-    fontSize: 17,
-    fontWeight: '700',
-    lineHeight: 24,
-  },
-  statusArrow: {
-    color: TeumtaHybrid.faint,
-    fontSize: 15,
-    fontWeight: '500',
+    fontSize: 13,
     lineHeight: 21,
   },
-  statusRecheck: {
-    color: TeumtaHybrid.navy,
-    fontSize: 15,
-    fontWeight: '700',
-    lineHeight: 21,
-  },
-  infoBox: {
-    borderLeftColor: TeumtaHybrid.signal,
-    borderLeftWidth: 4,
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  infoTitle: {
-    color: TeumtaHybrid.navy,
-    fontSize: 11,
-    fontWeight: '700',
+  stopPhoto: {
+    width: 60,
+    height: 60,
+    borderRadius: 4,
   },
   infoBody: {
     color: TeumtaHybrid.muted,
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 22,
+  },
+  footer: {
+    backgroundColor: TeumtaHybrid.paper,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    gap: 10,
+    borderTopColor: TeumtaHybrid.line,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  returnText: {
+    color: TeumtaHybrid.muted,
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  returnTime: {
+    color: TeumtaHybrid.ink,
+    fontWeight: '800',
   },
   ctaButton: {
-    alignItems: 'center',
     backgroundColor: TeumtaHybrid.navy,
-    borderRadius: TeumtaHybrid.radius.small,
-    height: 50,
-    justifyContent: 'center',
+    borderRadius: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 56,
+    paddingHorizontal: 24,
   },
   ctaLabel: {
     color: TeumtaHybrid.white,
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '700',
-    lineHeight: 18,
+    lineHeight: 24,
+  },
+  ctaArrow: {
+    color: TeumtaHybrid.white,
+    fontSize: 22,
   },
 });

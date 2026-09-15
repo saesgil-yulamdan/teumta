@@ -76,17 +76,12 @@ export default function HomeScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor={TeumtaHybrid.terracotta}
+            tintColor={TeumtaHybrid.navy}
           />
         }
         showsVerticalScrollIndicator={false}>
         <View style={styles.brandRow}>
           <TeumtaWaymark />
-          <Image
-            source={require('@/assets/images/teumta-logo.svg')}
-            style={styles.brandLogo}
-            contentFit="contain"
-          />
           <Text style={styles.brandName}>틈타</Text>
         </View>
 
@@ -99,7 +94,7 @@ export default function HomeScreen() {
         </View>
 
         <Link href={'/search' as Href} asChild>
-          <Pressable style={styles.searchField}>
+          <Pressable accessibilityRole="button" accessibilityLabel="장소와 지역 검색" style={styles.searchField}>
             <Image
               source={require('@/assets/images/icons/search.svg')}
               style={styles.searchIcon}
@@ -240,71 +235,61 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    gap: 18,
-    paddingBottom: 24,
+    gap: 24,
+    paddingBottom: 32,
     paddingHorizontal: 20,
-    paddingTop: 14,
+    paddingTop: 18,
   },
   brandRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 10,
-  },
-  brandLogo: {
-    height: 25,
-    width: 32,
+    gap: 8,
   },
   brandName: {
     color: TeumtaHybrid.ink,
-    fontSize: 22,
-    fontWeight: '900',
-    lineHeight: 32,
+    fontSize: 20,
+    fontWeight: '800',
+    lineHeight: 28,
   },
   intro: {
-    gap: 4,
+    gap: 8,
   },
   eyebrow: {
-    color: TeumtaHybrid.terracotta,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.1,
-    lineHeight: 17,
+    color: TeumtaHybrid.navy,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 20,
   },
   title: {
     color: TeumtaHybrid.ink,
     fontFamily: Fonts.sans,
     fontSize: 30,
     fontWeight: '800',
-    lineHeight: 39,
+    letterSpacing: -0.8,
+    lineHeight: 40,
   },
   subtitle: {
     color: TeumtaHybrid.muted,
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 15,
+    lineHeight: 23,
   },
   searchField: {
     alignItems: 'center',
     backgroundColor: TeumtaHybrid.paper,
-    borderColor: TeumtaHybrid.line,
-    borderRadius: 14,
-    borderWidth: 1,
+    borderRadius: 16,
     flexDirection: 'row',
-    gap: 10,
-    height: 54,
-    paddingHorizontal: 16,
-    shadowColor: TeumtaHybrid.ink,
-    shadowOffset: { height: 2, width: 0 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
+    gap: 12,
+    minHeight: 56,
+    paddingHorizontal: 18,
   },
   searchIcon: {
-    height: 19,
-    width: 19,
+    height: 22,
+    width: 22,
   },
   searchPlaceholder: {
-    color: TeumtaHybrid.faint,
-    fontSize: 13,
-    lineHeight: 19,
+    color: TeumtaHybrid.muted,
+    fontSize: 15,
+    lineHeight: 22,
   },
   chipRow: {
     flexDirection: 'row',
@@ -312,176 +297,141 @@ const styles = StyleSheet.create({
   },
   chip: {
     backgroundColor: TeumtaHybrid.paper,
-    borderColor: TeumtaHybrid.line,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     minHeight: 44,
     justifyContent: 'center',
   },
   chipSelected: {
-    backgroundColor: TeumtaHybrid.forestSoft,
-    borderColor: TeumtaHybrid.forest,
+    backgroundColor: TeumtaHybrid.navy,
   },
   chipLabel: {
     color: TeumtaHybrid.muted,
-    fontSize: 11,
-    fontWeight: '700',
-    lineHeight: 16,
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 20,
   },
   chipLabelSelected: {
-    color: TeumtaHybrid.navy,
+    color: TeumtaHybrid.white,
   },
   sectionRow: {
     alignItems: 'center',
-    borderTopColor: TeumtaHybrid.ink,
-    borderTopWidth: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingTop: 4,
+    marginTop: 8,
   },
   resumeCard: {
     alignItems: 'center',
     backgroundColor: TeumtaHybrid.navySoft,
-    borderColor: TeumtaHybrid.navy,
-    borderRadius: 16,
-    borderWidth: 1,
+    borderRadius: 20,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 14,
+    gap: 12,
+    padding: 20,
   },
   resumePlaceholder: {
     backgroundColor: TeumtaHybrid.navySoft,
-    borderColor: TeumtaHybrid.line,
-    borderRadius: 16,
-    borderWidth: 1,
-    height: 72,
+    borderRadius: 20,
+    height: 112,
   },
   resumeCopy: {
     flex: 1,
-    gap: 2,
+    gap: 4,
   },
   resumeEyebrow: {
-    color: TeumtaHybrid.slate,
-    fontSize: 10,
-    fontWeight: '800',
-    lineHeight: 14,
+    color: TeumtaHybrid.navy,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 18,
   },
   resumeTitle: {
     color: TeumtaHybrid.ink,
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: '800',
-    lineHeight: 21,
+    lineHeight: 26,
   },
   resumeMeta: {
     color: TeumtaHybrid.muted,
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 20,
   },
   resumeAction: {
     color: TeumtaHybrid.navy,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '800',
-    marginLeft: 12,
   },
   sectionTitle: {
     color: TeumtaHybrid.ink,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '800',
-    lineHeight: 24,
+    lineHeight: 28,
   },
   sectionAction: {
-    color: TeumtaHybrid.terracotta,
-    fontSize: 11,
+    color: TeumtaHybrid.navy,
+    fontSize: 13,
     fontWeight: '700',
-    lineHeight: 15,
+    lineHeight: 20,
   },
   featuredCard: {
     backgroundColor: TeumtaHybrid.paper,
-    borderColor: TeumtaHybrid.line,
-    borderRadius: 18,
-    borderWidth: 1,
-    elevation: 2,
+    borderRadius: 22,
     overflow: 'hidden',
-    shadowColor: TeumtaHybrid.ink,
-    shadowOffset: { height: 2, width: 0 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
   },
   featuredImage: {
-    aspectRatio: 16 / 9,
-    backgroundColor: TeumtaHybrid.canvas,
+    aspectRatio: 4 / 3,
+    backgroundColor: TeumtaHybrid.line,
   },
   featuredBody: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    padding: 20,
   },
   featuredTexts: {
-    gap: 1,
+    gap: 6,
   },
   featuredName: {
     color: TeumtaHybrid.ink,
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '800',
-    lineHeight: 24,
+    lineHeight: 30,
   },
   featuredMeta: {
     color: TeumtaHybrid.muted,
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 14,
+    lineHeight: 22,
   },
   attribution: {
-    marginTop: 4,
-  },
-  badge: {
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-  },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    lineHeight: 14,
+    marginTop: 8,
   },
   regionRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 12,
   },
   regionCard: {
     backgroundColor: TeumtaHybrid.paper,
-    borderColor: TeumtaHybrid.line,
-    borderRadius: 14,
-    borderWidth: 1,
-    elevation: 1,
-    // flex:1은 줄바꿈과 함께 쓰면 한 줄에 전부 밀어넣는다. 2열 격자라 폭을 고정한다.
+    borderRadius: 18,
     overflow: 'hidden',
-    width: '48%',
+    width: '47%',
+    flexGrow: 1,
+    maxWidth: '49%',
   },
   regionImage: {
     aspectRatio: 4 / 3,
-    backgroundColor: TeumtaHybrid.canvas,
-    borderRadius: 0,
+    backgroundColor: TeumtaHybrid.line,
   },
   regionBody: {
-    gap: 2,
-    minHeight: 68,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    gap: 5,
+    minHeight: 84,
+    padding: 14,
   },
   regionName: {
     color: TeumtaHybrid.ink,
-    fontSize: 13,
-    fontWeight: '800',
-    lineHeight: 18,
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 22,
   },
   regionMeta: {
     color: TeumtaHybrid.muted,
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 13,
+    lineHeight: 20,
   },
 });
