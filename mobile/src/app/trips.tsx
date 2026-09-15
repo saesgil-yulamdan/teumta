@@ -1,119 +1,107 @@
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { EmptyState } from '@/components/empty-state';
 import { PlaceThumbnail } from '@/components/place-thumbnail';
+import { ScreenSection } from '@/components/screen-section';
 import { TeumtaHeader } from '@/components/teumta-header';
 import { TeumtaTabBar } from '@/components/teumta-tab-bar';
 import { TeumtaHybrid } from '@/constants/theme';
 import { useBookmarks } from '@/hooks/use-bookmarks';
 import { useCourseLog, type CourseLogEntry } from '@/hooks/use-course-log';
-import { setSelectedCourse } from '@/stores/selected-course';
+import { loadSelectedCourse, setSelectedCourse, type SelectedCourse } from '@/stores/selected-course';
 import { dateLabel } from '@/utils/time';
 
-/**
- * 내 여행 탭.
- *
- * 예전에는 탭이 코스 지도 화면으로 바로 갔는데, 코스는 메모리에만 있어서
- * 앱을 껐다 켜면 항상 "선택한 코스 정보가 없어요"만 나왔다. 이제 기기에 남긴
- * 코스 기록과 저장한 목적지를 모아, 언제 들어와도 이어갈 거리를 보여준다.
- */
 export default function TripsScreen() {
   const router = useRouter();
   const { entries } = useCourseLog();
   const { places: savedPlaces } = useBookmarks();
+  const [activeCourse, setActiveCourse] = useState<SelectedCourse | null>(null);
+
+  useFocusEffect(useCallback(() => {
+    let ignored = false;
+    void loadSelectedCourse().then((value) => { if (!ignored) setActiveCourse(value); });
+    return () => { ignored = true; };
+  }, []));
 
   const openEntry = (entry: CourseLogEntry) => {
-    // 코스 지도 화면은 메모리 스토어를 읽으므로 스냅샷을 복원해 두고 이동한다.
     setSelectedCourse(entry.selected);
     router.push('/course-map');
   };
 
   return (
     <SafeAreaView style={styles.screen}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}>
-        <TeumtaHeader title="내 여행" subtitle="최근 코스와 저장한 목적지" />
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <TeumtaHeader title="내 여행" subtitle="다음 발걸음을 여기서 이어가세요." />
 
-        <Text style={styles.sectionTitle}>최근 본 코스</Text>
-        {entries.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>
-              아직 본 코스가 없어요.{'\n'}목적지 상세에서 &apos;틈타 코스 보기&apos;를 누르면
-              여기에 쌓여요.
+        {activeCourse && (
+          <Pressable accessibilityRole="button" accessibilityLabel="선택한 코스 이어보기" style={styles.resume}
+            onPress={() => router.push('/course-map')}>
+            <Text style={styles.resumeEyebrow}>이어서 둘러보기</Text>
+            <Text style={styles.resumeTitle}>{activeCourse.destination.name}</Text>
+            <Text style={styles.resumeRoute} numberOfLines={2}>
+              {activeCourse.course.stops.map((stop) => stop.name).join(' → ')}
             </Text>
-          </View>
-        ) : (
-          <View style={styles.list}>
-            {entries.map((entry) => (
-              <Pressable key={entry.key} style={styles.rowCard} onPress={() => openEntry(entry)}>
-                <View style={styles.minutesTile}>
-                  <Text style={styles.minutesValue}>{entry.selected.course.totalMinutes}</Text>
-                  <Text style={styles.minutesUnit}>분</Text>
-                </View>
-                <View style={styles.rowTexts}>
-                  <Text style={styles.rowName} numberOfLines={1}>
-                    {entry.selected.course.stops.map((stop) => stop.name).join(' · ')}
-                  </Text>
-                  <Text style={styles.rowMeta} numberOfLines={1}>
-                    {entry.selected.destination.name} · {dateLabel(entry.viewedAt)}
-                  </Text>
-                </View>
-                {entry.completedAt !== null && (
-                  <View style={styles.doneBadge}>
-                    <Text style={styles.doneBadgeLabel}>
-                      {entry.completedAll ? '완주' : '다녀옴'}
+            <View style={styles.resumeFooter}>
+              <Text style={styles.resumeMeta}>{activeCourse.course.totalMinutes}분 · {activeCourse.course.stops.length}곳 방문</Text>
+              <Text style={styles.resumeAction}>코스 이어보기 →</Text>
+            </View>
+          </Pressable>
+        )}
+
+        <ScreenSection title="최근 본 코스" meta={`${entries.length}개`}>
+          {entries.length === 0 ? (
+            <EmptyState title="여행의 첫 코스를 골라보세요" description="목적지를 고르고 잠깐 둘러볼 코스를 만들면 여기에 모아둘게요."
+              actionLabel="목적지 찾기" onAction={() => router.push('/search')} />
+          ) : (
+            <View style={styles.list}>
+              {entries.map((entry) => (
+                <Pressable key={entry.key} accessibilityRole="button" style={styles.row} onPress={() => openEntry(entry)}>
+                  <View style={styles.minutesTile}>
+                    <Text style={styles.minutesValue}>{entry.selected.course.totalMinutes}</Text>
+                    <Text style={styles.minutesUnit}>분 코스</Text>
+                  </View>
+                  <View style={styles.rowTexts}>
+                    <Text style={styles.rowTitle}>{entry.selected.destination.name}</Text>
+                    <Text style={styles.rowMeta} numberOfLines={2}>{entry.selected.course.stops.map((stop) => stop.name).join(' · ')}</Text>
+                    <Text style={styles.rowCaption}>
+                      {dateLabel(entry.viewedAt)}{entry.completedAt !== null ? ` · ${entry.completedAll ? '완주' : '다녀옴'}` : ''}
                     </Text>
                   </View>
-                )}
-                <Text style={styles.rowChevron}>›</Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
+                  <Text style={styles.chevron}>›</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </ScreenSection>
 
-        <Text style={styles.sectionTitle}>저장한 목적지에서 시작</Text>
-        {savedPlaces.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>
-              목적지 상세에서 북마크해 두면{'\n'}여기서 바로 새 코스를 만들 수 있어요.
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.list}>
-            {savedPlaces.map((place) => (
-              <Pressable
-                key={`${place.source}-${place.id}`}
-                style={styles.rowCard}
-                onPress={() =>
-                  router.push({
+        <ScreenSection title="저장한 곳에서 시작" meta={`${savedPlaces.length}곳`}>
+          {savedPlaces.length === 0 ? (
+            <EmptyState title="마음에 드는 장소를 저장하세요" description="장소 상세에서 북마크하면 다음 여행의 출발점으로 고를 수 있어요."
+              actionLabel="장소 둘러보기" onAction={() => router.push('/search')} />
+          ) : (
+            <View style={styles.list}>
+              {savedPlaces.map((place) => (
+                <Pressable key={`${place.source}-${place.id}`} accessibilityRole="button" style={styles.row}
+                  onPress={() => router.push({
                     pathname: '/detours',
-                    params: {
-                      ...(place.source === 'TOUR' ? { contentId: place.id } : { poiId: place.id }),
-                      name: place.name,
-                    },
-                  })
-                }>
-                <PlaceThumbnail imageUrl={place.imageUrl} variant="card" style={styles.rowThumb} />
-                <View style={styles.rowTexts}>
-                  <Text style={styles.rowName} numberOfLines={1}>
-                    {place.name}
-                  </Text>
-                  <Text style={styles.rowMeta} numberOfLines={1}>
-                    {place.address ?? '주소 정보 없음'}
-                  </Text>
-                </View>
-                <View style={styles.startBadge}>
-                  <Text style={styles.startBadgeLabel}>코스 만들기</Text>
-                </View>
-              </Pressable>
-            ))}
-          </View>
-        )}
+                    params: { ...(place.source === 'TOUR' ? { contentId: place.id } : { poiId: place.id }), name: place.name },
+                  })}>
+                  <PlaceThumbnail imageUrl={place.imageUrl} variant="card" style={styles.thumb} />
+                  <View style={styles.rowTexts}>
+                    <Text style={styles.rowTitle}>{place.name}</Text>
+                    <Text style={styles.rowMeta} numberOfLines={2}>{place.address ?? '주소 정보 없음'}</Text>
+                    <Text style={styles.actionLabel}>이곳에서 코스 만들기</Text>
+                  </View>
+                  <Text style={styles.chevron}>›</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </ScreenSection>
       </ScrollView>
-
       <TeumtaTabBar active="trips" />
     </SafeAreaView>
   );
@@ -121,142 +109,123 @@ export default function TripsScreen() {
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: TeumtaHybrid.paper,
+    backgroundColor: TeumtaHybrid.canvas,
     flex: 1,
   },
   scroll: {
     flex: 1,
   },
   content: {
-    gap: 18,
-    paddingBottom: 24,
+    gap: 32,
     paddingHorizontal: 20,
-    paddingTop: 8,
+    paddingTop: 18,
+    paddingBottom: 32,
   },
-  header: {
-    gap: 1,
-    marginBottom: 2,
+  resume: {
+    backgroundColor: TeumtaHybrid.navy,
+    borderRadius: 24,
+    padding: 24,
+    gap: 10,
   },
-  headerTitle: {
-    color: TeumtaHybrid.ink,
-    fontSize: 28,
-    fontWeight: '900',
-    lineHeight: 28,
+  resumeEyebrow: {
+    color: TeumtaHybrid.white,
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 20,
   },
-  headerSubtitle: {
-    color: TeumtaHybrid.muted,
-    fontSize: 12,
-    lineHeight: 18,
+  resumeTitle: {
+    color: TeumtaHybrid.white,
+    fontSize: 26,
+    fontWeight: '800',
+    lineHeight: 36,
   },
-  sectionTitle: {
-    borderTopColor: TeumtaHybrid.ink,
-    borderTopWidth: 1,
-    color: TeumtaHybrid.ink,
-    fontSize: 17,
+  resumeRoute: {
+    color: TeumtaHybrid.white,
+    fontSize: 14,
+    lineHeight: 23,
+  },
+  resumeFooter: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 12,
+  },
+  resumeMeta: {
+    color: TeumtaHybrid.white,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  resumeAction: {
+    color: TeumtaHybrid.white,
+    fontSize: 15,
     fontWeight: '800',
     lineHeight: 23,
-    marginTop: 2,
-    paddingTop: 12,
-  },
-  emptyBox: {
-    backgroundColor: TeumtaHybrid.canvas,
-    borderLeftColor: TeumtaHybrid.slate,
-    borderLeftWidth: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 14,
-  },
-  emptyText: {
-    color: TeumtaHybrid.muted,
-    fontSize: 11,
-    lineHeight: 16,
-    textAlign: 'center',
   },
   list: {
-    borderTopColor: TeumtaHybrid.line,
-    borderTopWidth: 1,
+    gap: 20,
   },
-  rowCard: {
-    alignItems: 'center',
-    borderBottomColor: TeumtaHybrid.line,
-    borderBottomWidth: 1,
+  row: {
     flexDirection: 'row',
-    gap: 10,
-    paddingLeft: 8,
-    paddingRight: 10,
-    paddingVertical: 10,
-  },
-  minutesTile: {
     alignItems: 'center',
-    backgroundColor: TeumtaHybrid.signalSoft,
-    borderRadius: TeumtaHybrid.radius.small,
-    flexDirection: 'row',
-    gap: 1,
-    height: 52,
-    justifyContent: 'center',
-    width: 52,
-  },
-  minutesValue: {
-    color: TeumtaHybrid.navy,
-    fontSize: 16,
-    fontWeight: '800',
-    lineHeight: 22,
-  },
-  minutesUnit: {
-    color: TeumtaHybrid.navy,
-    fontSize: 10,
-    fontWeight: '700',
-    lineHeight: 14,
-    marginTop: 5,
-  },
-  rowThumb: {
-    backgroundColor: TeumtaHybrid.canvas,
-    borderRadius: TeumtaHybrid.radius.small,
-    height: 52,
-    width: 52,
+    gap: 14,
+    minHeight: 84,
   },
   rowTexts: {
     flex: 1,
-    gap: 2,
+    gap: 5,
   },
-  rowName: {
+  rowTitle: {
     color: TeumtaHybrid.ink,
-    fontSize: 13,
-    fontWeight: '800',
-    lineHeight: 18,
+    fontSize: 17,
+    fontWeight: '700',
+    lineHeight: 25,
   },
   rowMeta: {
     color: TeumtaHybrid.muted,
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 14,
+    lineHeight: 22,
   },
-  doneBadge: {
-    backgroundColor: TeumtaHybrid.slateSoft,
-    borderRadius: TeumtaHybrid.radius.small,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  doneBadgeLabel: {
-    color: TeumtaHybrid.slate,
-    fontSize: 10,
-    fontWeight: '700',
-    lineHeight: 14,
-  },
-  startBadge: {
-    backgroundColor: TeumtaHybrid.signalSoft,
-    borderRadius: TeumtaHybrid.radius.small,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-  },
-  startBadgeLabel: {
-    color: TeumtaHybrid.navy,
-    fontSize: 10,
-    fontWeight: '700',
-    lineHeight: 14,
-  },
-  rowChevron: {
+  rowCaption: {
     color: TeumtaHybrid.faint,
-    fontSize: 20,
-    fontWeight: '500',
-    lineHeight: 28,
+    fontSize: 12,
+    lineHeight: 19,
+  },
+  minutesTile: {
+    backgroundColor: TeumtaHybrid.navySoft,
+    borderRadius: 18,
+    width: 72,
+    height: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  minutesValue: {
+    color: TeumtaHybrid.navy,
+    fontSize: 26,
+    fontWeight: '800',
+    lineHeight: 34,
+  },
+  minutesUnit: {
+    color: TeumtaHybrid.navy,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  thumb: {
+    width: 76,
+    height: 76,
+    backgroundColor: TeumtaHybrid.line,
+    borderRadius: 4,
+  },
+  actionLabel: {
+    color: TeumtaHybrid.navy,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 21,
+  },
+  chevron: {
+    color: TeumtaHybrid.faint,
+    fontSize: 24,
   },
 });

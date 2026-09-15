@@ -3,7 +3,6 @@ import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Fonts, TeumtaHybrid } from '@/constants/theme';
-import { TeumtaWaymark } from '@/components/teumta-waymark';
 
 type TeumtaHeaderProps = {
   title: string;
@@ -33,7 +32,7 @@ export function TeumtaHeader({
           accessibilityLabel="뒤로 가기"
           hitSlop={8}
           style={styles.backButton}
-          onPress={() => router.back()}>
+          onPress={() => router.canGoBack() ? router.back() : router.replace('/')}>
           <Image
             source={require('@/assets/images/icons/back.svg')}
             style={styles.backIcon}
@@ -42,14 +41,9 @@ export function TeumtaHeader({
         </Pressable>
       )}
       <View style={styles.copy}>
-        <View style={styles.titleRow}>
-          <TeumtaWaymark />
-          <View style={styles.titleCopy}>
-            {eyebrow && <Text style={styles.eyebrow}>{eyebrow}</Text>}
-        <Text style={styles.title}>{title}</Text>
+        {eyebrow && <Text style={styles.eyebrow}>{eyebrow}</Text>}
+        <Text accessibilityRole="header" style={styles.title}>{title}</Text>
         {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
-          </View>
-        </View>
       </View>
       {actionLabel && (
         <Pressable
@@ -70,24 +64,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: 12,
-    minHeight: 64,
+    minHeight: 72,
   },
   backButton: {
     alignItems: 'center',
     backgroundColor: TeumtaHybrid.canvas,
-    borderColor: TeumtaHybrid.line,
-    borderRadius: TeumtaHybrid.radius.small,
-    borderWidth: 1,
-    height: 40,
+    borderRadius: 22,
+    height: 44,
     justifyContent: 'center',
-    width: 40,
+    width: 44,
   },
   backIcon: { height: 18, width: 18 },
-  copy: { flex: 1 },
-  titleRow: { alignItems: 'center', flexDirection: 'row', gap: 9 },
-  titleCopy: { flex: 1, gap: 1 },
+  copy: { flex: 1, gap: 4 },
   eyebrow: {
-    color: TeumtaHybrid.terracotta,
+    color: TeumtaHybrid.navy,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 1.1,
@@ -96,11 +86,11 @@ const styles = StyleSheet.create({
   title: {
     color: TeumtaHybrid.ink,
     fontFamily: Fonts.sans,
-    fontSize: 27,
+    fontSize: 30,
     fontWeight: '800',
-    lineHeight: 32,
+    lineHeight: 38,
   },
-  subtitle: { color: TeumtaHybrid.muted, fontSize: 12, lineHeight: 18 },
+  subtitle: { color: TeumtaHybrid.muted, fontSize: 14, lineHeight: 22 },
   action: { paddingHorizontal: 4, paddingVertical: 10 },
-  actionLabel: { color: TeumtaHybrid.terracotta, fontSize: 11, fontWeight: '800' },
+  actionLabel: { color: TeumtaHybrid.navy, fontSize: 13, fontWeight: '700' },
 });

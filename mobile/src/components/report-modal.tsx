@@ -123,21 +123,23 @@ export function ReportModal({ visible, onClose, kind, place }: ReportModalProps)
 
 const styles = StyleSheet.create({
   backdrop: {
-    backgroundColor: 'rgba(25, 26, 23, 0.55)',
+    backgroundColor: 'rgba(25, 30, 40, 0.55)',
     flex: 1,
     justifyContent: 'flex-end',
+    alignItems: 'center',
   },
   sheet: {
     backgroundColor: TeumtaHybrid.paper,
-    borderTopLeftRadius: TeumtaHybrid.radius.large,
-    borderTopRightRadius: TeumtaHybrid.radius.large,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     maxHeight: '88%',
     width: '100%',
+    maxWidth: 520,
   },
   sheetContent: {
-    gap: 16,
-    paddingHorizontal: 20,
-    paddingTop: 18,
+    gap: 24,
+    paddingHorizontal: 24,
+    paddingTop: 24,
   },
   header: {
     alignItems: 'center',
@@ -150,23 +152,22 @@ const styles = StyleSheet.create({
   },
   title: {
     color: TeumtaHybrid.ink,
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: '800',
-    lineHeight: 25,
+    lineHeight: 33,
   },
   subtitle: {
     color: TeumtaHybrid.muted,
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 14,
+    lineHeight: 22,
   },
   closeButton: {
     alignItems: 'center',
-    borderColor: TeumtaHybrid.line,
-    borderRadius: TeumtaHybrid.radius.small,
-    borderWidth: 1,
-    height: 38,
     justifyContent: 'center',
-    width: 38,
+    backgroundColor: TeumtaHybrid.canvas,
+    borderRadius: 22,
+    width: 44,
+    height: 44,
   },
   closeLabel: {
     color: TeumtaHybrid.ink,
@@ -175,23 +176,20 @@ const styles = StyleSheet.create({
     lineHeight: 29,
   },
   categoryList: {
-    borderTopColor: TeumtaHybrid.line,
-    borderTopWidth: 1,
+    gap: 8,
   },
   categoryButton: {
     alignItems: 'center',
-    borderBottomColor: TeumtaHybrid.line,
-    borderBottomWidth: 1,
     flexDirection: 'row',
-    minHeight: 44,
-    paddingHorizontal: 14,
+    minHeight: 52,
+    paddingHorizontal: 4,
   },
   categoryLabel: {
     color: TeumtaHybrid.ink,
     flex: 1,
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '600',
-    lineHeight: 18,
+    lineHeight: 24,
   },
   chevron: {
     color: TeumtaHybrid.faint,
@@ -199,9 +197,9 @@ const styles = StyleSheet.create({
     lineHeight: 25,
   },
   notice: {
-    color: TeumtaHybrid.faint,
-    fontSize: 10,
-    lineHeight: 15,
+    color: TeumtaHybrid.muted,
+    fontSize: 12,
+    lineHeight: 20,
     textAlign: 'center',
   },
   pressed: {

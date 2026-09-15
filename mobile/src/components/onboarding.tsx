@@ -52,7 +52,7 @@ export function Onboarding() {
 
   const dismiss = () => {
     setVisible(false);
-    AsyncStorage.setItem(STORAGE_KEY, 'true').catch(() => {});
+    AsyncStorage.setItem(STORAGE_KEY, 'true').catch(() => { });
   };
 
   if (!visible) {
@@ -114,9 +114,12 @@ export function Onboarding() {
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: TeumtaHybrid.paper,
+    backgroundColor: TeumtaHybrid.canvas,
     flex: 1,
     paddingHorizontal: 24,
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 520,
   },
   screenCompact: {
     paddingHorizontal: 20,
@@ -126,9 +129,9 @@ const styles = StyleSheet.create({
   },
   content: {
     flexGrow: 1,
-    gap: 14,
+    gap: 20,
     justifyContent: 'center',
-    paddingVertical: 24,
+    paddingVertical: 32,
   },
   contentCompact: {
     gap: 11,
@@ -161,50 +164,47 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     color: TeumtaHybrid.muted,
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 24,
   },
   steps: {
-    gap: 12,
-    marginTop: 10,
+    gap: 20,
+    marginTop: 16,
   },
   stepRow: {
     alignItems: 'center',
-    borderBottomColor: TeumtaHybrid.line,
-    borderBottomWidth: 1,
     flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    gap: 16,
+    paddingVertical: 8,
   },
   stepBadge: {
     alignItems: 'center',
-    backgroundColor: TeumtaHybrid.signalSoft,
-    borderRadius: TeumtaHybrid.radius.small,
-    height: 28,
     justifyContent: 'center',
-    width: 28,
+    backgroundColor: TeumtaHybrid.navySoft,
+    borderRadius: 16,
+    width: 48,
+    height: 48,
   },
   stepBadgeLabel: {
     color: TeumtaHybrid.navy,
-    fontSize: 13,
+    fontSize: 17,
     fontWeight: '800',
-    lineHeight: 18,
+    lineHeight: 24,
   },
   stepTexts: {
     flex: 1,
-    gap: 2,
+    gap: 5,
   },
   stepTitle: {
     color: TeumtaHybrid.ink,
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 20,
+    fontSize: 17,
+    fontWeight: '800',
+    lineHeight: 25,
   },
   stepBody: {
     color: TeumtaHybrid.muted,
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 14,
+    lineHeight: 22,
   },
   privacyStrip: {
     alignItems: 'center',
@@ -220,22 +220,22 @@ const styles = StyleSheet.create({
   privacyText: {
     color: TeumtaHybrid.muted,
     flex: 1,
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 20,
   },
   ctaButton: {
     alignItems: 'center',
-    backgroundColor: TeumtaHybrid.ink,
-    borderRadius: TeumtaHybrid.radius.small,
+    backgroundColor: TeumtaHybrid.navy,
+    borderRadius: 16,
     justifyContent: 'center',
     marginBottom: 12,
-    minHeight: 52,
+    minHeight: 56,
     paddingVertical: 14,
   },
   ctaLabel: {
     color: TeumtaHybrid.white,
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 20,
+    fontSize: 16,
+    fontWeight: '800',
+    lineHeight: 24,
   },
 });

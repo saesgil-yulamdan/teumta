@@ -211,21 +211,19 @@ function stableModulo(value: string, modulo: number): number {
 
 const styles = StyleSheet.create({
   section: {
-    gap: 10,
+    gap: 16,
   },
   sectionRow: {
     alignItems: 'center',
-    borderTopColor: TeumtaHybrid.ink,
-    borderTopWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingTop: 12,
   },
   sectionTitle: {
     color: TeumtaHybrid.ink,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '800',
-    lineHeight: 24,
+    lineHeight: 28,
   },
   liveBadge: {
     alignItems: 'center',
@@ -233,60 +231,54 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   liveDot: {
-    backgroundColor: TeumtaHybrid.terracotta,
+    backgroundColor: TeumtaHybrid.navy,
+    borderRadius: 3,
     height: 6,
     width: 6,
   },
   liveLabel: {
     color: TeumtaHybrid.muted,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
-    lineHeight: 14,
+    lineHeight: 18,
   },
   loadingBox: {
     alignItems: 'center',
     justifyContent: 'center',
     // 로딩 → 카드 전환 시 홈 전체가 출렁이지 않게 카드 높이와 맞춘다.
-    height: 132,
+    height: 232,
   },
   rail: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 14,
   },
   card: {
     backgroundColor: TeumtaHybrid.paper,
-    borderColor: TeumtaHybrid.line,
-    borderRadius: 16,
-    borderWidth: 1,
-    elevation: 2,
+    borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: TeumtaHybrid.ink,
-    shadowOffset: { height: 2, width: 0 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    width: 156,
+    width: 204,
   },
   cardImage: {
     backgroundColor: TeumtaHybrid.canvas,
     borderRadius: 0,
-    height: 82,
+    height: 124,
   },
   cardBody: {
     backgroundColor: TeumtaHybrid.paper,
-    gap: 3,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
   },
   cardName: {
     color: TeumtaHybrid.ink,
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '800',
-    lineHeight: 18,
+    lineHeight: 24,
   },
   cardMeta: {
     color: TeumtaHybrid.muted,
-    fontSize: 10,
-    lineHeight: 14,
+    fontSize: 13,
+    lineHeight: 20,
   },
   levelChip: {
     alignItems: 'center',
@@ -304,8 +296,8 @@ const styles = StyleSheet.create({
     width: 6,
   },
   levelLabel: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
-    lineHeight: 14,
+    lineHeight: 18,
   },
 });

@@ -518,7 +518,7 @@ export default function TripScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={{ height: insets.top, backgroundColor: TeumtaHybrid.slateSoft }} />
+      <View style={{ height: insets.top, backgroundColor: TeumtaHybrid.canvas }} />
 
       <View style={styles.topBar}>
         <Pressable accessibilityRole="button" accessibilityLabel="진행 화면 나가기" style={styles.topButton} onPress={leaveTripScreen}>
@@ -541,42 +541,42 @@ export default function TripScreen() {
         )}
       </View>
 
-      <View style={styles.mapArea}>
-        <CourseMapView
-          detour={{
-            id: 'generated',
-            name: destination.name,
-            durationMinutes: plannedCourse.totalMinutes,
-            distanceKm: 0,
-            description: '',
-            coordinates: [
-              { latitude: destination.latitude, longitude: destination.longitude },
-              ...plannedCourse.stops.map((stop) => ({
-                latitude: stop.latitude,
-                longitude: stop.longitude,
-              })),
-              { latitude: destination.latitude, longitude: destination.longitude },
-            ],
-            stops: [
-              destination.name,
-              ...plannedCourse.stops.map((stop) => stop.name),
-              `${destination.name} 복귀`,
-            ],
-          }}
-          routePath={routePath}
-          skippedStopIndexes={plannedCourse.stops.flatMap((stop, index) => {
-            const outcome = outcomes[courseStopId(stop, index)];
-            return outcome === 'skipped' || outcome === 'unavailable' ? [index] : [];
-          })}
-          showsUserLocation={status === 'granted'}
-        />
-      </View>
-
       <ScrollView
         style={styles.sheet}
-        contentContainerStyle={[styles.sheetContent, { paddingBottom: 18 + insets.bottom }]}
+        contentContainerStyle={styles.sheetContent}
         nestedScrollEnabled
         showsVerticalScrollIndicator={false}>
+        <View style={styles.mapArea}>
+          <CourseMapView
+            detour={{
+              id: 'generated',
+              name: destination.name,
+              durationMinutes: plannedCourse.totalMinutes,
+              distanceKm: 0,
+              description: '',
+              coordinates: [
+                { latitude: destination.latitude, longitude: destination.longitude },
+                ...plannedCourse.stops.map((stop) => ({
+                  latitude: stop.latitude,
+                  longitude: stop.longitude,
+                })),
+                { latitude: destination.latitude, longitude: destination.longitude },
+              ],
+              stops: [
+                destination.name,
+                ...plannedCourse.stops.map((stop) => stop.name),
+                `${destination.name} 복귀`,
+              ],
+            }}
+            routePath={routePath}
+            skippedStopIndexes={plannedCourse.stops.flatMap((stop, index) => {
+              const outcome = outcomes[courseStopId(stop, index)];
+              return outcome === 'skipped' || outcome === 'unavailable' ? [index] : [];
+            })}
+            showsUserLocation={status === 'granted'}
+          />
+        </View>
+
         <Animated.View
           key={statusMomentKey}
           entering={FadeInDown.duration(280)}
@@ -698,15 +698,15 @@ export default function TripScreen() {
             {slackMinutes < 0
               ? `${Math.abs(slackMinutes)}분 늦을 수 있어요`
               : returnAlarmSet && !completed
-              ? '복귀 5분 전 알림'
-              : '복귀시각 자동 계산'}
+                ? '복귀 5분 전 알림'
+                : '복귀시각 자동 계산'}
           </Text>
           <Text style={styles.noticeBody}>
             {slackMinutes < 0
               ? '건너뛰거나 바로 복귀하면 다시 계산합니다.'
               : returnAlarmSet && !completed
-              ? '알림은 이 기기에서만 처리합니다.'
-              : '이동과 체류 상태를 반영합니다.'}
+                ? '알림은 이 기기에서만 처리합니다.'
+                : '이동과 체류 상태를 반영합니다.'}
           </Text>
         </View>
 
@@ -727,6 +727,15 @@ export default function TripScreen() {
           </View>
         </View>
 
+        <View style={styles.privacyStrip}>
+          <View style={styles.privacyDot} />
+          <Text style={styles.privacyText}>
+            위치는 이 기기에서만 사용합니다.
+          </Text>
+        </View>
+      </ScrollView>
+
+      <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
         <View style={styles.buttonRow}>
           <Pressable
             accessibilityRole="button"
@@ -746,6 +755,7 @@ export default function TripScreen() {
             <Text style={styles.endButtonLabel}>코스 종료</Text>
           </Pressable>
           <Pressable
+            accessibilityRole="button"
             style={[styles.directionsButton, !nextStop && styles.directionsButtonDisabled]}
             disabled={!nextStop}
             onPress={() => {
@@ -756,14 +766,7 @@ export default function TripScreen() {
             <Text style={styles.directionsButtonLabel}>길찾기 열기</Text>
           </Pressable>
         </View>
-
-        <View style={styles.privacyStrip}>
-          <View style={styles.privacyDot} />
-          <Text style={styles.privacyText}>
-            위치는 이 기기에서만 사용합니다.
-          </Text>
-        </View>
-      </ScrollView>
+      </View>
 
       <Modal
         animationType="fade"
@@ -884,21 +887,18 @@ const styles = StyleSheet.create({
   },
   topBar: {
     alignItems: 'center',
-    backgroundColor: TeumtaHybrid.slateSoft,
-    borderBottomColor: TeumtaHybrid.line,
-    borderBottomWidth: 1,
     flexDirection: 'row',
-    gap: 11,
-    height: 62,
-    paddingHorizontal: 16,
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
   },
   topButton: {
     alignItems: 'center',
-    backgroundColor: TeumtaHybrid.paper,
-    borderRadius: TeumtaHybrid.radius.small,
-    height: 40,
     justifyContent: 'center',
-    width: 40,
+    backgroundColor: TeumtaHybrid.paper,
+    borderRadius: 22,
+    width: 44,
+    height: 44,
   },
   topButtonIcon: {
     height: 19,
@@ -906,66 +906,58 @@ const styles = StyleSheet.create({
   },
   tripIdentity: {
     flex: 1,
-    gap: 1,
+    gap: 4,
   },
   tripEyebrow: {
-    color: TeumtaHybrid.terracotta,
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1.4,
-    lineHeight: 12,
+    color: TeumtaHybrid.muted,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 18,
   },
   tripDestination: {
     color: TeumtaHybrid.ink,
-    fontSize: 13,
+    fontSize: 20,
     fontWeight: '800',
-    lineHeight: 18,
+    lineHeight: 28,
   },
   etaPill: {
-    backgroundColor: TeumtaHybrid.signalSoft,
-    borderRadius: TeumtaHybrid.radius.small,
-    maxWidth: 126,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
+    backgroundColor: TeumtaHybrid.navySoft,
+    borderRadius: 14,
+    maxWidth: 122,
+    padding: 10,
   },
   etaPillLabel: {
     color: TeumtaHybrid.navy,
-    fontSize: 11,
-    fontWeight: '900',
-    lineHeight: 15,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 19,
   },
   mapArea: {
-    flex: 1,
-    minHeight: 120,
+    height: 220,
+    borderRadius: 24,
+    overflow: 'hidden',
   },
   sheet: {
-    backgroundColor: TeumtaHybrid.paper,
-    borderTopColor: TeumtaHybrid.slate,
-    borderTopWidth: 2,
-    maxHeight: '68%',
+    flex: 1,
   },
   sheetContent: {
-    gap: 10,
+    gap: 24,
     paddingHorizontal: 20,
-    paddingTop: 14,
+    paddingTop: 8,
+    paddingBottom: 28,
   },
   statusCard: {
     alignItems: 'center',
-    backgroundColor: TeumtaHybrid.paper,
-    borderColor: TeumtaHybrid.line,
-    borderRadius: TeumtaHybrid.radius.small,
-    borderWidth: 1,
     flexDirection: 'row',
-    gap: 12,
-    padding: 10,
+    gap: 16,
   },
   statusIconTile: {
     alignItems: 'center',
-    alignSelf: 'stretch',
-    backgroundColor: TeumtaHybrid.signalSoft,
-    borderRadius: TeumtaHybrid.radius.small,
     justifyContent: 'center',
-    width: 42,
+    backgroundColor: TeumtaHybrid.navySoft,
+    borderRadius: 18,
+    width: 56,
+    height: 56,
   },
   statusIcon: {
     height: 22,
@@ -973,54 +965,53 @@ const styles = StyleSheet.create({
   },
   statusTexts: {
     flex: 1,
-    gap: 2,
+    gap: 6,
   },
   statusTitle: {
-    color: TeumtaHybrid.navy,
-    fontSize: 14,
-    fontWeight: '900',
-    lineHeight: 19,
+    color: TeumtaHybrid.ink,
+    fontSize: 24,
+    fontWeight: '800',
+    lineHeight: 33,
   },
   statusSubtitle: {
     color: TeumtaHybrid.muted,
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 14,
+    lineHeight: 23,
   },
   easedBanner: {
     alignItems: 'center',
-    borderLeftColor: TeumtaHybrid.slate,
-    borderLeftWidth: 4,
+    backgroundColor: TeumtaHybrid.navySoft,
+    borderRadius: 16,
     flexDirection: 'row',
-    gap: 8,
-    paddingLeft: 10,
-    paddingVertical: 4,
+    gap: 10,
+    padding: 16,
   },
   easedDot: {
-    backgroundColor: TeumtaHybrid.slate,
-    height: 7,
-    width: 7,
+    backgroundColor: TeumtaHybrid.navy,
+    borderRadius: 4,
+    height: 8,
+    width: 8,
   },
   easedText: {
-    color: TeumtaHybrid.slate,
+    color: TeumtaHybrid.navy,
     flex: 1,
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: '700',
-    lineHeight: 16,
+    lineHeight: 22,
   },
   operatingChip: {
     alignItems: 'center',
     alignSelf: 'flex-start',
-    borderColor: TeumtaHybrid.line,
-    borderRadius: TeumtaHybrid.radius.small,
-    borderWidth: 1,
+    backgroundColor: TeumtaHybrid.paper,
+    borderRadius: 14,
     flexDirection: 'row',
-    gap: 7,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    gap: 8,
+    minHeight: 44,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   operatingChipWarning: {
-    backgroundColor: TeumtaHybrid.signalSoft,
-    borderColor: TeumtaHybrid.signal,
+    backgroundColor: TeumtaHybrid.terracottaSoft,
   },
   operatingDot: {
     backgroundColor: TeumtaHybrid.faint,
@@ -1032,44 +1023,39 @@ const styles = StyleSheet.create({
   },
   operatingLabel: {
     color: TeumtaHybrid.muted,
-    fontSize: 11,
+    flexShrink: 1,
+    fontSize: 14,
     fontWeight: '700',
-    lineHeight: 15,
+    lineHeight: 21,
   },
   operatingLabelWarning: {
-    color: TeumtaHybrid.navy,
+    color: TeumtaHybrid.terracotta,
   },
   progressRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 5,
+    gap: 10,
   },
   progressChip: {
     backgroundColor: TeumtaHybrid.paper,
-    borderColor: TeumtaHybrid.line,
-    borderRadius: TeumtaHybrid.radius.small,
-    borderWidth: 1,
-    maxWidth: 142,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    borderRadius: 14,
+    minHeight: 48,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   progressChipDone: {
-    backgroundColor: TeumtaHybrid.navySoft,
-    borderColor: TeumtaHybrid.navySoft,
+    backgroundColor: TeumtaHybrid.paper,
   },
   progressChipCurrent: {
-    backgroundColor: TeumtaHybrid.signalSoft,
-    borderColor: TeumtaHybrid.signal,
+    backgroundColor: TeumtaHybrid.navySoft,
   },
   progressChipSkipped: {
     backgroundColor: TeumtaHybrid.canvas,
-    borderColor: TeumtaHybrid.line,
   },
   progressChipLabel: {
-    color: TeumtaHybrid.faint,
-    fontSize: 10,
-    fontWeight: '800',
-    lineHeight: 14,
+    color: TeumtaHybrid.muted,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 22,
   },
   progressChipLabelActive: {
     color: TeumtaHybrid.navy,
@@ -1081,19 +1067,18 @@ const styles = StyleSheet.create({
   stopActionRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 7,
+    gap: 10,
   },
   stopActionButton: {
     alignItems: 'center',
-    borderColor: TeumtaHybrid.navy,
-    borderRadius: TeumtaHybrid.radius.small,
-    borderWidth: 1,
-    flexBasis: 116,
+    backgroundColor: TeumtaHybrid.paper,
+    borderRadius: 14,
+    flexBasis: 130,
     flexGrow: 1,
     justifyContent: 'center',
-    minHeight: 40,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
+    minHeight: 48,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
   },
   stopActionButtonPrimary: {
     backgroundColor: TeumtaHybrid.navy,
@@ -1101,114 +1086,99 @@ const styles = StyleSheet.create({
   },
   stopActionLabel: {
     color: TeumtaHybrid.navy,
-    fontSize: 10,
+    fontSize: 14,
     fontWeight: '800',
-    lineHeight: 14,
+    lineHeight: 21,
   },
   stopActionLabelPrimary: {
     color: TeumtaHybrid.white,
   },
   noticeBox: {
-    backgroundColor: TeumtaHybrid.canvas,
-    borderLeftColor: TeumtaHybrid.signal,
-    borderLeftWidth: 5,
-    gap: 3,
-    paddingHorizontal: 11,
-    paddingVertical: 8,
+    backgroundColor: TeumtaHybrid.paper,
+    borderRadius: 20,
+    gap: 8,
+    padding: 20,
   },
   noticeTitle: {
-    color: TeumtaHybrid.navy,
-    fontSize: 11,
-    fontWeight: '900',
-    lineHeight: 15,
+    color: TeumtaHybrid.ink,
+    fontSize: 16,
+    fontWeight: '800',
+    lineHeight: 24,
   },
   noticeBody: {
     color: TeumtaHybrid.muted,
-    fontSize: 10,
-    lineHeight: 15,
+    fontSize: 14,
+    lineHeight: 23,
   },
   statsRow: {
-    borderBottomColor: TeumtaHybrid.line,
-    borderBottomWidth: 1,
-    borderTopColor: TeumtaHybrid.line,
-    borderTopWidth: 1,
     flexDirection: 'row',
+    gap: 12,
+    paddingVertical: 4,
   },
   statTile: {
-    alignItems: 'flex-start',
-    borderRightColor: TeumtaHybrid.line,
-    borderRightWidth: 1,
     flex: 1,
-    gap: 2,
-    paddingHorizontal: 9,
-    paddingVertical: 9,
+    gap: 8,
   },
   statTileLast: {
     borderRightWidth: 0,
   },
   statLabel: {
     color: TeumtaHybrid.muted,
-    fontSize: 10,
-    fontWeight: '700',
-    lineHeight: 13,
-  },
-  statValue: {
-    color: TeumtaHybrid.navy,
-    fontSize: 13,
-    fontWeight: '900',
+    fontSize: 12,
+    fontWeight: '600',
     lineHeight: 18,
   },
+  statValue: {
+    color: TeumtaHybrid.ink,
+    fontSize: 21,
+    fontWeight: '800',
+    lineHeight: 29,
+  },
   statValueCongestion: {
-    fontSize: 14,
-    lineHeight: 19,
+    fontSize: 19,
+    lineHeight: 29,
   },
   buttonRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
   },
   endButton: {
     alignItems: 'center',
-    backgroundColor: TeumtaHybrid.paper,
-    borderColor: TeumtaHybrid.navy,
-    borderRadius: TeumtaHybrid.radius.small,
-    borderWidth: 1,
+    backgroundColor: TeumtaHybrid.canvas,
+    borderRadius: 16,
     justifyContent: 'center',
-    minHeight: 48,
-    paddingVertical: 12,
-    width: 118,
+    minHeight: 56,
+    padding: 14,
+    flex: 1,
   },
   endButtonLabel: {
-    color: TeumtaHybrid.navy,
-    fontSize: 12,
-    fontWeight: '800',
-    lineHeight: 17,
+    color: TeumtaHybrid.ink,
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 23,
   },
   directionsButton: {
     alignItems: 'center',
     backgroundColor: TeumtaHybrid.navy,
-    borderRadius: TeumtaHybrid.radius.small,
-    flex: 1,
+    borderRadius: 16,
+    flex: 1.5,
     justifyContent: 'center',
-    minHeight: 48,
-    paddingVertical: 12,
+    minHeight: 56,
+    padding: 14,
   },
   directionsButtonDisabled: {
     opacity: 0.5,
   },
   directionsButtonLabel: {
     color: TeumtaHybrid.white,
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: '800',
-    lineHeight: 17,
+    lineHeight: 23,
   },
   privacyStrip: {
     alignItems: 'center',
-    borderTopColor: TeumtaHybrid.line,
-    borderTopWidth: 1,
     flexDirection: 'row',
     gap: 8,
-    paddingHorizontal: 2,
-    paddingTop: 9,
   },
   privacyDot: {
     backgroundColor: TeumtaHybrid.slate,
@@ -1217,8 +1187,8 @@ const styles = StyleSheet.create({
   },
   privacyText: {
     color: TeumtaHybrid.muted,
-    fontSize: 10,
-    lineHeight: 14,
+    fontSize: 12,
+    lineHeight: 19,
   },
   modalBackdrop: {
     alignItems: 'center',
@@ -1229,35 +1199,33 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     backgroundColor: TeumtaHybrid.paper,
-    borderRadius: TeumtaHybrid.radius.large,
+    borderRadius: 28,
     maxHeight: '88%',
-    maxWidth: 360,
+    maxWidth: 440,
     width: '100%',
   },
   modalCardContent: {
-    gap: 12,
-    padding: 20,
+    gap: 18,
+    padding: 24,
   },
   modalTitle: {
-    color: TeumtaHybrid.navy,
-    fontSize: 19,
-    fontWeight: '900',
-    lineHeight: 25,
+    color: TeumtaHybrid.ink,
+    fontSize: 24,
+    fontWeight: '800',
+    lineHeight: 33,
   },
   modalBody: {
     color: TeumtaHybrid.muted,
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 15,
+    lineHeight: 24,
   },
   modalDetail: {
     backgroundColor: TeumtaHybrid.canvas,
-    borderLeftColor: TeumtaHybrid.signal,
-    borderLeftWidth: 4,
+    borderRadius: 12,
     color: TeumtaHybrid.muted,
-    fontSize: 11,
-    lineHeight: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    fontSize: 13,
+    lineHeight: 21,
+    padding: 14,
   },
   alternativeState: {
     alignItems: 'center',
@@ -1267,18 +1235,16 @@ const styles = StyleSheet.create({
   },
   alternativeStateText: {
     color: TeumtaHybrid.muted,
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 14,
+    lineHeight: 22,
   },
   alternativeCard: {
     alignItems: 'center',
-    borderColor: TeumtaHybrid.navy,
-    borderRadius: TeumtaHybrid.radius.small,
-    borderWidth: 1,
+    backgroundColor: TeumtaHybrid.navySoft,
+    borderRadius: 16,
     flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 11,
-    paddingVertical: 9,
+    gap: 12,
+    padding: 16,
   },
   alternativeTexts: {
     flex: 1,
@@ -1286,66 +1252,67 @@ const styles = StyleSheet.create({
   },
   alternativeName: {
     color: TeumtaHybrid.ink,
-    fontSize: 13,
+    fontSize: 17,
     fontWeight: '800',
-    lineHeight: 18,
+    lineHeight: 25,
   },
   alternativeMeta: {
     color: TeumtaHybrid.muted,
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 13,
+    lineHeight: 21,
   },
   alternativeCaution: {
     color: TeumtaHybrid.terracotta,
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '700',
-    lineHeight: 13,
+    lineHeight: 20,
   },
   alternativeApply: {
     color: TeumtaHybrid.navy,
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: '800',
   },
   modalActionRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 7,
-    justifyContent: 'flex-end',
-    marginTop: 2,
+    gap: 10,
+    marginTop: 4,
   },
   modalSecondaryButton: {
     alignItems: 'center',
-    borderColor: TeumtaHybrid.navy,
-    borderRadius: TeumtaHybrid.radius.small,
-    borderWidth: 1,
+    backgroundColor: TeumtaHybrid.canvas,
+    borderRadius: 14,
     flexBasis: '45%',
     flexGrow: 1,
     justifyContent: 'center',
-    minHeight: 42,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    minHeight: 50,
+    padding: 12,
   },
   modalSecondaryLabel: {
-    color: TeumtaHybrid.navy,
-    fontSize: 11,
+    color: TeumtaHybrid.ink,
+    fontSize: 14,
     fontWeight: '700',
     textAlign: 'center',
   },
   modalPrimaryButton: {
     alignItems: 'center',
     backgroundColor: TeumtaHybrid.navy,
-    borderRadius: TeumtaHybrid.radius.small,
+    borderRadius: 14,
     flexBasis: '45%',
     flexGrow: 1,
     justifyContent: 'center',
-    minHeight: 42,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+    minHeight: 50,
+    padding: 12,
   },
   modalPrimaryLabel: {
     color: TeumtaHybrid.white,
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: '800',
     textAlign: 'center',
+  },
+  footer: {
+    backgroundColor: TeumtaHybrid.paper,
+    paddingHorizontal: 20,
+    paddingTop: 12,
   },
 });

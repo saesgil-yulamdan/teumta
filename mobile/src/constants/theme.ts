@@ -44,33 +44,39 @@ export const Teumta = {
   },
 } as const;
 
-/**
- * 2026 hybrid visual direction.
- *
- * Discovery screens use the editorial paper/ink/forest colors while active
- * course screens use the navy/signal wayfinding colors. Keeping this separate
- * from `Teumta` lets screens move over incrementally without changing legacy
- * surfaces by accident.
- */
+/** 사진 중심 UI: 중립 배경 + 단일 행동 색. 상태 색은 별도로 유지한다. */
+export const TeumtaPalette = {
+  background: '#F6F7F9',
+  surface: '#FFFFFF',
+  text: '#202632',
+  secondaryText: '#626C7C',
+  border: '#E4E8EF',
+  primary: '#3457D5',
+  primarySoft: '#EBEFFE',
+  danger: '#B54536',
+  dangerSoft: '#FBECE9',
+} as const;
+
+/** 기존 화면의 토큰 이름은 호환용. forest/navy는 같은 행동 색으로 수렴한다. */
 export const TeumtaHybrid = {
-  canvas: '#F4F7F5',
-  paper: '#FFFFFF',
-  ink: '#14231F',
-  muted: '#5E6B66',
+  canvas: TeumtaPalette.background,
+  paper: TeumtaPalette.surface,
+  ink: TeumtaPalette.text,
+  muted: TeumtaPalette.secondaryText,
   // 보조 텍스트도 야외·저시력 환경에서 읽히도록 paper 대비를 확보한다.
-  faint: '#7B8982',
-  line: '#D9E4DE',
-  forest: '#126B57',
-  forestSoft: '#DCEFE8',
+  faint: '#6D7685',
+  line: TeumtaPalette.border,
+  forest: TeumtaPalette.primary,
+  forestSoft: TeumtaPalette.primarySoft,
   // 작은 강조 문구에도 쓸 수 있도록 paper 대비 4.5:1 이상을 유지한다.
-  terracotta: '#C95B47',
-  terracottaSoft: '#F8E5DF',
-  navy: '#29485D',
-  navySoft: '#E2EBEF',
+  terracotta: TeumtaPalette.danger,
+  terracottaSoft: TeumtaPalette.dangerSoft,
+  navy: TeumtaPalette.primary,
+  navySoft: TeumtaPalette.primarySoft,
   signal: '#E3B557',
   signalSoft: '#FFF2D5',
-  slate: '#56717D',
-  slateSoft: '#E8EFF0',
+  slate: '#626C7C',
+  slateSoft: '#EEF1F6',
   white: '#FFFFFF',
   radius: {
     small: 8,

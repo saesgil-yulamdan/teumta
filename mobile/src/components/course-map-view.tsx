@@ -18,9 +18,9 @@ type CourseMapViewProps = {
 };
 
 const MARKER_ANCHOR = { x: 0.5, y: 0.5 };
-const DESTINATION_COLOR = TeumtaHybrid.terracotta;
-/** 저채도 청회색 경로 — 목적지 적갈색과 구분하되 지도 위에서 과하게 튀지 않는다. */
-const ROUTE_LINE_COLOR = TeumtaHybrid.slate;
+const DESTINATION_COLOR = TeumtaHybrid.ink;
+/** 행동 색과 같은 파란 경로. 출발지는 차콜로 구분한다. */
+const ROUTE_LINE_COLOR = TeumtaHybrid.navy;
 /** 파선 14px, 간격 9px — 마커(지름 26px)보다 확실히 길어 "점"이 아니라 "선"으로 읽힌다. */
 const ROUTE_DASH_PATTERN = [14, 9];
 
@@ -94,11 +94,7 @@ export function CourseMapView({
             </Marker>
           );
         })}
-        {/* 경로는 흰 밑선 위에 청회색 파선을 겹쳐 그린다.
-            둥근 점(lineDashPattern=[0, 12])으로 그리던 때는 점 하나하나가 작은 원이라
-            장소 마커와 헷갈렸다. 경로 색을 마커와 겹치지 않는 청회색으로 분리해
-            "이 선이 이동 경로"라는 게 한눈에 읽히게 한다.
-            밑선은 파선 사이가 끊겨 보이지 않게 경로를 이어주고, 지도 배경과도 대비를 만든다. */}
+        {/* 흰 밑선 위의 파란 파선으로 지도 배경과 이동 경로를 구분한다. */}
         <Polyline
           coordinates={lineCoordinates}
           strokeColor={Teumta.surface}

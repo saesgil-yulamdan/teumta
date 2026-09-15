@@ -14,10 +14,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PlaceThumbnail } from '@/components/place-thumbnail';
+import { ScreenSection } from '@/components/screen-section';
 import { ReportModal } from '@/components/report-modal';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
 import { REALTIME_LEVEL_LABEL, REALTIME_LEVEL_TO_CONGESTION_LEVEL } from '@/constants/congestion';
-import { Fonts, TeumtaHybrid, TeumtaHybridCongestion } from '@/constants/theme';
+import { TeumtaHybrid, TeumtaHybridCongestion } from '@/constants/theme';
 import { useBookmarks } from '@/hooks/use-bookmarks';
 import { usePlaceLiveData } from '@/hooks/use-place-live-data';
 import type { CongestionLevel } from '@/types/place';
@@ -31,7 +32,7 @@ import {
 } from '@/utils/forecast';
 import { realtimeBasisLabel } from '@/utils/realtime-status';
 
-const STATUS_BAR_TINT = TeumtaHybrid.paper;
+const STATUS_BAR_TINT = TeumtaHybrid.canvas;
 
 const CONGESTION_HEADLINE: Record<CongestionLevel, string> = {
   low: '지금은 여유로워요',
@@ -143,8 +144,8 @@ export default function PlaceDetailScreen() {
   const forecastSummary = forecast ? summarizeForecast(forecast.forecasts) : null;
   const palette = congestionLevel ? TeumtaHybridCongestion[congestionLevel] : null;
   const headline = congestionLevel ? CONGESTION_HEADLINE[congestionLevel] : null;
-  // 우회 트리거(congestion-rules §5): CROWDED 이상일 때만 CTA 강조.
-  // 그 미만·미제공(404)·조회 실패는 기존 모양 유지 — 예측값으로 대체 판단하지 않는다.
+  // 우회 트리거(congestion-rules §5): CROWDED 이상이면 혼잡 회피 안내 문구를 표시한다.
+  // 예측값으로 현재 혼잡을 대체 판단하지 않는다.
   const crowdedNow =
     congestionStatus === 'idle' && shouldShowDetourPrompt(congestion ?? null, congestionLevel);
 
@@ -162,44 +163,44 @@ export default function PlaceDetailScreen() {
     <View style={styles.screen}>
       <View style={{ height: insets.top, backgroundColor: STATUS_BAR_TINT }} />
 
+      <View style={styles.heroTopRow}>
+        <Pressable accessibilityRole="button" accessibilityLabel="뒤로 가기" style={styles.heroButton} onPress={() => router.canGoBack() ? router.back() : router.replace('/search')}>
+          <Image
+            source={require('@/assets/images/icons/back.svg')}
+            style={styles.heroButtonIcon}
+            contentFit="contain"
+          />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={isPlaceBookmarked(source, id) ? '저장한 장소에서 삭제' : '장소 저장'}
+          style={[styles.heroButton, isPlaceBookmarked(source, id) && styles.heroButtonSaved]}
+          onPress={() =>
+            togglePlaceBookmark({
+              id,
+              source,
+              name,
+              address: address ?? null,
+              imageUrl: imageUrl ?? null,
+            })
+          }>
+          <Image
+            source={require('@/assets/images/icons/bookmark.svg')}
+            style={styles.heroButtonIcon}
+            contentFit="contain"
+          />
+        </Pressable>
+      </View>
       <ScrollView
         style={styles.scroll}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={refresh}
-            tintColor={TeumtaHybrid.terracotta}
+            tintColor={TeumtaHybrid.navy}
           />
         }
         showsVerticalScrollIndicator={false}>
-        <View style={styles.heroTopRow}>
-          <Pressable accessibilityRole="button" accessibilityLabel="뒤로 가기" style={styles.heroButton} onPress={() => router.back()}>
-            <Image
-              source={require('@/assets/images/icons/back.svg')}
-              style={styles.heroButtonIcon}
-              contentFit="contain"
-            />
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={isPlaceBookmarked(source, id) ? '저장한 장소에서 삭제' : '장소 저장'}
-            style={[styles.heroButton, isPlaceBookmarked(source, id) && styles.heroButtonSaved]}
-            onPress={() =>
-              togglePlaceBookmark({
-                id,
-                source,
-                name,
-                address: address ?? null,
-                imageUrl: imageUrl ?? null,
-              })
-            }>
-            <Image
-              source={require('@/assets/images/icons/bookmark.svg')}
-              style={styles.heroButtonIcon}
-              contentFit="contain"
-            />
-          </Pressable>
-        </View>
         {imageUrl ? (
           <Image
             source={{ uri: imageUrl }}
@@ -288,11 +289,7 @@ export default function PlaceDetailScreen() {
           </View>
 
           {congestionStatus === 'idle' && congestionLevel && (
-            <>
-              <View style={styles.sectionRow}>
-                <Text style={styles.sectionTitle}>혼잡도 단계</Text>
-                <Text style={styles.sectionAction}>4단계 기준</Text>
-              </View>
+            <ScreenSection title="혼잡도 단계" meta="4단계 기준">
 
               <View style={styles.legendRow}>
                 {LEGEND_STEPS.map((step) => {
@@ -316,15 +313,11 @@ export default function PlaceDetailScreen() {
                   );
                 })}
               </View>
-            </>
+            </ScreenSection>
           )}
 
           {forecastSummary && (
-            <>
-              <View style={styles.sectionRow}>
-                <Text style={styles.sectionTitle}>덜 붐비는 날</Text>
-                <Text style={styles.sectionAction}>향후 30일</Text>
-              </View>
+            <ScreenSection title="덜 붐비는 날" meta="향후 30일">
 
               <View style={styles.forecastCard}>
                 <Text style={styles.forecastTitle}>
@@ -334,9 +327,8 @@ export default function PlaceDetailScreen() {
                   30일 중간값보다{' '}
                   {forecastSummary.differenceFromMedian === 0
                     ? '비슷해요'
-                    : `${Math.abs(forecastSummary.differenceFromMedian)}% ${
-                        forecastSummary.differenceFromMedian > 0 ? '높아요' : '낮아요'
-                      }`}
+                    : `${Math.abs(forecastSummary.differenceFromMedian)}% ${forecastSummary.differenceFromMedian > 0 ? '높아요' : '낮아요'
+                    }`}
                 </Text>
 
                 <ScrollView
@@ -385,114 +377,116 @@ export default function PlaceDetailScreen() {
                 )}
 
               </View>
-            </>
+            </ScreenSection>
           )}
 
-          <View style={styles.sectionRow}>
-            <Text style={styles.sectionTitle}>근처 행사</Text>
-            <Text style={styles.sectionAction}>진행 중·예정</Text>
-          </View>
+          <ScreenSection title="근처 행사" meta="진행 중·예정">
 
-          {festivalStatus === 'loading' && <ActivityIndicator style={styles.stateBox} />}
-          {festivalStatus === 'error' && (
-            <Text style={styles.stateText}>근처 행사 정보를 불러오지 못했어요.</Text>
-          )}
-          {festivalStatus === 'idle' && festivals.length === 0 && (
-            <Text style={styles.stateText}>가까운 진행 중·예정 행사가 없어요.</Text>
-          )}
+            {festivalStatus === 'loading' && <ActivityIndicator style={styles.stateBox} />}
+            {festivalStatus === 'error' && (
+              <Text style={styles.stateText}>근처 행사 정보를 불러오지 못했어요.</Text>
+            )}
+            {festivalStatus === 'idle' && festivals.length === 0 && (
+              <Text style={styles.stateText}>가까운 진행 중·예정 행사가 없어요.</Text>
+            )}
 
-          <View style={styles.nearbyList}>
-            {festivals.map((festival) => (
-              <Pressable
-                key={`${festival.tourApiContentId}-${festival.name}`}
-                style={styles.nearbyCard}
-                onPress={() =>
-                  router.push({
-                    pathname: '/local-places/[id]',
-                    params: {
-                      id: festival.name,
-                      contentId: festival.tourApiContentId,
-                      name: festival.name,
-                      latitude: String(festival.latitude),
-                      longitude: String(festival.longitude),
-                      distanceMeters: String(festival.distanceMeters),
-                      travelTimeMinutes: String(festival.travelTimeMinutes),
-                      destinationName: name,
-                      category: '행사·축제',
-                      ...(festival.address ? { address: festival.address } : {}),
-                      ...(festival.imageUrl ? { imageUrl: festival.imageUrl } : {}),
-                    },
-                  })
-                }>
-                <PlaceThumbnail
-                  imageUrl={festival.imageUrl}
-                  category="행사·축제"
-                  variant="card"
-                  style={styles.nearbyThumb}
-                />
-                <View style={styles.nearbyTexts}>
-                  <Text style={styles.nearbyName}>{festival.name}</Text>
-                  <Text style={styles.nearbyMeta}>
-                    {festivalPeriodLabel(festival.eventStartDate, festival.eventEndDate)} · 도보{' '}
-                    {festival.travelTimeMinutes}분 · {festival.distanceMeters}m
-                  </Text>
-                </View>
-              </Pressable>
-            ))}
-          </View>
+            <View style={styles.nearbyList}>
+              {festivals.map((festival) => (
+                <Pressable
+                  key={`${festival.tourApiContentId}-${festival.name}`}
+                  style={styles.nearbyCard}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/local-places/[id]',
+                      params: {
+                        id: festival.name,
+                        contentId: festival.tourApiContentId,
+                        name: festival.name,
+                        latitude: String(festival.latitude),
+                        longitude: String(festival.longitude),
+                        distanceMeters: String(festival.distanceMeters),
+                        travelTimeMinutes: String(festival.travelTimeMinutes),
+                        destinationName: name,
+                        category: '행사·축제',
+                        eventStartDate: festival.eventStartDate,
+                        eventEndDate: festival.eventEndDate,
+                        ...(festival.address ? { address: festival.address } : {}),
+                        ...(festival.imageUrl ? { imageUrl: festival.imageUrl } : {}),
+                      },
+                    })
+                  }>
+                  <PlaceThumbnail
+                    imageUrl={festival.imageUrl}
+                    category="행사·축제"
+                    contentFit="contain"
+                    variant="card"
+                    style={styles.nearbyThumb}
+                  />
+                  <View style={styles.nearbyTexts}>
+                    <Text style={styles.nearbyName}>{festival.name}</Text>
+                    <Text style={styles.nearbyMeta}>
+                      {festivalPeriodLabel(festival.eventStartDate, festival.eventEndDate)} · 도보{' '}
+                      {festival.travelTimeMinutes}분 · {festival.distanceMeters}m
+                    </Text>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
 
-          <View style={styles.sectionRow}>
-            <Text style={styles.sectionTitle}>근처 둘러볼 곳</Text>
-          </View>
+          </ScreenSection>
 
-          {nearbyStatus === 'loading' && <ActivityIndicator style={styles.stateBox} />}
-          {nearbyStatus === 'error' && (
-            <Text style={styles.stateText}>주변 장소를 불러오지 못했어요.</Text>
-          )}
-          {nearbyStatus === 'idle' && nearby.length === 0 && (
-            <Text style={styles.stateText}>주변에 추천할 로컬 장소가 없어요.</Text>
-          )}
+          <ScreenSection title="근처 둘러볼 곳">
 
-          <View style={styles.nearbyList}>
-            {nearby.map((place) => (
-              <Pressable
-                key={`${place.name}-${place.latitude}-${place.longitude}`}
-                style={styles.nearbyCard}
-                onPress={() =>
-                  router.push({
-                    pathname: '/local-places/[id]',
-                    params: {
-                      id: place.name,
-                      contentId: place.tourApiContentId,
-                      name: place.name,
-                      latitude: String(place.latitude),
-                      longitude: String(place.longitude),
-                      distanceMeters: String(place.distanceMeters),
-                      travelTimeMinutes: String(place.travelTimeMinutes),
-                      destinationName: name,
-                      ...(place.address ? { address: place.address } : {}),
-                      ...(place.imageUrl ? { imageUrl: place.imageUrl } : {}),
-                      ...(place.category ? { category: place.category } : {}),
-                    },
-                  })
-                }>
-                <PlaceThumbnail
-                  imageUrl={place.imageUrl}
-                  category={place.category}
-                  variant="card"
-                  style={styles.nearbyThumb}
-                />
-                <View style={styles.nearbyTexts}>
-                  <Text style={styles.nearbyName}>{place.name}</Text>
-                  <Text style={styles.nearbyMeta}>
-                    {/* 어떤 곳인지 먼저 보여야 갈지 말지 판단할 수 있다. */}
-                    {place.category ? `${place.category} · ` : ''}도보 {place.travelTimeMinutes}분 ·{' '}
-                    {place.distanceMeters}m
-                  </Text>
-                </View>
-              </Pressable>
-            ))}
-          </View>
+            {nearbyStatus === 'loading' && <ActivityIndicator style={styles.stateBox} />}
+            {nearbyStatus === 'error' && (
+              <Text style={styles.stateText}>주변 장소를 불러오지 못했어요.</Text>
+            )}
+            {nearbyStatus === 'idle' && nearby.length === 0 && (
+              <Text style={styles.stateText}>주변에 추천할 로컬 장소가 없어요.</Text>
+            )}
+
+            <View style={styles.nearbyList}>
+              {nearby.map((place) => (
+                <Pressable
+                  key={`${place.name}-${place.latitude}-${place.longitude}`}
+                  style={styles.nearbyCard}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/local-places/[id]',
+                      params: {
+                        id: place.name,
+                        contentId: place.tourApiContentId,
+                        name: place.name,
+                        latitude: String(place.latitude),
+                        longitude: String(place.longitude),
+                        distanceMeters: String(place.distanceMeters),
+                        travelTimeMinutes: String(place.travelTimeMinutes),
+                        destinationName: name,
+                        ...(place.address ? { address: place.address } : {}),
+                        ...(place.imageUrl ? { imageUrl: place.imageUrl } : {}),
+                        ...(place.category ? { category: place.category } : {}),
+                      },
+                    })
+                  }>
+                  <PlaceThumbnail
+                    imageUrl={place.imageUrl}
+                    category={place.category}
+                    variant="card"
+                    style={styles.nearbyThumb}
+                  />
+                  <View style={styles.nearbyTexts}>
+                    <Text style={styles.nearbyName}>{place.name}</Text>
+                    <Text style={styles.nearbyMeta}>
+                      {/* 어떤 곳인지 먼저 보여야 갈지 말지 판단할 수 있다. */}
+                      {place.category ? `${place.category} · ` : ''}도보 {place.travelTimeMinutes}분 ·{' '}
+                      {place.distanceMeters}m
+                    </Text>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+
+          </ScreenSection>
 
           {/* 주변 로컬 장소 목록도 TourAPI 데이터라 목적지 출처와 무관하게 표기한다. */}
           {(source === 'TOUR' || nearby.length > 0 || festivals.length > 0) && (
@@ -511,7 +505,7 @@ export default function PlaceDetailScreen() {
 
       <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
         <Pressable
-          style={[styles.ctaButton, crowdedNow && styles.ctaButtonCrowded]}
+          style={styles.ctaButton}
           accessibilityRole="button"
           accessibilityLabel={crowdedNow ? '혼잡을 피해 코스 보기' : '주변 코스 보기'}
           onPress={goToDetours}>
@@ -525,7 +519,7 @@ export default function PlaceDetailScreen() {
         animationType="fade"
         onRequestClose={() => setShowCrowdedAlert(false)}>
         <Pressable style={styles.alertBackdrop} onPress={() => setShowCrowdedAlert(false)}>
-          <Pressable style={styles.alertCard} onPress={() => {}}>
+          <Pressable style={styles.alertCard} onPress={() => { }}>
             <Pressable
               accessibilityLabel="혼잡 안내 닫기"
               accessibilityRole="button"
@@ -584,79 +578,64 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   heroTopRow: {
-    backgroundColor: TeumtaHybrid.paper,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingBottom: 10,
     paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingVertical: 10,
   },
   heroButton: {
     alignItems: 'center',
-    backgroundColor: TeumtaHybrid.paper,
-    borderColor: TeumtaHybrid.line,
-    borderRadius: 12,
-    borderWidth: 1,
-    height: 42,
     justifyContent: 'center',
-    width: 42,
+    backgroundColor: TeumtaHybrid.paper,
+    borderRadius: 22,
+    width: 44,
+    height: 44,
   },
   heroButtonSaved: {
-    backgroundColor: TeumtaHybrid.terracottaSoft,
-    borderColor: TeumtaHybrid.terracotta,
+    backgroundColor: TeumtaHybrid.navySoft,
   },
   heroButtonIcon: {
     height: 19,
     width: 19,
   },
   heroImage: {
-    aspectRatio: 16 / 9,
+    aspectRatio: 4 / 3,
+    marginHorizontal: 20,
+    borderRadius: 24,
     backgroundColor: TeumtaHybrid.line,
   },
   heroTitleBand: {
-    backgroundColor: TeumtaHybrid.paper,
-    borderBottomColor: TeumtaHybrid.ink,
-    borderBottomWidth: 0,
-    borderRadius: 0,
-    gap: 5,
-    paddingBottom: 22,
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    gap: 8,
+    padding: 24,
   },
   heroEyebrow: {
-    color: TeumtaHybrid.terracotta,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.8,
-    lineHeight: 14,
+    color: TeumtaHybrid.navy,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 20,
   },
   heroTitle: {
     color: TeumtaHybrid.ink,
-    fontFamily: Fonts.sans,
-    fontSize: 31,
-    fontWeight: '500',
-    letterSpacing: -1,
+    fontSize: 30,
+    fontWeight: '800',
     lineHeight: 39,
+    letterSpacing: -0.8,
   },
   heroSubtitle: {
     color: TeumtaHybrid.muted,
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 22,
   },
   content: {
-    backgroundColor: TeumtaHybrid.paper,
-    gap: 22,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    paddingTop: 24,
+    gap: 32,
+    paddingHorizontal: 24,
+    paddingBottom: 28,
   },
   congestionCard: {
-    backgroundColor: TeumtaHybrid.canvas,
-    borderColor: TeumtaHybrid.line,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 14,
-    padding: 16,
+    backgroundColor: TeumtaHybrid.paper,
+    borderRadius: 24,
+    gap: 18,
+    padding: 20,
   },
   congestionHeader: {
     alignItems: 'flex-end',
@@ -670,9 +649,9 @@ const styles = StyleSheet.create({
   },
   congestionTitle: {
     color: TeumtaHybrid.ink,
-    fontSize: 19,
-    fontWeight: '700',
-    lineHeight: 26,
+    fontSize: 20,
+    fontWeight: '800',
+    lineHeight: 28,
   },
   dataBasisRow: {
     alignItems: 'center',
@@ -680,10 +659,10 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   dataBasisText: {
-    color: TeumtaHybrid.faint,
+    color: TeumtaHybrid.muted,
     flexShrink: 1,
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 12,
+    lineHeight: 19,
   },
   dataStatusRow: {
     alignItems: 'center',
@@ -716,20 +695,18 @@ const styles = StyleSheet.create({
   },
   congestionTrack: {
     backgroundColor: TeumtaHybrid.canvas,
-    height: 7,
+    height: 8,
+    borderRadius: 4,
     overflow: 'hidden',
   },
   congestionFill: {
-    height: 7,
+    height: 8,
+    borderRadius: 4,
   },
   congestionBanner: {
     alignItems: 'flex-start',
-    borderLeftColor: TeumtaHybrid.slate,
-    borderLeftWidth: 4,
     flexDirection: 'row',
-    gap: 9,
-    paddingLeft: 11,
-    paddingVertical: 3,
+    gap: 8,
   },
   bannerIcon: {
     height: 16,
@@ -737,61 +714,42 @@ const styles = StyleSheet.create({
     width: 16,
   },
   bannerText: {
-    color: TeumtaHybrid.slate,
+    color: TeumtaHybrid.muted,
     flex: 1,
-    fontSize: 12,
-    fontWeight: '600',
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 22,
   },
   congestionBannerAlert: {
-    borderLeftColor: TeumtaHybrid.terracotta,
+    backgroundColor: TeumtaHybrid.terracottaSoft,
+    padding: 12,
+    borderRadius: 12,
   },
   bannerTextAlert: {
     color: TeumtaHybrid.terracotta,
     fontWeight: '700',
   },
-  sectionRow: {
-    alignItems: 'center',
-    borderTopColor: TeumtaHybrid.ink,
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingTop: 12,
-  },
-  sectionTitle: {
-    color: TeumtaHybrid.ink,
-    fontSize: 18,
-    fontWeight: '700',
-    lineHeight: 25,
-  },
-  sectionAction: {
-    color: TeumtaHybrid.terracotta,
-    fontSize: 11,
-    fontWeight: '800',
-    lineHeight: 15,
-  },
   legendRow: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 8,
   },
   legendCard: {
     alignItems: 'center',
-    backgroundColor: TeumtaHybrid.paper,
-    borderColor: TeumtaHybrid.line,
-    borderRadius: 12,
-    borderWidth: 1,
-    flex: 1,
-    gap: 7,
-    height: 62,
     justifyContent: 'center',
+    backgroundColor: TeumtaHybrid.paper,
+    borderRadius: 16,
+    flex: 1,
+    gap: 8,
+    minHeight: 72,
+    paddingVertical: 12,
   },
   legendDot: {
-    height: 5,
+    height: 6,
     width: 24,
+    borderRadius: 3,
   },
   legendLabel: {
     color: TeumtaHybrid.muted,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
   },
   stateBox: {
@@ -799,115 +757,115 @@ const styles = StyleSheet.create({
   },
   stateText: {
     color: TeumtaHybrid.muted,
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 22,
   },
   congestionLevelBox: {
     alignItems: 'flex-end',
     gap: 1,
   },
   forecastCard: {
+    backgroundColor: TeumtaHybrid.paper,
+    borderRadius: 24,
+    padding: 20,
     gap: 14,
   },
   forecastTitle: {
     color: TeumtaHybrid.ink,
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '800',
-    lineHeight: 21,
+    lineHeight: 25,
   },
   forecastSubtitle: {
     color: TeumtaHybrid.muted,
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: -9,
+    fontSize: 14,
+    lineHeight: 22,
   },
   forecastChart: {
     alignItems: 'flex-end',
     flexDirection: 'row',
-    gap: 4,
-    height: 84,
+    gap: 6,
+    height: 114,
   },
   forecastBarColumn: {
     alignItems: 'center',
-    gap: 4,
-    width: 20,
+    gap: 8,
+    width: 24,
   },
   forecastBarTrack: {
-    height: 64,
+    height: 84,
     justifyContent: 'flex-end',
     width: '100%',
   },
   forecastBar: {
     backgroundColor: TeumtaHybrid.line,
     width: '100%',
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
   },
   forecastBarToday: {
-    backgroundColor: TeumtaHybrid.navy,
+    backgroundColor: TeumtaHybrid.ink,
   },
   forecastBarQuietest: {
-    backgroundColor: TeumtaHybrid.terracotta,
+    backgroundColor: TeumtaHybrid.navy,
   },
   forecastDayLabel: {
-    color: TeumtaHybrid.faint,
-    fontSize: 10,
-    lineHeight: 13,
+    color: TeumtaHybrid.muted,
+    fontSize: 11,
+    lineHeight: 16,
   },
   forecastDayLabelStrong: {
     color: TeumtaHybrid.ink,
     fontWeight: '700',
   },
   forecastHint: {
-    borderLeftColor: TeumtaHybrid.terracotta,
-    borderLeftWidth: 4,
-    paddingLeft: 11,
-    paddingVertical: 3,
+    backgroundColor: TeumtaHybrid.navySoft,
+    padding: 12,
+    borderRadius: 12,
   },
   forecastHintText: {
-    color: TeumtaHybrid.ink,
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 18,
-  },
-  nearbyList: {
-    borderTopColor: TeumtaHybrid.line,
-    borderTopWidth: 1,
-  },
-  nearbyCard: {
-    alignItems: 'center',
-    borderBottomColor: TeumtaHybrid.line,
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    gap: 12,
-    paddingVertical: 11,
-  },
-  nearbyThumb: {
-    backgroundColor: TeumtaHybrid.canvas,
-    borderRadius: 4,
-    height: 66,
-    width: 66,
-  },
-  nearbyTexts: {
-    flex: 1,
-    gap: 2,
-  },
-  nearbyName: {
-    color: TeumtaHybrid.ink,
-    fontSize: 15,
+    color: TeumtaHybrid.navy,
+    fontSize: 13,
     fontWeight: '700',
     lineHeight: 21,
   },
+  nearbyList: {
+    gap: 20,
+  },
+  nearbyCard: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 16,
+    minHeight: 80,
+  },
+  nearbyThumb: {
+    backgroundColor: TeumtaHybrid.paper,
+    borderRadius: 4,
+    height: 80,
+    width: 80,
+  },
+  nearbyTexts: {
+    flex: 1,
+    gap: 6,
+  },
+  nearbyName: {
+    color: TeumtaHybrid.ink,
+    fontSize: 17,
+    fontWeight: '700',
+    lineHeight: 25,
+  },
   nearbyMeta: {
     color: TeumtaHybrid.muted,
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 21,
   },
   attribution: {
     marginTop: 4,
   },
   reportLink: {
     alignItems: 'center',
-    paddingBottom: 8,
-    paddingVertical: 10,
+    justifyContent: 'center',
+    minHeight: 44,
   },
   reportLinkLabel: {
     color: TeumtaHybrid.muted,
@@ -918,20 +876,16 @@ const styles = StyleSheet.create({
   },
   footer: {
     backgroundColor: TeumtaHybrid.paper,
-    borderTopColor: TeumtaHybrid.ink,
-    borderTopWidth: 0,
     paddingHorizontal: 20,
     paddingTop: 12,
   },
   ctaButton: {
     alignItems: 'center',
-    backgroundColor: TeumtaHybrid.ink,
-    borderRadius: 14,
-    height: 52,
     justifyContent: 'center',
-  },
-  ctaButtonCrowded: {
-    backgroundColor: TeumtaHybrid.terracotta,
+    backgroundColor: TeumtaHybrid.navy,
+    borderRadius: 16,
+    minHeight: 56,
+    padding: 14,
   },
   alertBackdrop: {
     alignItems: 'center',
@@ -953,15 +907,14 @@ const styles = StyleSheet.create({
   },
   alertCloseButton: {
     alignItems: 'center',
-    borderColor: TeumtaHybrid.line,
-    borderRadius: TeumtaHybrid.radius.small,
-    borderWidth: 1,
-    height: 40,
     justifyContent: 'center',
+    backgroundColor: TeumtaHybrid.canvas,
+    borderRadius: 22,
+    width: 44,
+    height: 44,
     position: 'absolute',
-    right: 10,
-    top: 10,
-    width: 40,
+    right: 12,
+    top: 12,
   },
   alertCloseLabel: {
     color: TeumtaHybrid.ink,
@@ -985,11 +938,12 @@ const styles = StyleSheet.create({
   },
   alertButton: {
     alignItems: 'center',
-    backgroundColor: TeumtaHybrid.navy,
-    borderRadius: TeumtaHybrid.radius.small,
-    height: 48,
     justifyContent: 'center',
-    marginTop: 6,
+    backgroundColor: TeumtaHybrid.navy,
+    borderRadius: 16,
+    minHeight: 52,
+    padding: 12,
+    marginTop: 8,
     width: '100%',
   },
   alertButtonLabel: {
@@ -999,8 +953,8 @@ const styles = StyleSheet.create({
   },
   ctaLabel: {
     color: TeumtaHybrid.white,
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 20,
+    fontSize: 16,
+    fontWeight: '800',
+    lineHeight: 23,
   },
 });
