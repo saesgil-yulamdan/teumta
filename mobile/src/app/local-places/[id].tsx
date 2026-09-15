@@ -6,13 +6,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getLocalPlaceDetail } from '@/api/places';
 import { PlaceThumbnail } from '@/components/place-thumbnail';
+import { ScreenSection } from '@/components/screen-section';
 import { ReportModal } from '@/components/report-modal';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
 import { TeumtaHybrid } from '@/constants/theme';
 import type { LocalPlaceDetail } from '@/types/place';
 import { openDirections, openNaverMapPlace } from '@/utils/directions';
 
-const STATUS_BAR_TINT = TeumtaHybrid.paper;
+const STATUS_BAR_TINT = TeumtaHybrid.canvas;
 
 /**
  * 주변 로컬 장소 상세.
@@ -35,6 +36,8 @@ type LocalPlaceParams = {
   category?: string;
   /** 어느 목적지 주변에서 찾았는지(표시용). */
   destinationName?: string;
+  eventStartDate?: string;
+  eventEndDate?: string;
 };
 
 function formatDistance(meters: number) {
@@ -45,6 +48,12 @@ export default function LocalPlaceDetailScreen() {
   const params = useLocalSearchParams<LocalPlaceParams>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const goBack = () => router.canGoBack() ? router.back() : router.replace('/search');
+  const isFestival = params.category === '행사·축제';
+  const eventDate = (value?: string) => value && /^\d{8}$/.test(value)
+    ? `${value.slice(0, 4)}.${value.slice(4, 6)}.${value.slice(6, 8)}` : null;
+  const eventPeriod = [eventDate(params.eventStartDate), eventDate(params.eventEndDate)]
+    .filter(Boolean).filter((value, index, values) => values.indexOf(value) === index).join(' – ');
 
   const latitude = Number(params.latitude);
   const longitude = Number(params.longitude);
@@ -84,7 +93,7 @@ export default function LocalPlaceDetailScreen() {
           { paddingTop: 24 + insets.top, paddingBottom: 24 + insets.bottom },
         ]}>
         <Text style={styles.emptyText}>장소 정보를 불러올 수 없습니다.</Text>
-        <Pressable style={styles.emptyButton} onPress={() => router.back()}>
+        <Pressable style={styles.emptyButton} onPress={goBack}>
           <Text style={styles.emptyButtonLabel}>돌아가기</Text>
         </Pressable>
       </View>
@@ -98,20 +107,21 @@ export default function LocalPlaceDetailScreen() {
     <View style={styles.screen}>
       <View style={{ height: insets.top, backgroundColor: STATUS_BAR_TINT }} />
 
+      <View style={styles.heroTopRow}>
+        <Pressable accessibilityRole="button" accessibilityLabel="뒤로 가기" style={styles.heroButton} onPress={goBack}>
+          <Image
+            source={require('@/assets/images/icons/back.svg')}
+            style={styles.heroButtonIcon}
+            contentFit="contain"
+          />
+        </Pressable>
+      </View>
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.heroTopRow}>
-          <Pressable accessibilityRole="button" accessibilityLabel="뒤로 가기" style={styles.heroButton} onPress={() => router.back()}>
-            <Image
-              source={require('@/assets/images/icons/back.svg')}
-              style={styles.heroButtonIcon}
-              contentFit="contain"
-            />
-          </Pressable>
-        </View>
         <PlaceThumbnail
           imageUrl={params.imageUrl}
           category={params.category}
           variant="hero"
+          contentFit={isFestival ? 'contain' : 'cover'}
           style={styles.heroImage}
         />
         <View style={styles.heroTitleBand}>
@@ -140,17 +150,17 @@ export default function LocalPlaceDetailScreen() {
             </View>
           </View>
 
-          {detail?.overview ? (
-            <>
-              <Text style={styles.sectionTitle}>소개</Text>
-              <Text style={styles.overview}>{detail.overview}</Text>
-            </>
-          ) : null}
+          {isFestival && (
+            <View style={styles.eventBanner}>
+              <Text style={styles.eventLabel}>행사 일정</Text>
+              <Text style={styles.eventDate}>{eventPeriod || '일정 확인 필요'}</Text>
+              <Text style={styles.description}>방문 전 주최 측에서 운영 일정을 확인해 주세요.</Text>
+            </View>
+          )}
 
           {/* 휴무일 데이터가 스키마에 없어 "닫힌 가게 제안" 신뢰 문제가 있었다 — TourAPI 실시간으로 채운다. */}
           {(detail?.openHours || detail?.restDays) && (
-            <>
-              <Text style={styles.sectionTitle}>운영 정보</Text>
+            <ScreenSection title="운영 정보">
               <View style={styles.hoursCard}>
                 {detail?.openHours ? (
                   <View style={styles.hoursRow}>
@@ -165,17 +175,23 @@ export default function LocalPlaceDetailScreen() {
                   </View>
                 ) : null}
               </View>
-            </>
+            </ScreenSection>
           )}
 
-          <Text style={styles.sectionTitle}>주소</Text>
-          <Text style={styles.description}>{params.address ?? '주소 정보가 없어요.'}</Text>
+          {detail?.overview ? (
+            <ScreenSection title="이곳은요">
+              <Text style={styles.overview}>{detail.overview}</Text>
+            </ScreenSection>
+          ) : null}
+
+          <ScreenSection title="찾아가는 길">
+            <Text style={styles.description}>{params.address || '주소 정보가 없어요.'}</Text>
+          </ScreenSection>
 
           {detail?.tel ? (
-            <>
-              <Text style={styles.sectionTitle}>연락처</Text>
+            <ScreenSection title="연락처">
               <Text style={styles.description}>{detail.tel}</Text>
-            </>
+            </ScreenSection>
           ) : null}
 
           <View style={styles.emptyBox}>
@@ -184,8 +200,9 @@ export default function LocalPlaceDetailScreen() {
             </Text>
           </View>
 
-          {/* 사진·리뷰·영업시간까지는 우리가 제공하지 않는다. 판단은 여기서, 심화 정보는 지도 앱에서. */}
+          {/* 추가 사진·리뷰와 최신 운영 정보는 지도 앱에서 확인한다. */}
           <Pressable
+            accessibilityRole="button"
             style={styles.secondaryButton}
             onPress={() => {
               void openNaverMapPlace({ name: params.name as string, address: params.address });
@@ -208,14 +225,14 @@ export default function LocalPlaceDetailScreen() {
       <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
         <View style={styles.footerRow}>
           {/* 뒤로가기 아이콘만으로는 코스 화면으로 돌아갈 길이 안 보인다 — 엄지 위치에 명시. */}
-          <Pressable style={styles.returnButton} onPress={() => router.back()}>
+          <Pressable accessibilityRole="button" style={styles.returnButton} onPress={goBack}>
             <Text style={styles.returnLabel} numberOfLines={1}>
-              {params.destinationName ? '코스로 돌아가기' : '돌아가기'}
+              이전 화면
             </Text>
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="이 장소로 코스 만들기"
+            accessibilityLabel="이 장소 길찾기 열기"
             style={styles.ctaButton}
             onPress={() => {
               void openDirections({
@@ -259,11 +276,11 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   emptyButton: {
-    backgroundColor: TeumtaHybrid.ink,
-    borderRadius: 4,
-    marginTop: 12,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
+    backgroundColor: TeumtaHybrid.navy,
+    borderRadius: 16,
+    marginTop: 16,
+    padding: 16,
+    minHeight: 48,
   },
   emptyButtonLabel: {
     color: TeumtaHybrid.white,
@@ -278,212 +295,192 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   heroTopRow: {
-    backgroundColor: TeumtaHybrid.paper,
     flexDirection: 'row',
-    paddingBottom: 6,
-    paddingHorizontal: 18,
-    paddingTop: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
   },
   heroButton: {
     alignItems: 'center',
-    backgroundColor: TeumtaHybrid.paper,
-    borderColor: TeumtaHybrid.line,
-    borderRadius: TeumtaHybrid.radius.small,
-    borderWidth: 1,
-    height: 42,
     justifyContent: 'center',
-    width: 42,
+    backgroundColor: TeumtaHybrid.paper,
+    borderRadius: 22,
+    width: 44,
+    height: 44,
   },
   heroButtonIcon: {
     height: 19,
     width: 19,
   },
   heroImage: {
-    aspectRatio: 16 / 9,
-    backgroundColor: TeumtaHybrid.canvas,
+    aspectRatio: 4 / 3,
+    marginHorizontal: 20,
+    borderRadius: 24,
+    overflow: 'hidden',
+    backgroundColor: TeumtaHybrid.paper,
   },
   heroTitleBand: {
-    backgroundColor: TeumtaHybrid.paper,
-    borderBottomColor: TeumtaHybrid.ink,
-    borderBottomWidth: 1,
-    gap: 5,
-    paddingBottom: 22,
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    gap: 8,
+    padding: 24,
   },
   heroCategory: {
-    color: TeumtaHybrid.terracotta,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1,
-    lineHeight: 17,
+    color: TeumtaHybrid.navy,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 20,
   },
   heroTitle: {
     color: TeumtaHybrid.ink,
     fontSize: 30,
-    fontWeight: '900',
-    lineHeight: 32,
+    fontWeight: '800',
+    lineHeight: 39,
+    letterSpacing: -0.8,
   },
   heroSubtitle: {
     color: TeumtaHybrid.muted,
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 22,
   },
   content: {
-    backgroundColor: TeumtaHybrid.paper,
-    gap: 22,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    paddingTop: 24,
+    gap: 32,
+    paddingHorizontal: 24,
+    paddingBottom: 28,
   },
   statsRow: {
-    borderBottomColor: TeumtaHybrid.line,
-    borderBottomWidth: 1,
-    borderTopColor: TeumtaHybrid.ink,
-    borderTopWidth: 2,
     flexDirection: 'row',
+    backgroundColor: TeumtaHybrid.paper,
+    borderRadius: 20,
+    padding: 20,
+    gap: 20,
   },
   statTile: {
-    alignItems: 'flex-start',
-    borderRightColor: TeumtaHybrid.line,
-    borderRightWidth: 1,
     flex: 1,
-    gap: 2,
-    paddingHorizontal: 8,
-    paddingVertical: 12,
+    gap: 6,
   },
   statLabel: {
     color: TeumtaHybrid.muted,
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 13,
+    lineHeight: 19,
   },
   statValue: {
     color: TeumtaHybrid.ink,
-    fontSize: 16,
+    fontSize: 24,
     fontWeight: '800',
-    lineHeight: 22,
-  },
-  sectionTitle: {
-    borderTopColor: TeumtaHybrid.ink,
-    borderTopWidth: 1,
-    color: TeumtaHybrid.ink,
-    fontSize: 17,
-    fontWeight: '800',
-    lineHeight: 23,
-    paddingTop: 12,
+    lineHeight: 31,
   },
   description: {
     color: TeumtaHybrid.muted,
-    fontSize: 12,
-    lineHeight: 19,
+    fontSize: 15,
+    lineHeight: 24,
   },
   overview: {
     color: TeumtaHybrid.ink,
-    fontSize: 13,
-    lineHeight: 21,
+    fontSize: 15,
+    lineHeight: 26,
   },
   hoursCard: {
-    borderBottomColor: TeumtaHybrid.line,
-    borderBottomWidth: 1,
-    borderTopColor: TeumtaHybrid.line,
-    borderTopWidth: 1,
-    gap: 7,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
+    gap: 16,
   },
   hoursRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 16,
   },
   hoursLabel: {
     color: TeumtaHybrid.muted,
-    fontSize: 11,
-    fontWeight: '700',
-    lineHeight: 17,
-    width: 52,
+    fontSize: 14,
+    lineHeight: 23,
+    width: 60,
   },
   hoursValue: {
     color: TeumtaHybrid.ink,
     flex: 1,
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 15,
+    lineHeight: 23,
   },
   emptyBox: {
-    borderLeftColor: TeumtaHybrid.slate,
-    borderLeftWidth: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 14,
+    paddingVertical: 4,
   },
   emptyBoxText: {
     color: TeumtaHybrid.muted,
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 20,
   },
   secondaryButton: {
     alignItems: 'center',
-    borderColor: TeumtaHybrid.line,
-    borderRadius: TeumtaHybrid.radius.small,
-    borderWidth: 1,
-    marginTop: 12,
-    paddingVertical: 13,
+    justifyContent: 'center',
+    backgroundColor: TeumtaHybrid.navySoft,
+    borderRadius: 16,
+    minHeight: 52,
+    padding: 14,
   },
   secondaryButtonLabel: {
-    color: TeumtaHybrid.ink,
-    fontSize: 14,
+    color: TeumtaHybrid.navy,
+    fontSize: 15,
     fontWeight: '700',
   },
   reportLink: {
     alignItems: 'center',
-    paddingVertical: 10,
+    justifyContent: 'center',
+    minHeight: 44,
   },
   reportLinkLabel: {
     color: TeumtaHybrid.muted,
-    fontSize: 11,
-    fontWeight: '600',
-    lineHeight: 15,
+    fontSize: 13,
+    lineHeight: 20,
     textDecorationLine: 'underline',
   },
   footer: {
     backgroundColor: TeumtaHybrid.paper,
-    borderTopColor: TeumtaHybrid.ink,
-    borderTopWidth: 1,
     paddingHorizontal: 20,
-    paddingTop: 10,
+    paddingTop: 12,
   },
   footerRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
   },
   returnButton: {
     alignItems: 'center',
-    borderColor: TeumtaHybrid.line,
-    borderRadius: TeumtaHybrid.radius.small,
-    borderWidth: 1,
-    flex: 1,
     justifyContent: 'center',
-    minHeight: 50,
-    paddingHorizontal: 10,
-    paddingVertical: 13,
+    backgroundColor: TeumtaHybrid.canvas,
+    borderRadius: 16,
+    flex: 1,
+    minHeight: 56,
+    padding: 12,
   },
   returnLabel: {
-    color: TeumtaHybrid.muted,
-    fontSize: 12,
+    color: TeumtaHybrid.ink,
+    fontSize: 15,
     fontWeight: '700',
   },
   ctaButton: {
     alignItems: 'center',
-    backgroundColor: TeumtaHybrid.ink,
-    borderRadius: TeumtaHybrid.radius.small,
-    flex: 1,
     justifyContent: 'center',
-    minHeight: 50,
-    paddingHorizontal: 10,
-    paddingVertical: 13,
+    backgroundColor: TeumtaHybrid.navy,
+    borderRadius: 16,
+    flex: 1.5,
+    minHeight: 56,
+    padding: 12,
   },
   ctaLabel: {
     color: TeumtaHybrid.white,
-    fontSize: 14,
+    fontSize: 16,
+    fontWeight: '800',
+    lineHeight: 23,
+  },
+  eventBanner: {
+    backgroundColor: TeumtaHybrid.navySoft,
+    borderRadius: 20,
+    gap: 10,
+    padding: 20,
+  },
+  eventLabel: {
+    color: TeumtaHybrid.navy,
+    fontSize: 13,
     fontWeight: '700',
-    lineHeight: 20,
+  },
+  eventDate: {
+    color: TeumtaHybrid.ink,
+    fontSize: 21,
+    fontWeight: '800',
+    lineHeight: 30,
   },
 });

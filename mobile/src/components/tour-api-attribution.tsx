@@ -1,6 +1,6 @@
 import { StyleSheet, Text, type StyleProp, type TextStyle } from 'react-native';
 
-import { Teumta } from '@/constants/theme';
+import { TeumtaHybrid } from '@/constants/theme';
 
 type TourApiAttributionProps = {
   style?: StyleProp<TextStyle>;
@@ -13,9 +13,9 @@ export function TourApiAttribution({ style }: TourApiAttributionProps) {
 
 const styles = StyleSheet.create({
   text: {
-    color: Teumta.textTertiary,
-    fontSize: 10,
-    lineHeight: 14,
+    color: TeumtaHybrid.muted,
+    fontSize: 12,
+    lineHeight: 18,
     textAlign: 'center',
   },
 });

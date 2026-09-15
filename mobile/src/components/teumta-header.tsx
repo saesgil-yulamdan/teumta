@@ -42,7 +42,7 @@ export function TeumtaHeader({
       )}
       <View style={styles.copy}>
         {eyebrow && <Text style={styles.eyebrow}>{eyebrow}</Text>}
-        <Text style={styles.title}>{title}</Text>
+        <Text accessibilityRole="header" style={styles.title}>{title}</Text>
         {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
       </View>
       {actionLabel && (

@@ -8,7 +8,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { Teumta, TeumtaHybrid } from '@/constants/theme';
+import { TeumtaHybrid } from '@/constants/theme';
 
 /**
  * 장소 사진 자리.
@@ -23,13 +23,14 @@ import { Teumta, TeumtaHybrid } from '@/constants/theme';
 
 type PlaceThumbnailProps = {
   imageUrl?: string | null;
+  contentFit?: 'cover' | 'contain';
   /** 서버 분류 라벨(3.3b `category`). 없으면 중립 배경만. */
   category?: string | null;
   variant: 'card' | 'hero';
   style?: StyleProp<ViewStyle & ImageStyle>;
 };
 
-type Tone = { background: string; text: string };
+type Tone = { background: string; text: string; };
 
 /**
  * 분류 계열별 색.
@@ -37,10 +38,10 @@ type Tone = { background: string; text: string };
  * 혼잡도 색(`Teumta.congestion`)은 재사용하지 않는다 — 그쪽은 "붐빔"이라는 의미를 갖고 있어
  * 분류에 쓰면 두 신호가 섞인다.
  */
-const FOOD: Tone = { background: '#FFF3E6', text: '#B5701A' };
-const SHOPPING: Tone = { background: '#F0EEFB', text: '#5B51A8' };
+const FOOD: Tone = { background: TeumtaHybrid.navySoft, text: TeumtaHybrid.navy };
+const SHOPPING: Tone = { background: TeumtaHybrid.navySoft, text: TeumtaHybrid.navy };
 const CULTURE: Tone = { background: TeumtaHybrid.slateSoft, text: TeumtaHybrid.slate };
-const NEUTRAL: Tone = { background: Teumta.imagePlaceholder, text: Teumta.textTertiary };
+const NEUTRAL: Tone = { background: TeumtaHybrid.slateSoft, text: TeumtaHybrid.muted };
 
 /** 서버 분류 라벨(nearby-local-place.service의 표)과 같은 값을 쓴다. */
 const TONE_BY_CATEGORY: Record<string, Tone> = {
@@ -76,11 +77,11 @@ function shortLabel(category: string): string {
   return category.split('·')[0];
 }
 
-export function PlaceThumbnail({ imageUrl, category, variant, style }: PlaceThumbnailProps) {
+export function PlaceThumbnail({ imageUrl, category, variant, style, contentFit = 'cover' }: PlaceThumbnailProps) {
   if (imageUrl) {
     // 목록에서 뷰가 재활용될 때 직전 항목의 사진이 남지 않게 한다.
     return (
-      <Image source={{ uri: imageUrl }} style={style} contentFit="cover" recyclingKey={imageUrl} />
+      <Image source={{ uri: imageUrl }} style={style} contentFit={contentFit} recyclingKey={imageUrl} />
     );
   }
 
