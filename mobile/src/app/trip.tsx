@@ -12,11 +12,12 @@ import {
   View,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CourseMapView } from '@/components/course-map-view';
 import { REALTIME_LEVEL_LABEL } from '@/constants/congestion';
-import { TeumtaHybrid } from '@/constants/theme';
+import { TeumtaHybrid, TeumtaLayout } from '@/constants/theme';
+import { ScreenActionBar, screenActionStyles } from '@/components/screen-action-bar';
 import { useCourseLog } from '@/hooks/use-course-log';
 import { useCourseProgress, type CourseStop } from '@/hooks/use-course-progress';
 import { useCurrentLocation } from '@/hooks/use-current-location';
@@ -40,6 +41,7 @@ import { distanceInMeters } from '@/utils/distance';
 import { evaluateOperatingStatus, type OperatingStatus } from '@/utils/operating-status';
 import { withRoJosa } from '@/utils/text';
 import { timeLabelAt } from '@/utils/time';
+import { courseStopId } from '@/utils/trip-summary';
 import {
   courseReturningAfterCurrent,
   courseWithAlternative,
@@ -52,10 +54,6 @@ const CLOCK_TICK_MS = 30 * 1000;
 
 function formatDistance(meters: number) {
   return meters >= 1000 ? `${(meters / 1000).toFixed(1)}km` : `${Math.round(meters)}m`;
-}
-
-function courseStopId(stop: GeneratedCourse['stops'][number], index: number): string {
-  return `stop-${stop.tourApiContentId ?? `${index}-${stop.name}`}`;
 }
 
 type AdjustmentPrompt = {
@@ -77,7 +75,6 @@ type OperatingInfoState =
 
 export default function TripScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const [selected, setSelected] = useState<SelectedCourse | null>(() => getSelectedCourse());
   const [selectionReady, setSelectionReady] = useState(selected !== null);
   const course = selected?.course;
@@ -517,8 +514,7 @@ export default function TripScreen() {
   };
 
   return (
-    <View style={styles.screen}>
-      <View style={{ height: insets.top, backgroundColor: TeumtaHybrid.canvas }} />
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.screen}>
 
       <View style={styles.topBar}>
         <Pressable accessibilityRole="button" accessibilityLabel="진행 화면 나가기" style={styles.topButton} onPress={leaveTripScreen}>
@@ -735,7 +731,7 @@ export default function TripScreen() {
         </View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
+      <ScreenActionBar>
         <View style={styles.buttonRow}>
           <Pressable
             accessibilityRole="button"
@@ -766,7 +762,7 @@ export default function TripScreen() {
             <Text style={styles.directionsButtonLabel}>길찾기 열기</Text>
           </Pressable>
         </View>
-      </View>
+      </ScreenActionBar>
 
       <Modal
         animationType="fade"
@@ -854,7 +850,7 @@ export default function TripScreen() {
           </ScrollView>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -889,7 +885,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: TeumtaLayout.screenGutter,
     paddingVertical: 12,
   },
   topButton: {
@@ -942,9 +938,9 @@ const styles = StyleSheet.create({
   },
   sheetContent: {
     gap: 24,
-    paddingHorizontal: 20,
+    paddingHorizontal: TeumtaLayout.screenGutter,
     paddingTop: 8,
-    paddingBottom: 28,
+    paddingBottom: TeumtaLayout.contentBottomPadding,
   },
   statusCard: {
     alignItems: 'center',
@@ -1143,12 +1139,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   endButton: {
-    alignItems: 'center',
-    backgroundColor: TeumtaHybrid.canvas,
-    borderRadius: 16,
-    justifyContent: 'center',
-    minHeight: 56,
-    padding: 14,
+    ...screenActionStyles.button,
+    ...screenActionStyles.secondary,
     flex: 1,
   },
   endButtonLabel: {
@@ -1158,23 +1150,13 @@ const styles = StyleSheet.create({
     lineHeight: 23,
   },
   directionsButton: {
-    alignItems: 'center',
-    backgroundColor: TeumtaHybrid.navy,
-    borderRadius: 16,
+    ...screenActionStyles.button,
     flex: 1.5,
-    justifyContent: 'center',
-    minHeight: 56,
-    padding: 14,
   },
   directionsButtonDisabled: {
     opacity: 0.5,
   },
-  directionsButtonLabel: {
-    color: TeumtaHybrid.white,
-    fontSize: 16,
-    fontWeight: '800',
-    lineHeight: 23,
-  },
+  directionsButtonLabel: { ...screenActionStyles.label },
   privacyStrip: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -1309,10 +1291,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     textAlign: 'center',
-  },
-  footer: {
-    backgroundColor: TeumtaHybrid.paper,
-    paddingHorizontal: 20,
-    paddingTop: 12,
   },
 });

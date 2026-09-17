@@ -28,9 +28,9 @@ const styles = StyleSheet.create({
   title: {
     flexShrink: 1,
     color: TeumtaHybrid.ink,
-    fontSize: 20,
-    fontWeight: '800',
-    lineHeight: 28,
+    fontSize: 17,
+    fontWeight: '700',
+    lineHeight: 24,
   },
   meta: {
     color: TeumtaHybrid.muted,

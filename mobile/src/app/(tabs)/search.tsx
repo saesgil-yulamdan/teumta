@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
-import { Link } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { Link, useFocusEffect } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
@@ -20,9 +20,8 @@ import { TourApiAttribution } from '@/components/tour-api-attribution';
 import { EmptyState } from '@/components/empty-state';
 import { PlaceThumbnail } from '@/components/place-thumbnail';
 import { ScreenSection } from '@/components/screen-section';
-import { TeumtaTabBar } from '@/components/teumta-tab-bar';
 import { TeumtaHeader } from '@/components/teumta-header';
-import { TeumtaHybrid } from '@/constants/theme';
+import { TeumtaHybrid, TeumtaLayout } from '@/constants/theme';
 import type { SearchPlaceResult } from '@/types/place';
 import {
   MAX_RECENT_SEARCHES,
@@ -52,9 +51,11 @@ export default function SearchScreen() {
   const [recent, setRecent] = useState<string[]>([]);
   const requestGuard = useRef(createRequestGuard()).current;
 
-  useEffect(() => {
-    void loadRecentSearches().then(setRecent);
-  }, []);
+  useFocusEffect(useCallback(() => {
+    let ignored = false;
+    void loadRecentSearches().then((items) => { if (!ignored) setRecent(items); });
+    return () => { ignored = true; };
+  }, []));
 
   function rememberKeyword(term: string) {
     setRecent((previous) => {
@@ -112,10 +113,10 @@ export default function SearchScreen() {
   const showShortcuts = status === 'idle' && !hasSearched && results.length === 0;
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.screen}>
       <KeyboardAvoidingView style={styles.body} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.fixedHeader}>
-          <TeumtaHeader showBack title="탐색" subtitle="다음 여행은 어디가 좋을까요?" />
+          <TeumtaHeader title="탐색" />
           <View style={styles.searchRow}>
             <View style={styles.inputWrap}>
               <Image source={require('@/assets/images/icons/search.svg')} style={styles.searchIcon} contentFit="contain" />
@@ -159,13 +160,11 @@ export default function SearchScreen() {
                   </View>
                 </View>
               )}
-              <ScreenSection title="이런 곳은 어때요">
-                <Text style={styles.description}>바다부터 골목까지, 가고 싶은 곳을 찾아보세요.</Text>
+              <ScreenSection title="추천 검색">
                 <View style={styles.suggestions}>
-                  {SUGGESTED_KEYWORDS.map((term, index) => (
+                  {SUGGESTED_KEYWORDS.map((term) => (
                     <Pressable key={term} accessibilityRole="button" accessibilityLabel={`${term} 검색`}
                       style={styles.suggestion} onPress={() => void runSearch(term)}>
-                      <Text style={styles.suggestionIndex}>{String(index + 1).padStart(2, '0')}</Text>
                       <Text style={styles.suggestionName}>{term}</Text>
                       <Text style={styles.suggestionArrow}>↗</Text>
                     </Pressable>
@@ -177,7 +176,7 @@ export default function SearchScreen() {
           {status === 'loading' && (
             <View style={styles.loading} accessibilityLiveRegion="polite">
               <ActivityIndicator color={TeumtaHybrid.navy} />
-              <Text style={styles.description}>어울리는 장소를 찾고 있어요.</Text>
+              <Text style={styles.description}>검색 중</Text>
             </View>
           )}
           {status === 'error' && (
@@ -219,7 +218,6 @@ export default function SearchScreen() {
           {results.some((place) => place.source === 'TOUR') && <TourApiAttribution />}
         </ScrollView>
       </KeyboardAvoidingView>
-      <TeumtaTabBar active="explore" />
     </SafeAreaView>
   );
 }
@@ -240,24 +238,24 @@ function SearchResultContent({ place, unavailable = false }: { place: SearchPlac
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: TeumtaHybrid.canvas,
+    backgroundColor: TeumtaHybrid.paper,
     flex: 1,
   },
   body: {
     flex: 1,
   },
   fixedHeader: {
-    backgroundColor: TeumtaHybrid.canvas,
-    gap: 20,
-    paddingTop: 18,
-    paddingHorizontal: 20,
+    backgroundColor: TeumtaHybrid.paper,
+    gap: 12,
+    paddingTop: 12,
+    paddingHorizontal: TeumtaLayout.screenGutter,
     paddingBottom: 20,
   },
   container: {
     gap: 32,
-    paddingHorizontal: 20,
+    paddingHorizontal: TeumtaLayout.screenGutter,
     paddingTop: 8,
-    paddingBottom: 32,
+    paddingBottom: TeumtaLayout.contentBottomPadding,
   },
   searchRow: {
     flexDirection: 'row',
@@ -268,10 +266,10 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: TeumtaHybrid.paper,
-    borderRadius: 16,
+    backgroundColor: TeumtaHybrid.canvas,
+    borderRadius: 10,
     paddingLeft: 14,
-    minHeight: 56,
+    minHeight: 50,
     gap: 8,
   },
   searchIcon: {
@@ -281,7 +279,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     minWidth: 0,
-    minHeight: 56,
+    minHeight: 50,
     color: TeumtaHybrid.ink,
     fontSize: 15,
     paddingVertical: 14,
@@ -298,8 +296,8 @@ const styles = StyleSheet.create({
   },
   searchButton: {
     backgroundColor: TeumtaHybrid.navy,
-    borderRadius: 16,
-    minHeight: 56,
+    borderRadius: 10,
+    minHeight: 50,
     paddingHorizontal: 18,
     alignItems: 'center',
     justifyContent: 'center',
@@ -322,9 +320,9 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: TeumtaHybrid.ink,
-    fontSize: 20,
-    fontWeight: '800',
-    lineHeight: 28,
+    fontSize: 17,
+    fontWeight: '700',
+    lineHeight: 24,
   },
   clearRecent: {
     minHeight: 44,
@@ -340,8 +338,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   chip: {
-    backgroundColor: TeumtaHybrid.paper,
-    borderRadius: 24,
+    backgroundColor: TeumtaHybrid.canvas,
+    borderRadius: 8,
     minHeight: 44,
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -361,22 +359,18 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   suggestion: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: TeumtaHybrid.line,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
-    minHeight: 56,
-  },
-  suggestionIndex: {
-    color: TeumtaHybrid.navy,
-    fontSize: 14,
-    fontWeight: '700',
-    width: 24,
+    minHeight: 50,
   },
   suggestionName: {
     flex: 1,
     color: TeumtaHybrid.ink,
-    fontSize: 17,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '500',
     lineHeight: 25,
   },
   suggestionArrow: {
@@ -389,17 +383,20 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   list: {
-    gap: 24,
+    gap: 0,
   },
   result: {
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: TeumtaHybrid.line,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
     minHeight: 80,
   },
   thumb: {
-    width: 76,
-    height: 76,
+    width: 60,
+    height: 60,
     borderRadius: 4,
     backgroundColor: TeumtaHybrid.line,
   },

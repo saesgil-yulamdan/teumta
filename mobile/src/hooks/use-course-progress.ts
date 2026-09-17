@@ -8,9 +8,10 @@ import {
   courseProgressReducer,
   INITIAL_COURSE_PROGRESS,
   type CourseStop,
-  type ProgressState,
 } from '@/utils/course-progress-state';
 import { distanceInMeters } from '@/utils/distance';
+import { PROGRESS_STORAGE_KEY } from '@/stores/trip-progress';
+import { validRestoredProgress } from '@/utils/trip-summary';
 
 export type { CourseStop } from '@/utils/course-progress-state';
 
@@ -19,29 +20,6 @@ export type { CourseStop } from '@/utils/course-progress-state';
  * 같은 반경을 쓰면 GPS 요동만으로 도착↔이동이 깜빡인다(히스테리시스).
  */
 const STAY_LEAVE_RADIUS_METERS = ARRIVAL_RADIUS_METERS * 1.5;
-const PROGRESS_STORAGE_KEY = 'teumta:active-trip-progress:v1';
-
-function validRestoredState(value: unknown, stops: CourseStop[]): value is ProgressState {
-  const state = value as Partial<ProgressState> | null;
-  const phases = ['not_started', 'in_progress', 'completed'];
-  const validStayingAt =
-    state?.stayingAt === null ||
-    (typeof state?.stayingAt?.id === 'string' &&
-      stops.some((stop) => stop.id === state.stayingAt?.id));
-  return (
-    typeof state === 'object' &&
-    state !== null &&
-    phases.includes(String(state.phase)) &&
-    Number.isInteger(state.currentIndex) &&
-    Number(state.currentIndex) >= 0 &&
-    Number(state.currentIndex) <= stops.length &&
-    validStayingAt &&
-    (state.stayingSince === null || typeof state.stayingSince === 'number') &&
-    (state.startedAt === null || typeof state.startedAt === 'number') &&
-    typeof state.outcomes === 'object' &&
-    state.outcomes !== null
-  );
-}
 
 /**
  * 코스 진행 상태(시작/도착/체류/다음/복귀/완료)를 **단말 local state로만** 관리한다.
@@ -68,7 +46,7 @@ export function useCourseProgress(stops: CourseStop[], persistenceKey?: string |
       .then((raw) => {
         if (!raw || ignored) return;
         const parsed = JSON.parse(raw) as { key?: unknown; state?: unknown };
-        if (parsed.key === persistenceKey && validRestoredState(parsed.state, stops)) {
+        if (parsed.key === persistenceKey && validRestoredProgress(parsed.state, stops)) {
           dispatch({ type: 'restore', state: parsed.state });
         }
       })

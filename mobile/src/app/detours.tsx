@@ -1,12 +1,13 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TourApiAttribution } from '@/components/tour-api-attribution';
 import { CourseRouteCard } from '@/components/course-route-card';
 import { TeumtaHeader } from '@/components/teumta-header';
-import { TeumtaHybrid } from '@/constants/theme';
+import { TeumtaHybrid, TeumtaLayout } from '@/constants/theme';
+import { ScreenActionBar, screenActionStyles } from '@/components/screen-action-bar';
 import { useCourseLog } from '@/hooks/use-course-log';
 import { useGeneratedCourses } from '@/hooks/use-generated-courses';
 import { setSelectedCourse } from '@/stores/selected-course';
@@ -26,7 +27,6 @@ type DetoursParams = {
 export default function DetoursScreen() {
   const { contentId, poiId, name } = useLocalSearchParams<DetoursParams>();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { logViewedCourse } = useCourseLog();
 
   const [availableMinutes, setAvailableMinutes] =
@@ -80,8 +80,7 @@ export default function DetoursScreen() {
   const destinationName = destination?.name ?? name ?? '목적지';
 
   return (
-    <View style={styles.screen}>
-      <View style={{ height: insets.top, backgroundColor: TeumtaHybrid.canvas }} />
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.screen}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
@@ -181,15 +180,15 @@ export default function DetoursScreen() {
         )}
       </ScrollView>
       {status === 'idle' && destination && courses[selectedIndex] && (
-        <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
+        <ScreenActionBar>
           <Text style={styles.footerSummary}>선택한 코스 · 약 {courses[selectedIndex].totalMinutes}분</Text>
           <Pressable accessibilityRole="button" style={styles.ctaButton} onPress={handleStart}>
             <Text style={styles.ctaLabel}>코스 상세 보기</Text>
             <Text style={styles.ctaArrow}>→</Text>
           </Pressable>
-        </View>
+        </ScreenActionBar>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -202,9 +201,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    gap: 28,
-    paddingBottom: 28,
-    paddingHorizontal: 20,
+    gap: TeumtaLayout.sectionGap,
+    paddingBottom: TeumtaLayout.contentBottomPadding,
+    paddingHorizontal: TeumtaLayout.screenGutter,
     paddingTop: 18,
   },
   durationBlock: {
@@ -298,26 +297,12 @@ const styles = StyleSheet.create({
     lineHeight: 23,
   },
   ctaButton: {
-    backgroundColor: TeumtaHybrid.navy,
-    borderRadius: 18,
+    ...screenActionStyles.button,
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 56,
-    paddingHorizontal: 24,
+    gap: 12,
   },
-  ctaLabel: {
-    color: TeumtaHybrid.white,
-    fontSize: 16,
-    fontWeight: '700',
-    lineHeight: 24,
-  },
-  footer: {
-    backgroundColor: TeumtaHybrid.paper,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    gap: 10,
-  },
+  ctaLabel: { ...screenActionStyles.label },
   footerSummary: {
     color: TeumtaHybrid.muted,
     fontSize: 13,

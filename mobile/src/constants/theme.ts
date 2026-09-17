@@ -44,7 +44,7 @@ export const Teumta = {
   },
 } as const;
 
-/** 사진 중심 UI: 중립 배경 + 단일 행동 색. 상태 색은 별도로 유지한다. */
+/** 코스 추천 화면을 기준으로 한 공통 팔레트. 상태 색은 별도로 유지한다. */
 export const TeumtaPalette = {
   background: '#F6F7F9',
   surface: '#FFFFFF',
@@ -55,6 +55,18 @@ export const TeumtaPalette = {
   primarySoft: '#EBEFFE',
   danger: '#B54536',
   dangerSoft: '#FBECE9',
+} as const;
+
+/** 모든 화면의 바깥 여백과 카드·행동 영역 규격. */
+export const TeumtaLayout = {
+  screenGutter: 12,
+  contentBottomPadding: 16,
+  tabBarMinHeight: 60,
+  sectionGap: 24,
+  cardRadius: 24,
+  cardPadding: 20,
+  controlRadius: 16,
+  actionHeight: 56,
 } as const;
 
 /** 기존 화면의 토큰 이름은 호환용. forest/navy는 같은 행동 색으로 수렴한다. */

@@ -2,18 +2,17 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getLocalPlaceDetail } from '@/api/places';
 import { PlaceThumbnail } from '@/components/place-thumbnail';
 import { ScreenSection } from '@/components/screen-section';
 import { ReportModal } from '@/components/report-modal';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
-import { TeumtaHybrid } from '@/constants/theme';
+import { TeumtaHybrid, TeumtaLayout } from '@/constants/theme';
+import { ScreenActionBar, screenActionStyles } from '@/components/screen-action-bar';
 import type { LocalPlaceDetail } from '@/types/place';
 import { openDirections, openNaverMapPlace } from '@/utils/directions';
-
-const STATUS_BAR_TINT = TeumtaHybrid.canvas;
 
 /**
  * 주변 로컬 장소 상세.
@@ -104,8 +103,7 @@ export default function LocalPlaceDetailScreen() {
   const travelMinutes = Number(params.travelTimeMinutes);
 
   return (
-    <View style={styles.screen}>
-      <View style={{ height: insets.top, backgroundColor: STATUS_BAR_TINT }} />
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.screen}>
 
       <View style={styles.heroTopRow}>
         <Pressable accessibilityRole="button" accessibilityLabel="뒤로 가기" style={styles.heroButton} onPress={goBack}>
@@ -222,7 +220,7 @@ export default function LocalPlaceDetailScreen() {
         </View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
+      <ScreenActionBar>
         <View style={styles.footerRow}>
           {/* 뒤로가기 아이콘만으로는 코스 화면으로 돌아갈 길이 안 보인다 — 엄지 위치에 명시. */}
           <Pressable accessibilityRole="button" style={styles.returnButton} onPress={goBack}>
@@ -244,7 +242,7 @@ export default function LocalPlaceDetailScreen() {
             <Text style={styles.ctaLabel}>길찾기 열기</Text>
           </Pressable>
         </View>
-      </View>
+      </ScreenActionBar>
 
       <ReportModal
         visible={showReport}
@@ -257,7 +255,7 @@ export default function LocalPlaceDetailScreen() {
           ...(params.address ? { address: params.address } : {}),
         }}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -296,7 +294,7 @@ const styles = StyleSheet.create({
   },
   heroTopRow: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
+    paddingHorizontal: TeumtaLayout.screenGutter,
     paddingVertical: 10,
   },
   heroButton: {
@@ -313,14 +311,14 @@ const styles = StyleSheet.create({
   },
   heroImage: {
     aspectRatio: 4 / 3,
-    marginHorizontal: 20,
+    marginHorizontal: TeumtaLayout.screenGutter,
     borderRadius: 24,
     overflow: 'hidden',
     backgroundColor: TeumtaHybrid.paper,
   },
   heroTitleBand: {
     gap: 8,
-    padding: 24,
+    padding: TeumtaLayout.cardPadding,
   },
   heroCategory: {
     color: TeumtaHybrid.navy,
@@ -330,7 +328,7 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: TeumtaHybrid.ink,
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: '800',
     lineHeight: 39,
     letterSpacing: -0.8,
@@ -341,9 +339,9 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   content: {
-    gap: 32,
-    paddingHorizontal: 24,
-    paddingBottom: 28,
+    gap: TeumtaLayout.sectionGap,
+    paddingHorizontal: TeumtaLayout.screenGutter,
+    paddingBottom: TeumtaLayout.contentBottomPadding,
   },
   statsRow: {
     flexDirection: 'row',
@@ -428,23 +426,14 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     textDecorationLine: 'underline',
   },
-  footer: {
-    backgroundColor: TeumtaHybrid.paper,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-  },
   footerRow: {
     flexDirection: 'row',
     gap: 10,
   },
   returnButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: TeumtaHybrid.canvas,
-    borderRadius: 16,
+    ...screenActionStyles.button,
+    ...screenActionStyles.secondary,
     flex: 1,
-    minHeight: 56,
-    padding: 12,
   },
   returnLabel: {
     color: TeumtaHybrid.ink,
@@ -452,20 +441,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   ctaButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: TeumtaHybrid.navy,
-    borderRadius: 16,
+    ...screenActionStyles.button,
     flex: 1.5,
-    minHeight: 56,
-    padding: 12,
   },
-  ctaLabel: {
-    color: TeumtaHybrid.white,
-    fontSize: 16,
-    fontWeight: '800',
-    lineHeight: 23,
-  },
+  ctaLabel: { ...screenActionStyles.label },
   eventBanner: {
     backgroundColor: TeumtaHybrid.navySoft,
     borderRadius: 20,

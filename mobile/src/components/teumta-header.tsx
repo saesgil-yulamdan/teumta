@@ -25,7 +25,7 @@ export function TeumtaHeader({
   const router = useRouter();
 
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, !subtitle && !eyebrow && styles.compact]}>
       {showBack && (
         <Pressable
           accessibilityRole="button"
@@ -74,6 +74,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 44,
   },
+  compact: { minHeight: 44 },
   backIcon: { height: 18, width: 18 },
   copy: { flex: 1, gap: 4 },
   eyebrow: {
@@ -86,9 +87,9 @@ const styles = StyleSheet.create({
   title: {
     color: TeumtaHybrid.ink,
     fontFamily: Fonts.sans,
-    fontSize: 30,
-    fontWeight: '800',
-    lineHeight: 38,
+    fontSize: 24,
+    fontWeight: '700',
+    lineHeight: 32,
   },
   subtitle: { color: TeumtaHybrid.muted, fontSize: 14, lineHeight: 22 },
   action: { paddingHorizontal: 4, paddingVertical: 10 },

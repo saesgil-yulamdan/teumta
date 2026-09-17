@@ -1,10 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TeumtaHybrid } from '@/constants/theme';
+import { TeumtaLogo } from '@/components/teumta-logo';
 
 /** 봤는지 여부만 기기에 남긴다 — 다른 저장 데이터와 달리 지워도 다시 뜨는 것뿐이라 전체 삭제에 안 묶는다. */
 const STORAGE_KEY = 'teumta:onboarding-seen:v1';
@@ -67,11 +67,7 @@ export function Onboarding() {
           contentContainerStyle={[styles.content, compact && styles.contentCompact]}
           showsVerticalScrollIndicator={false}>
           <View style={styles.brandRow}>
-            <Image
-              source={require('@/assets/images/teumta-logo.svg')}
-              style={styles.brandLogo}
-              contentFit="contain"
-            />
+            <TeumtaLogo size={36} />
             <Text style={styles.brandName}>틈타</Text>
           </View>
 
@@ -141,10 +137,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: 10,
-  },
-  brandLogo: {
-    height: 25,
-    width: 32,
   },
   brandName: {
     color: TeumtaHybrid.ink,

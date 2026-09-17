@@ -11,14 +11,15 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PlaceThumbnail } from '@/components/place-thumbnail';
 import { ScreenSection } from '@/components/screen-section';
 import { ReportModal } from '@/components/report-modal';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
+import { ScreenActionBar, screenActionStyles } from '@/components/screen-action-bar';
 import { REALTIME_LEVEL_LABEL, REALTIME_LEVEL_TO_CONGESTION_LEVEL } from '@/constants/congestion';
-import { TeumtaHybrid, TeumtaHybridCongestion } from '@/constants/theme';
+import { TeumtaHybrid, TeumtaHybridCongestion, TeumtaLayout } from '@/constants/theme';
 import { useBookmarks } from '@/hooks/use-bookmarks';
 import { usePlaceLiveData } from '@/hooks/use-place-live-data';
 import type { CongestionLevel } from '@/types/place';
@@ -31,8 +32,6 @@ import {
   type ForecastTone,
 } from '@/utils/forecast';
 import { realtimeBasisLabel } from '@/utils/realtime-status';
-
-const STATUS_BAR_TINT = TeumtaHybrid.canvas;
 
 const CONGESTION_HEADLINE: Record<CongestionLevel, string> = {
   low: '지금은 여유로워요',
@@ -160,8 +159,7 @@ export default function PlaceDetailScreen() {
   }
 
   return (
-    <View style={styles.screen}>
-      <View style={{ height: insets.top, backgroundColor: STATUS_BAR_TINT }} />
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.screen}>
 
       <View style={styles.heroTopRow}>
         <Pressable accessibilityRole="button" accessibilityLabel="뒤로 가기" style={styles.heroButton} onPress={() => router.canGoBack() ? router.back() : router.replace('/search')}>
@@ -503,7 +501,7 @@ export default function PlaceDetailScreen() {
         </View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
+      <ScreenActionBar>
         <Pressable
           style={styles.ctaButton}
           accessibilityRole="button"
@@ -511,7 +509,7 @@ export default function PlaceDetailScreen() {
           onPress={goToDetours}>
           <Text style={styles.ctaLabel}>{crowdedNow ? '혼잡을 피해 코스 보기' : '주변 코스 보기'}</Text>
         </Pressable>
-      </View>
+      </ScreenActionBar>
 
       <Modal
         visible={showCrowdedAlert}
@@ -555,7 +553,7 @@ export default function PlaceDetailScreen() {
           ...(address ? { address } : {}),
         }}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -580,7 +578,7 @@ const styles = StyleSheet.create({
   heroTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingHorizontal: TeumtaLayout.screenGutter,
     paddingVertical: 10,
   },
   heroButton: {
@@ -600,13 +598,13 @@ const styles = StyleSheet.create({
   },
   heroImage: {
     aspectRatio: 4 / 3,
-    marginHorizontal: 20,
+    marginHorizontal: TeumtaLayout.screenGutter,
     borderRadius: 24,
     backgroundColor: TeumtaHybrid.line,
   },
   heroTitleBand: {
     gap: 8,
-    padding: 24,
+    padding: TeumtaLayout.cardPadding,
   },
   heroEyebrow: {
     color: TeumtaHybrid.navy,
@@ -616,7 +614,7 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: TeumtaHybrid.ink,
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: '800',
     lineHeight: 39,
     letterSpacing: -0.8,
@@ -627,13 +625,13 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   content: {
-    gap: 32,
-    paddingHorizontal: 24,
-    paddingBottom: 28,
+    gap: TeumtaLayout.sectionGap,
+    paddingHorizontal: TeumtaLayout.screenGutter,
+    paddingBottom: TeumtaLayout.contentBottomPadding,
   },
   congestionCard: {
     backgroundColor: TeumtaHybrid.paper,
-    borderRadius: 24,
+    borderRadius: TeumtaLayout.cardRadius,
     gap: 18,
     padding: 20,
   },
@@ -874,18 +872,8 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     textDecorationLine: 'underline',
   },
-  footer: {
-    backgroundColor: TeumtaHybrid.paper,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-  },
   ctaButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: TeumtaHybrid.navy,
-    borderRadius: 16,
-    minHeight: 56,
-    padding: 14,
+    ...screenActionStyles.button,
   },
   alertBackdrop: {
     alignItems: 'center',
@@ -951,10 +939,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
-  ctaLabel: {
-    color: TeumtaHybrid.white,
-    fontSize: 16,
-    fontWeight: '800',
-    lineHeight: 23,
-  },
+  ctaLabel: { ...screenActionStyles.label },
 });

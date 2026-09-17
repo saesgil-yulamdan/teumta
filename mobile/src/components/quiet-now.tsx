@@ -1,183 +1,146 @@
 import { Image } from 'expo-image';
 import { Link, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { getRealtimeCongestion } from '@/api/places';
 import { REALTIME_LEVEL_LABEL, REALTIME_LEVEL_TO_CONGESTION_LEVEL } from '@/constants/congestion';
 import { FEATURED_DESTINATIONS, type FeaturedDestination } from '@/constants/destinations';
 import { TeumtaHybrid, TeumtaHybridCongestion } from '@/constants/theme';
-import type { RealtimeCongestion } from '@/types/place';
+import { resolveCongestionRefresh, type HomeCongestionEntry } from '@/utils/home-congestion';
+import { realtimeBasisLabel } from '@/utils/realtime-status';
 
-/**
- * 홈 상단 "지금 어디가 여유로울까" — 실시간 혼잡도 한 줄.
- *
- * hasRealtimeCongestion은 조회 후보 선정에만 쓴다(destinations.ts 주석 참고).
- * 화면에 보이는 단계는 전부 실제 응답값이라 플래그가 낡아도 거짓말이 되지 않는다.
- * 서버가 장소별 5분 캐시를 두므로 홈 진입마다 조회해도 외부 호출은 거의 늘지 않는다.
- */
-const REALTIME_CANDIDATES = FEATURED_DESTINATIONS.filter(
-  (destination) => destination.hasRealtimeCongestion,
-);
-const QUIET_NOW_CANDIDATE_COUNT = 8;
-
-/** 여유로운 곳이 먼저 보이도록 정렬. */
-const LEVEL_ORDER: Record<RealtimeCongestion['level'], number> = {
-  RELAXED: 0,
-  NORMAL: 1,
-  CROWDED: 2,
-  VERY_CROWDED: 3,
-};
-
-type QuietNowEntry = {
-  destination: FeaturedDestination;
-  congestion: RealtimeCongestion;
-};
-
-/** 홈에 머물다 돌아왔을 때 이보다 오래됐으면 다시 조회 — 서버 캐시(5분)와 같은 주기. */
+const REALTIME_CANDIDATES = FEATURED_DESTINATIONS.filter((destination) => destination.hasRealtimeCongestion);
+// 홈 미리보기는 3곳만 확인한다. 전체 장소 조회는 상세 화면에서 사용자가 직접 연다.
+const QUIET_NOW_CANDIDATE_COUNT = 3;
 const REFRESH_AFTER_MS = 5 * 60 * 1000;
 
-type QuietNowProps = {
-  /** 값이 바뀌면 5분 게이트를 건너뛰고 즉시 재조회(홈 당겨서 새로고침). */
-  refreshSignal?: number;
-  /** 명시적 새로고침의 조회가 끝났을 때 — 홈이 스피너를 내리는 용도. */
-  onRefreshed?: () => void;
-};
+type QuietNowProps = { refreshSignal?: number; onRefreshed?: () => void };
 
 export function QuietNow({ refreshSignal = 0, onRefreshed }: QuietNowProps) {
-  // null = 첫 조회 중(이후 갱신 중에는 기존 카드를 그대로 보여준다)
-  const [entries, setEntries] = useState<QuietNowEntry[] | null>(null);
+  const [snapshot, setSnapshot] = useState<{
+    entries: HomeCongestionEntry[] | null; failed: boolean; partial: boolean;
+  }>({ entries: null, failed: false, partial: false });
+  const [expanded, setExpanded] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [retrySignal, setRetrySignal] = useState(0);
+  const [now, setNow] = useState(() => new Date());
   const lastLoadedAt = useRef(0);
+  const handledRefresh = useRef(-1);
+  const handledRetry = useRef(-1);
 
-  const load = useCallback((onDone?: () => void) => {
+  useFocusEffect(useCallback(() => {
     let ignored = false;
-    const candidates = selectQuietNowCandidates(refreshSignal);
-
-    void Promise.allSettled(
-      candidates.map((destination) =>
-        getRealtimeCongestion({ contentId: destination.tourApiContentId }).then(
-          (congestion): QuietNowEntry => ({ destination, congestion }),
-        ),
-      ),
-    ).then((results) => {
-      // 스피너는 결과 반영 여부와 무관하게 내린다 — 화면을 떠났어도 멈춘 스피너를 남기지 않는다.
-      onDone?.();
-      if (ignored) {
-        return;
-      }
+    let pending = false;
+    const load = async (force = false) => {
+      if (pending || (!force && Date.now() - lastLoadedAt.current < REFRESH_AFTER_MS)) return;
+      pending = true;
+      setLoading(true);
+      const results = await Promise.allSettled(
+        selectQuietNowCandidates(refreshSignal + retrySignal).map(async (destination) => ({
+          destination,
+          congestion: await getRealtimeCongestion({ contentId: destination.tourApiContentId }),
+        })),
+      );
+      pending = false;
+      if (ignored) return;
+      // 실패 직후에도 자동 재시도 간격을 지키되, 버튼은 즉시 재시도한다.
       lastLoadedAt.current = Date.now();
-      // 실패(SK 미커버·일시 오류)는 조용히 빼고 성공한 곳만 보여준다.
-      const loaded = results
-        .filter(
-          (result): result is PromiseFulfilledResult<QuietNowEntry> =>
-            result.status === 'fulfilled',
-        )
-        .map((result) => result.value)
-        .sort(
-          (first, second) =>
-            LEVEL_ORDER[first.congestion.level] - LEVEL_ORDER[second.congestion.level],
-        );
-      // 갱신이 통째로 실패했을 때 이미 보여주던 카드를 지우지 않는다(첫 조회만 빈 결과 반영).
-      setEntries((previous) => (loaded.length === 0 && previous ? previous : loaded));
+      setSnapshot((previous) => resolveCongestionRefresh(previous.entries, results));
+      setLoading(false);
+      setNow(new Date());
+      onRefreshed?.();
+    };
+    const force = handledRefresh.current !== refreshSignal || handledRetry.current !== retrySignal;
+    handledRefresh.current = refreshSignal;
+    handledRetry.current = retrySignal;
+    // 진행 중 요청이 포커스를 잃어 취소된 경우에도 다시 조회한다.
+    void load(force || lastLoadedAt.current === 0);
+    const timer = setInterval(() => {
+      setNow(new Date());
+      if (AppState.currentState === 'active') void load();
+    }, 30_000);
+    const listener = AppState.addEventListener('change', (state) => {
+      if (state === 'active') { setNow(new Date()); void load(); }
     });
-
     return () => {
       ignored = true;
+      listener.remove();
+      clearInterval(timer);
+      if (pending) { lastLoadedAt.current = 0; onRefreshed?.(); }
     };
-  }, [refreshSignal]);
+  }, [refreshSignal, retrySignal, onRefreshed]));
 
-  useFocusEffect(
-    useCallback(() => {
-      // 상세를 다녀와 홈이 다시 보일 때마다 불린다 — 5분 안이면 그대로 둬서 폭주 방지.
-      if (Date.now() - lastLoadedAt.current < REFRESH_AFTER_MS) {
-        return;
-      }
-      return load();
-    }, [load]),
-  );
-
-  // 당겨서 새로고침 — 사용자의 명시적 요청이라 5분 게이트를 건너뛴다.
-  const isFirstSignal = useRef(true);
-  useEffect(() => {
-    if (isFirstSignal.current) {
-      isFirstSignal.current = false;
-      return;
-    }
-    return load(onRefreshed);
-  }, [refreshSignal, load, onRefreshed]);
-
-  // 전부 실패하면 섹션째 숨긴다 — 빈 껍데기가 남는 것보다 낫다.
-  if (entries !== null && entries.length === 0) {
-    return null;
-  }
-
+  const { entries, failed, partial } = snapshot;
   return (
     <View style={styles.section}>
       <View style={styles.sectionRow}>
-        <Text style={styles.sectionTitle}>지금 여유로운 곳</Text>
-        <View style={styles.liveBadge}>
-          <View style={styles.liveDot} />
-          <Text style={styles.liveLabel}>실시간</Text>
-        </View>
+        <Text accessibilityRole="header" style={styles.sectionTitle}>혼잡도</Text>
+        <Text style={styles.liveLabel}>여유로운 순</Text>
       </View>
-
-      {entries === null ? (
-        <View style={styles.loadingBox}>
-          <ActivityIndicator size="small" />
+      {(failed || partial) && (
+        <View style={styles.notice} accessibilityLiveRegion="polite">
+          <Text style={styles.noticeText}>
+            {failed
+              ? entries?.length ? '갱신 실패 · 이전 정보입니다.' : '혼잡도를 불러오지 못했어요.'
+              : '일부 장소만 확인됐어요.'}
+          </Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="혼잡도 다시 확인"
+            disabled={loading} onPress={() => setRetrySignal((value) => value + 1)} style={styles.retry}>
+            <Text style={styles.retryText}>{loading ? '확인 중' : '다시 확인'}</Text>
+          </Pressable>
         </View>
-      ) : (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.rail}>
-          {entries.map(({ destination, congestion }) => {
-            const palette =
-              TeumtaHybridCongestion[REALTIME_LEVEL_TO_CONGESTION_LEVEL[congestion.level]];
+      )}
+      {entries === null ? (
+        <View style={styles.loadingBox} accessibilityLabel="혼잡도 불러오는 중">
+          <ActivityIndicator color={TeumtaHybrid.navy} />
+        </View>
+      ) : entries.length > 0 ? (
+        <View>
+          {(expanded ? entries : entries.slice(0, 3)).map(({ destination, congestion }) => {
+            const palette = TeumtaHybridCongestion[REALTIME_LEVEL_TO_CONGESTION_LEVEL[congestion.level]];
             return (
-              <Link
-                key={destination.tourApiContentId}
-                href={{
-                  pathname: '/places/[id]',
-                  params: {
-                    id: destination.tourApiContentId,
-                    source: 'TOUR',
-                    name: destination.name,
-                    address: destination.address,
-                    ...(destination.imageUrl ? { imageUrl: destination.imageUrl } : {}),
-                  },
-                }}
-                asChild>
-                <Pressable style={styles.card}>
+              <Link key={destination.tourApiContentId} href={{
+                pathname: '/places/[id]',
+                params: {
+                  id: destination.tourApiContentId, source: 'TOUR', name: destination.name,
+                  address: destination.address,
+                  ...(destination.imageUrl ? { imageUrl: destination.imageUrl } : {}),
+                },
+              }} asChild>
+                <Pressable accessibilityRole="button" style={styles.card}>
                   {destination.imageUrl ? (
-                    <Image
-                      source={{ uri: destination.imageUrl }}
-                      style={styles.cardImage}
-                      contentFit="cover"
-                      recyclingKey={destination.tourApiContentId}
-                    />
-                  ) : (
-                    <View style={styles.cardImage} />
-                  )}
+                    <Image source={{ uri: destination.imageUrl }} style={styles.cardImage}
+                      contentFit="cover" recyclingKey={destination.tourApiContentId} />
+                  ) : <View style={styles.cardImage} />}
                   <View style={styles.cardBody}>
-                    <Text style={styles.cardName} numberOfLines={1}>
-                      {destination.name}
+                    <Text style={styles.cardName} numberOfLines={1}>{destination.name}</Text>
+                    <Text style={styles.cardMeta} numberOfLines={1}>{destination.areaLabel}</Text>
+                    <Text style={styles.timestamp}>
+                      {realtimeBasisLabel(congestion.measuredAt, now).replace('실시간 · ', '')}
                     </Text>
-                    <Text style={styles.cardMeta} numberOfLines={1}>
-                      {destination.areaLabel}
+                    {failed && <Text style={styles.timestamp}>
+                      {realtimeBasisLabel(congestion.fetchedAt, now).replace('실시간 · ', '').replace(' 기준', ' 조회')}
+                    </Text>}
+                  </View>
+                  <View style={[styles.levelChip, { backgroundColor: palette.background }]}>
+                    <View style={[styles.levelDot, { backgroundColor: palette.dot }]} />
+                    <Text style={[styles.levelLabel, { color: palette.text }]}>
+                      {REALTIME_LEVEL_LABEL[congestion.level]}
                     </Text>
-                    <View style={[styles.levelChip, { backgroundColor: palette.background }]}>
-                      <View style={[styles.levelDot, { backgroundColor: palette.dot }]} />
-                      <Text style={[styles.levelLabel, { color: palette.text }]}>
-                        {REALTIME_LEVEL_LABEL[congestion.level]}
-                      </Text>
-                    </View>
                   </View>
                 </Pressable>
               </Link>
             );
           })}
-        </ScrollView>
-      )}
+          {entries.length > 3 && (
+            <Pressable accessibilityRole="button" accessibilityState={{ expanded }}
+              onPress={() => setExpanded((value) => !value)} style={styles.expandButton}>
+              <Text style={styles.expandLabel}>{expanded ? '접기' : `전체 ${entries.length}곳 보기`}</Text>
+            </Pressable>
+          )}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -210,94 +173,24 @@ function stableModulo(value: string, modulo: number): number {
 }
 
 const styles = StyleSheet.create({
-  section: {
-    gap: 16,
-  },
-  sectionRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingTop: 12,
-  },
-  sectionTitle: {
-    color: TeumtaHybrid.ink,
-    fontSize: 20,
-    fontWeight: '800',
-    lineHeight: 28,
-  },
-  liveBadge: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 5,
-  },
-  liveDot: {
-    backgroundColor: TeumtaHybrid.navy,
-    borderRadius: 3,
-    height: 6,
-    width: 6,
-  },
-  liveLabel: {
-    color: TeumtaHybrid.muted,
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 18,
-  },
-  loadingBox: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    // 로딩 → 카드 전환 시 홈 전체가 출렁이지 않게 카드 높이와 맞춘다.
-    height: 232,
-  },
-  rail: {
-    flexDirection: 'row',
-    gap: 14,
-  },
-  card: {
-    backgroundColor: TeumtaHybrid.paper,
-    borderRadius: 20,
-    overflow: 'hidden',
-    width: 204,
-  },
-  cardImage: {
-    backgroundColor: TeumtaHybrid.canvas,
-    borderRadius: 0,
-    height: 124,
-  },
-  cardBody: {
-    backgroundColor: TeumtaHybrid.paper,
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-  },
-  cardName: {
-    color: TeumtaHybrid.ink,
-    fontSize: 16,
-    fontWeight: '800',
-    lineHeight: 24,
-  },
-  cardMeta: {
-    color: TeumtaHybrid.muted,
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  levelChip: {
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    borderRadius: TeumtaHybrid.radius.small,
-    flexDirection: 'row',
-    gap: 4,
-    marginTop: 2,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  levelDot: {
-    borderRadius: 3,
-    height: 6,
-    width: 6,
-  },
-  levelLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 18,
-  },
+  section: { gap: 8 },
+  sectionRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', paddingTop: 8 },
+  sectionTitle: { color: TeumtaHybrid.ink, fontSize: 17, fontWeight: '700', lineHeight: 24 },
+  liveLabel: { color: TeumtaHybrid.muted, fontSize: 12, lineHeight: 18 },
+  notice: { backgroundColor: TeumtaHybrid.canvas, borderRadius: 8, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  noticeText: { flex: 1, color: TeumtaHybrid.muted, fontSize: 12, lineHeight: 18, paddingVertical: 10 },
+  retry: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
+  retryText: { color: TeumtaHybrid.navy, fontSize: 12, fontWeight: '600' },
+  loadingBox: { alignItems: 'center', justifyContent: 'center', height: 240 },
+  card: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: TeumtaHybrid.line },
+  cardImage: { backgroundColor: TeumtaHybrid.canvas, borderRadius: 8, height: 48, width: 48 },
+  cardBody: { flex: 1, gap: 2 },
+  cardName: { color: TeumtaHybrid.ink, fontSize: 15, fontWeight: '600', lineHeight: 22 },
+  cardMeta: { color: TeumtaHybrid.muted, fontSize: 12, lineHeight: 18 },
+  timestamp: { color: TeumtaHybrid.muted, fontSize: 11, lineHeight: 16 },
+  levelChip: { alignItems: 'center', borderRadius: 6, flexDirection: 'row', gap: 5, paddingHorizontal: 8, paddingVertical: 5 },
+  levelDot: { borderRadius: 3, height: 6, width: 6 },
+  levelLabel: { fontSize: 12, fontWeight: '600', lineHeight: 18 },
+  expandButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  expandLabel: { color: TeumtaHybrid.muted, fontSize: 13, fontWeight: '600' },
 });

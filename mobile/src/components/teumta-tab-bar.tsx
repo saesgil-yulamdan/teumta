@@ -1,20 +1,20 @@
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import type { BottomTabBarProps } from 'expo-router/tabs';
+import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { TeumtaHybrid } from '@/constants/theme';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-export type TeumtaTab = 'home' | 'explore' | 'trips' | 'my';
+import { TeumtaHybrid, TeumtaLayout } from '@/constants/theme';
 
 const TABS = [
   {
-    key: 'home',
+    key: 'index',
     label: '홈',
     activeIcon: require('@/assets/images/icons/tab-home.svg'),
     inactiveIcon: require('@/assets/images/icons/tab-home-inactive.svg'),
   },
   {
-    key: 'explore',
+    key: 'search',
     label: '탐색',
     activeIcon: require('@/assets/images/icons/tab-explore-active.svg'),
     inactiveIcon: require('@/assets/images/icons/tab-explore.svg'),
@@ -33,35 +33,29 @@ const TABS = [
   },
 ] as const;
 
-export function TeumtaTabBar({ active }: { active: TeumtaTab }) {
-  const router = useRouter();
-
-  const goTo = (tab: TeumtaTab) => {
-    if (tab === active) {
-      return;
-    }
-    switch (tab) {
-      case 'home':
-        router.dismissTo('/');
-        break;
-      case 'explore':
-        router.push('/search');
-        break;
-      case 'trips':
-        router.push('/trips');
-        break;
-      case 'my':
-        router.push('/my');
-        break;
-    }
-  };
-
+export function TeumtaTabBar({ state, navigation }: BottomTabBarProps) {
   return (
-    <View style={styles.bar}>
+    <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.safeArea}>
+      <View style={styles.bar}>
       {TABS.map((tab) => {
-        const isActive = tab.key === active;
+        const route = state.routes.find((item) => item.name === tab.key);
+        if (!route) return null;
+        const isActive = state.routes[state.index].key === route.key;
         return (
-          <Pressable key={tab.key} accessibilityRole="tab" accessibilityLabel={`${tab.label} 탭`} accessibilityState={{ selected: isActive }} style={styles.item} onPress={() => goTo(tab.key)}>
+          <Pressable
+            key={tab.key}
+            accessibilityRole="tab"
+            accessibilityLabel={`${tab.label} 탭`}
+            accessibilityState={{ selected: isActive }}
+            style={styles.item}
+            onPress={() => {
+              const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+              if (!isActive && !event.defaultPrevented) {
+                Keyboard.dismiss();
+                navigation.navigate(route.name, route.params);
+              }
+            }}
+            onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })}>
             <Image
               source={isActive ? tab.activeIcon : tab.inactiveIcon}
               style={styles.icon}
@@ -71,22 +65,28 @@ export function TeumtaTabBar({ active }: { active: TeumtaTab }) {
           </Pressable>
         );
       })}
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    backgroundColor: TeumtaHybrid.paper,
+    flexShrink: 0,
+  },
   bar: {
     alignItems: 'center',
     backgroundColor: TeumtaHybrid.paper,
     borderTopColor: TeumtaHybrid.line,
-    borderTopWidth: 0,
+    borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
-    height: 76,
+    minHeight: TeumtaLayout.tabBarMinHeight,
     justifyContent: 'space-around',
-    paddingHorizontal: 24,
+    paddingHorizontal: TeumtaLayout.screenGutter,
   },
   item: {
+    flex: 1,
     alignItems: 'center',
     borderRadius: 14,
     gap: 4,
@@ -101,11 +101,11 @@ const styles = StyleSheet.create({
   label: {
     color: TeumtaHybrid.faint,
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '500',
     lineHeight: 18,
   },
   labelActive: {
     color: TeumtaHybrid.forest,
-    fontWeight: '800',
+    fontWeight: '700',
   },
 });

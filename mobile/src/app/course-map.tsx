@@ -2,11 +2,12 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CourseMapView } from '@/components/course-map-view';
 import { TourApiAttribution } from '@/components/tour-api-attribution';
-import { TeumtaHybrid } from '@/constants/theme';
+import { TeumtaHybrid, TeumtaLayout } from '@/constants/theme';
+import { ScreenActionBar, screenActionStyles } from '@/components/screen-action-bar';
 import { getSelectedCourse, loadSelectedCourse } from '@/stores/selected-course';
 import { courseDistanceMeters, courseStayMinutes } from '@/types/course';
 import { buildCourseRoutePath } from '@/utils/course-path';
@@ -17,7 +18,6 @@ const DOT_START = TeumtaHybrid.ink;
 
 export default function CourseMapScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const [selected, setSelected] = useState(getSelectedCourse);
   const [loading, setLoading] = useState(!selected);
 
@@ -136,7 +136,7 @@ export default function CourseMapScreen() {
   ];
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.screen}>
       <View style={styles.topBar}>
         <Pressable accessibilityRole="button" accessibilityLabel="뒤로 가기" style={styles.topButton}
           onPress={() => router.canGoBack() ? router.back() : router.replace('/search')}>
@@ -204,20 +204,20 @@ export default function CourseMapScreen() {
         </View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: 12 + insets.bottom }]}>
+      <ScreenActionBar>
         <Text style={styles.returnText}>지금 출발하면 <Text style={styles.returnTime}>{returnTimeLabel}</Text> 복귀 예상</Text>
         <Pressable accessibilityRole="button" style={styles.ctaButton} onPress={() => router.push('/trip')}>
           <Text style={styles.ctaLabel}>이 코스로 출발하기</Text>
           <Text style={styles.ctaArrow}>→</Text>
         </Pressable>
-      </View>
-    </View>
+      </ScreenActionBar>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: TeumtaHybrid.paper,
+    backgroundColor: TeumtaHybrid.canvas,
     flex: 1,
   },
   emptyContainer: {
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingHorizontal: TeumtaLayout.screenGutter,
     paddingVertical: 10,
     gap: 12,
   },
@@ -286,18 +286,18 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingTop: 8,
-    paddingBottom: 24,
-    gap: 28,
+    paddingBottom: TeumtaLayout.contentBottomPadding,
+    gap: TeumtaLayout.sectionGap,
   },
   mapArea: {
     height: 248,
-    marginHorizontal: 20,
+    marginHorizontal: TeumtaLayout.screenGutter,
     borderRadius: 24,
     overflow: 'hidden',
     backgroundColor: TeumtaHybrid.canvas,
   },
   intro: {
-    paddingHorizontal: 24,
+    paddingHorizontal: TeumtaLayout.screenGutter,
     gap: 8,
   },
   eyebrow: {
@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   itinerary: {
-    paddingHorizontal: 24,
+    paddingHorizontal: TeumtaLayout.screenGutter,
     gap: 20,
   },
   sectionHeading: {
@@ -418,14 +418,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 22,
   },
-  footer: {
-    backgroundColor: TeumtaHybrid.paper,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    gap: 10,
-    borderTopColor: TeumtaHybrid.line,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
   returnText: {
     color: TeumtaHybrid.muted,
     fontSize: 13,
@@ -437,20 +429,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   ctaButton: {
-    backgroundColor: TeumtaHybrid.navy,
-    borderRadius: 18,
+    ...screenActionStyles.button,
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 56,
-    paddingHorizontal: 24,
+    gap: 12,
   },
-  ctaLabel: {
-    color: TeumtaHybrid.white,
-    fontSize: 16,
-    fontWeight: '700',
-    lineHeight: 24,
-  },
+  ctaLabel: { ...screenActionStyles.label },
   ctaArrow: {
     color: TeumtaHybrid.white,
     fontSize: 22,

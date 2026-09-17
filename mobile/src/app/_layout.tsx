@@ -26,8 +26,7 @@ export default function RootLayout() {
               headerShadowVisible: false,
               contentStyle: { backgroundColor: TeumtaHybrid.paper },
             }}>
-            <Stack.Screen name="index" options={{ title: 'teumta', headerShown: false }} />
-            <Stack.Screen name="search" options={{ title: '관광지 검색', headerShown: false }} />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen
               name="places/[id]"
               options={{ title: '관광지 상세', headerShown: false }}
@@ -39,8 +38,6 @@ export default function RootLayout() {
             <Stack.Screen name="detours" options={{ title: '틈타 코스', headerShown: false }} />
             <Stack.Screen name="course-map" options={{ title: '코스 상세', headerShown: false }} />
             <Stack.Screen name="trip" options={{ title: '코스 진행', headerShown: false }} />
-            <Stack.Screen name="trips" options={{ title: '내 여행', headerShown: false }} />
-            <Stack.Screen name="my" options={{ title: '마이', headerShown: false }} />
           </Stack>
         </CourseLogProvider>
       </BookmarksProvider>
