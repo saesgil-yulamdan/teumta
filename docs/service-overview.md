@@ -43,7 +43,7 @@ Mobile → Express 공개 API → TourAPI/TMAP/SK/KTO → 변환·메모리 캐�
 
 ## timeout과 오류
 
-- 외부 API 1회 호출: 서버 `EXTERNAL_API_TIMEOUT_MS`, 기본 5초
+- 외부 API 1회 호출: 서버 `EXTERNAL_API_TIMEOUT_MS`, 기본 15초
 - 일반 모바일 API: 10초
 - 코스 생성/대체 코스 모바일 API: 30초
 - 모든 JSON 응답: `{ success, data, error }`

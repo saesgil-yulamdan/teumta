@@ -1,4 +1,4 @@
-import { ExternalApiNotFoundError } from '../external/common';
+import { ExternalApiError, ExternalApiNotFoundError } from '../external/common';
 import { fetchRealtimeCongestion } from '../external/congestion';
 import { extractPoiBase, fetchPoiDetail, fetchPoiSearch, mapPoiSearchToDestinations } from '../external/tmap';
 import { extractDetailCoordinate, extractDetailItem, fetchTourPlaceDetail } from '../external/tour';
@@ -86,7 +86,25 @@ export async function resolveTmapPoiId(contentId: string): Promise<string | null
 }
 
 async function lookupTmapPoiId(contentId: string): Promise<string | null> {
-  const detail = await fetchTourPlaceDetail(contentId);
+  // 수동 매핑은 Tour 상세 없이 SK 실조회로 확정 가능 — Tour 장애 시에도 혼잡도를 살린다.
+  const manual = MANUAL_POI_ID_BY_CONTENT_ID[contentId];
+  if (manual) {
+    const verifiedManual = await firstWithRealtime([manual]);
+    if (verifiedManual !== null) {
+      return verifiedManual;
+    }
+  }
+
+  let detail;
+  try {
+    detail = await fetchTourPlaceDetail(contentId);
+  } catch (error) {
+    // Tour 타임아웃을 혼잡 전체 504로 올리지 않는다 — 매칭 불가로 두고 상위가 404 처리.
+    if (error instanceof ExternalApiError) {
+      return null;
+    }
+    throw error;
+  }
   const item = extractDetailItem(detail);
   const coordinate = extractDetailCoordinate(detail);
   const name = item?.title?.trim();
@@ -105,7 +123,6 @@ async function lookupTmapPoiId(contentId: string): Promise<string | null> {
   // 이를 먼저 기다리면 첫 혼잡도 요청이 수십 초 느려진다. 직접 후보가 실시간 검증에
   // 실패한 예외 장소에서만 인덱스 역매칭을 사용한다.
   const directCandidates: string[] = [];
-  const manual = MANUAL_POI_ID_BY_CONTENT_ID[contentId];
   if (manual) directCandidates.push(manual);
   if (directBest !== null && !directCandidates.includes(directBest)) {
     directCandidates.push(directBest);

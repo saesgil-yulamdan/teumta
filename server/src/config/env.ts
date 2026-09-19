@@ -23,7 +23,7 @@ const envSchema = z.object({
   PREDICTION_API_BASE_URL: z.string().optional().default(''),
 
   // 외부 API 공통 요청 timeout(ms).
-  EXTERNAL_API_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
+  EXTERNAL_API_TIMEOUT_MS: z.coerce.number().int().positive().default(15000),
 
   // 아래 관리자·Trip·스케줄러 설정은 보존 코드용이며 현재 app.ts/server.ts는 사용하지 않는다.
   ADMIN_PASSWORD: z.string().optional().default(''),

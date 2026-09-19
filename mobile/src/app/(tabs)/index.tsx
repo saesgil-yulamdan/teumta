@@ -135,8 +135,18 @@ function BrowseContent() {
           </View>
           {searching && <Pressable accessibilityRole="button" onPress={cancelSearch} style={styles.clearRecent}><Text style={styles.shortcutClear}>검색 취소</Text></Pressable>}
         </View>
-        <ScrollView style={[styles.body, searching && { display: 'none' }]} contentContainerStyle={styles.container}>
-          {active && <Pressable accessibilityRole="button" style={styles.suggestion} onPress={() => router.push('/trip')}><Text style={styles.suggestionName}>{active.selected.destination.name} · 코스 이어가기</Text><Text style={styles.suggestionArrow}>→</Text></Pressable>}
+        <ScrollView style={[styles.body, searching && { display: 'none' }]} contentContainerStyle={styles.browseContainer}>
+          {active && (
+            <Pressable
+              accessibilityRole="button"
+              style={styles.resumePill}
+              onPress={() => router.push('/trip')}>
+              <Text style={styles.resumeLabel} numberOfLines={1}>
+                {active.selected.destination.name} · 코스 이어가기
+              </Text>
+              <Text style={styles.resumeArrow}>→</Text>
+            </Pressable>
+          )}
           <QuietNow />
         </ScrollView>
         <ScrollView style={[styles.body, !searching && { display: 'none' }]} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
@@ -246,6 +256,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: TeumtaLayout.screenGutter,
     paddingTop: 8,
     paddingBottom: TeumtaLayout.contentBottomPadding,
+  },
+  browseContainer: {
+    gap: 20,
+    paddingHorizontal: TeumtaLayout.screenGutter,
+    paddingTop: 4,
+    paddingBottom: TeumtaLayout.contentBottomPadding,
+  },
+  resumePill: {
+    alignItems: 'center',
+    backgroundColor: TeumtaHybrid.navySoft,
+    borderRadius: 14,
+    flexDirection: 'row',
+    gap: 10,
+    minHeight: 48,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  resumeLabel: {
+    color: TeumtaHybrid.navy,
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
+  },
+  resumeArrow: {
+    color: TeumtaHybrid.navy,
+    fontSize: 18,
+    fontWeight: '700',
   },
   searchRow: {
     flexDirection: 'row',

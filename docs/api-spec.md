@@ -111,7 +111,7 @@ Query: `originContentId`, 목적지 `contentId` 또는 `poiId`, `availableMinute
 
 ## timeout 및 외부 API 오류
 
-- 서버의 외부 API 요청 timeout: `EXTERNAL_API_TIMEOUT_MS`, 기본 5초
+- 서버의 외부 API 요청 timeout: `EXTERNAL_API_TIMEOUT_MS`, 기본 15초
 - 모바일 일반 요청: 10초
 - 모바일 코스/대체 코스 요청: 30초
 - 외부 인증/응답/네트워크 오류: 502

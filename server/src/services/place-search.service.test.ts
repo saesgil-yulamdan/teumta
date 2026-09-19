@@ -109,6 +109,16 @@ describe('searchDestinations', () => {
     });
   });
 
+  it('TourAPI가 타임아웃나면 TMAP POI 검색으로 폴백한다', async () => {
+    const { ExternalApiTimeoutError } = await import('../external/common');
+    fetchTourPlacesByKeywordMock.mockRejectedValue(new ExternalApiTimeoutError('tour'));
+    fetchPoiSearchMock.mockResolvedValue(poiResponse);
+
+    const results = await searchDestinations({ keyword: '경복궁' });
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({ source: 'TMAP', tmapPoiId: '10817049' });
+  });
+
   it('TMAP 폴백에서 좌표 없는 POI는 제외한다', async () => {
     fetchTourPlacesByKeywordMock.mockResolvedValue(tourResponse([]));
     fetchPoiSearchMock.mockResolvedValue({

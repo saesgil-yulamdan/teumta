@@ -240,11 +240,19 @@ export interface MeasuredNearbyPlace {
   path: { latitude: number; longitude: number }[];
 }
 
-/** 목적지 상세 → 기준점. 좌표 없으면 null. */
+/** 목적지 상세 → 기준점. 좌표 없으면 null. Tour 장애도 null(코스가 504 대신 NOT_FOUND). */
 export async function resolveDestinationByContentId(
   contentId: string,
 ): Promise<DestinationBase | null> {
-  const detail = await fetchTourPlaceDetail(contentId);
+  let detail;
+  try {
+    detail = await fetchTourPlaceDetail(contentId);
+  } catch (error) {
+    if (error instanceof ExternalApiError) {
+      return null;
+    }
+    throw error;
+  }
   const coordinate = extractDetailCoordinate(detail);
   if (!coordinate) {
     return null;
