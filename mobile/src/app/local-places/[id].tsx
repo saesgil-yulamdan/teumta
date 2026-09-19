@@ -49,7 +49,7 @@ export default function LocalPlaceDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isPlaceBookmarked, togglePlaceBookmark } = useBookmarks();
-  const goBack = () => router.canGoBack() ? router.back() : router.replace('/search');
+  const goBack = () => router.canGoBack() ? router.back() : router.replace('/');
   const isFestival = params.category === '행사·축제';
   const eventDate = (value?: string) => value && /^\d{8}$/.test(value)
     ? `${value.slice(0, 4)}.${value.slice(4, 6)}.${value.slice(6, 8)}` : null;

@@ -14,7 +14,7 @@ export default function TripsScreen() {
   const { section } = useLocalSearchParams<{ section?: string }>();
   const tab = section === 'history' ? 'history' : 'saved';
   const { bookmarks, records, recent, ready, error } = useTravel();
-  const [expanded, setExpanded] = useState(section === 'current');
+  const [expanded, setExpanded] = useState(false);
   return <SafeAreaView edges={['top', 'left', 'right']} style={styles.screen}>
     <View style={styles.header}>
       <View style={styles.savedRow}><Text style={[styles.rowTitle, { flex: 1, fontSize: 24 }]}>내 여행</Text>

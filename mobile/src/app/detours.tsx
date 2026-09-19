@@ -145,7 +145,7 @@ export default function DetoursScreen() {
         )}
 
         {((status === 'idle' && courses.length === 0) || status === 'error' || status === 'timeout' || status === 'rate-limited') && <View style={styles.durationBlock}>
-          <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={() => router.push('/search')}><Text style={styles.secondaryButtonLabel}>다른 출발지 찾기</Text></Pressable>
+          <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={() => router.push({ pathname: '/', params: { search: '1' } })}><Text style={styles.secondaryButtonLabel}>다른 출발지 찾기</Text></Pressable>
           {identifier && <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={() => router.push({ pathname: '/places/[id]', params: { id: contentId ?? poiId ?? '', source: contentId ? 'TOUR' : 'TMAP', name: destinationName } })}><Text style={styles.secondaryButtonLabel}>주변 장소 개별로 보기</Text></Pressable>}
         </View>}
 

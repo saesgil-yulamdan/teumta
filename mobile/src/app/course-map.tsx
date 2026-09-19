@@ -48,7 +48,7 @@ export default function CourseMapScreen() {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>선택한 코스 정보가 없어요.</Text>
-        <Pressable style={styles.emptyButton} onPress={() => router.canGoBack() ? router.back() : router.replace('/search')}>
+        <Pressable style={styles.emptyButton} onPress={() => router.canGoBack() ? router.back() : router.replace({ pathname: '/', params: { search: '1' } })}>
           <Text style={styles.emptyButtonLabel}>코스 다시 고르기</Text>
         </Pressable>
       </View>
@@ -164,7 +164,7 @@ export default function CourseMapScreen() {
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.screen}>
       <View style={styles.topBar}>
         <Pressable accessibilityRole="button" accessibilityLabel="뒤로 가기" style={styles.topButton}
-          onPress={() => router.canGoBack() ? router.back() : router.replace('/search')}>
+          onPress={() => router.canGoBack() ? router.back() : router.replace('/')}>
           <Image source={require('@/assets/images/icons/back.svg')} style={styles.topButtonIcon} contentFit="contain" />
         </Pressable>
         <Text style={styles.navigationTitle}>코스 상세</Text>

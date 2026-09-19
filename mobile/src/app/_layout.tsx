@@ -4,8 +4,6 @@ import { useEffect } from 'react';
 
 import '@/global.css';
 import { TeumtaHybrid } from '@/constants/theme';
-import { BookmarksProvider } from '@/hooks/use-bookmarks';
-import { CourseLogProvider } from '@/hooks/use-course-log';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -17,34 +15,30 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={DefaultTheme}>
-      <BookmarksProvider>
-        <CourseLogProvider>
-          <Stack
-            screenOptions={{
-              headerStyle: { backgroundColor: TeumtaHybrid.paper },
-              headerTintColor: TeumtaHybrid.ink,
-              headerShadowVisible: false,
-              contentStyle: { backgroundColor: TeumtaHybrid.paper },
-            }}>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen
-              name="places/[id]"
-              options={{ title: '관광지 상세', headerShown: false }}
-            />
-            <Stack.Screen
-              name="local-places/[id]"
-              options={{ title: '로컬 장소 상세', headerShown: false }}
-            />
-            <Stack.Screen name="detours" options={{ title: '틈타 코스', headerShown: false }} />
-            <Stack.Screen name="course-map" options={{ title: '코스 상세', headerShown: false }} />
-            <Stack.Screen name="settings" options={{ headerShown: false }} />
-            <Stack.Screen name="history/[id]" options={{ headerShown: false }} />
-            <Stack.Screen name="my" options={{ headerShown: false }} />
-            <Stack.Screen name="search" options={{ headerShown: false }} />
-            <Stack.Screen name="trip" options={{ title: '코스 진행', headerShown: false }} />
-          </Stack>
-        </CourseLogProvider>
-      </BookmarksProvider>
+      <Stack
+        screenOptions={{
+          headerStyle: { backgroundColor: TeumtaHybrid.paper },
+          headerTintColor: TeumtaHybrid.ink,
+          headerShadowVisible: false,
+          contentStyle: { backgroundColor: TeumtaHybrid.paper },
+        }}>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="places/[id]"
+          options={{ title: '관광지 상세', headerShown: false }}
+        />
+        <Stack.Screen
+          name="local-places/[id]"
+          options={{ title: '로컬 장소 상세', headerShown: false }}
+        />
+        <Stack.Screen name="detours" options={{ title: '틈타 코스', headerShown: false }} />
+        <Stack.Screen name="course-map" options={{ title: '코스 상세', headerShown: false }} />
+        <Stack.Screen name="settings" options={{ headerShown: false }} />
+        <Stack.Screen name="history/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="my" options={{ headerShown: false }} />
+        <Stack.Screen name="search" options={{ headerShown: false }} />
+        <Stack.Screen name="trip" options={{ title: '코스 진행', headerShown: false }} />
+      </Stack>
     </ThemeProvider>
   );
 }

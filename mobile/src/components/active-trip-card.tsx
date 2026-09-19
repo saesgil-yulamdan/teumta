@@ -11,7 +11,7 @@ export function ActiveTripCard({ showEmpty = false }: { showEmpty?: boolean }) {
   if (!ready) return <View accessibilityLabel="여행 불러오는 중" style={styles.placeholder} />;
   if (!selected) {
     return showEmpty ? (
-      <Link href="/search" asChild>
+      <Link href={{ pathname: '/', params: { search: '1' } }} asChild>
         <Pressable accessibilityRole="button" style={styles.card}>
           <View style={styles.heading}>
             <View style={styles.emptyCopy}>

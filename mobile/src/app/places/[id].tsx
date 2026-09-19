@@ -147,7 +147,7 @@ export default function PlaceDetailScreen() {
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.screen}>
 
       <View style={styles.heroTopRow}>
-        <Pressable accessibilityRole="button" accessibilityLabel="뒤로 가기" style={styles.heroButton} onPress={() => router.canGoBack() ? router.back() : router.replace('/search')}>
+        <Pressable accessibilityRole="button" accessibilityLabel="뒤로 가기" style={styles.heroButton} onPress={() => router.canGoBack() ? router.back() : router.replace('/')}>
           <Image
             source={require('@/assets/images/icons/back.svg')}
             style={styles.heroButtonIcon}
