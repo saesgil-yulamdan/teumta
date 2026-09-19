@@ -9,27 +9,15 @@ import { TeumtaHybrid, TeumtaLayout } from '@/constants/theme';
 const TABS = [
   {
     key: 'index',
-    label: '홈',
+    label: '둘러보기',
     activeIcon: require('@/assets/images/icons/tab-home.svg'),
     inactiveIcon: require('@/assets/images/icons/tab-home-inactive.svg'),
-  },
-  {
-    key: 'search',
-    label: '탐색',
-    activeIcon: require('@/assets/images/icons/tab-explore-active.svg'),
-    inactiveIcon: require('@/assets/images/icons/tab-explore.svg'),
   },
   {
     key: 'trips',
     label: '내 여행',
     activeIcon: require('@/assets/images/icons/tab-trips-active.svg'),
     inactiveIcon: require('@/assets/images/icons/tab-trips.svg'),
-  },
-  {
-    key: 'my',
-    label: '마이',
-    activeIcon: require('@/assets/images/icons/tab-my-active.svg'),
-    inactiveIcon: require('@/assets/images/icons/tab-my.svg'),
   },
 ] as const;
 

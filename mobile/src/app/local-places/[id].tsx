@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useBookmarks } from '@/hooks/use-bookmarks';
 import { getLocalPlaceDetail } from '@/api/places';
 import { PlaceThumbnail } from '@/components/place-thumbnail';
 import { ScreenSection } from '@/components/screen-section';
@@ -47,7 +48,8 @@ export default function LocalPlaceDetailScreen() {
   const params = useLocalSearchParams<LocalPlaceParams>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const goBack = () => router.canGoBack() ? router.back() : router.replace('/search');
+  const { isPlaceBookmarked, togglePlaceBookmark } = useBookmarks();
+  const goBack = () => router.canGoBack() ? router.back() : router.replace('/');
   const isFestival = params.category === '행사·축제';
   const eventDate = (value?: string) => value && /^\d{8}$/.test(value)
     ? `${value.slice(0, 4)}.${value.slice(4, 6)}.${value.slice(6, 8)}` : null;
@@ -59,6 +61,7 @@ export default function LocalPlaceDetailScreen() {
   const hasCoordinate = Number.isFinite(latitude) && Number.isFinite(longitude);
 
   const [detail, setDetail] = useState<LocalPlaceDetail | null>(null);
+  const [detailStatus, setDetailStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [showReport, setShowReport] = useState(false);
 
   // 소개문은 목록에 없다. 화면에 실제로 들어온 1곳만 상세로 조회한다(외부 API 쿼터).
@@ -72,11 +75,11 @@ export default function LocalPlaceDetailScreen() {
     getLocalPlaceDetail(contentId)
       .then((data) => {
         if (!ignored) {
-          setDetail(data);
+          setDetail(data); setDetailStatus('ready');
         }
       })
       .catch(() => {
-        // 소개가 없는 장소도 있다. 실패하면 해당 섹션만 숨긴다.
+        if (!ignored) setDetailStatus('error');
       });
 
     return () => {
@@ -113,6 +116,7 @@ export default function LocalPlaceDetailScreen() {
             contentFit="contain"
           />
         </Pressable>
+        {contentId && <Pressable accessibilityRole="button" accessibilityLabel={isPlaceBookmarked('TOUR', contentId) ? '저장 해제' : '장소 저장'} accessibilityState={{ selected: isPlaceBookmarked('TOUR', contentId) }} style={[styles.heroButton, { marginLeft: 'auto' }]} onPress={() => togglePlaceBookmark({ id: contentId, source: 'TOUR', name: params.name!, address: params.address ?? null, imageUrl: params.imageUrl ?? null, local: { latitude: String(latitude), longitude: String(longitude), category: params.category, eventStartDate: params.eventStartDate, eventEndDate: params.eventEndDate } })}><Text>{isPlaceBookmarked('TOUR', contentId) ? '저장됨' : '저장'}</Text></Pressable>}
       </View>
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
         <PlaceThumbnail
@@ -133,6 +137,10 @@ export default function LocalPlaceDetailScreen() {
         </View>
 
         <View style={styles.content}>
+          {params.address && <Text style={styles.description}>{params.address}</Text>}
+          {!contentId && <Text style={styles.description}>다시 조회할 수 있는 장소 코드가 없어 저장은 지원하지 않아요. 외부 지도에서 확인해 주세요.</Text>}
+          {contentId && detailStatus !== 'ready' && <Text style={styles.description}>{detailStatus === 'loading' ? '소개·운영정보 확인 중…' : '소개·운영정보 조회 실패 · 외부 지도에서 확인해 주세요.'}</Text>}
+          {params.destinationName && <Text style={styles.description}>아래 거리·시간은 {params.destinationName} 기준의 예상치입니다.</Text>}
           <View style={styles.statsRow}>
             <View style={styles.statTile}>
               <Text style={styles.statLabel}>도보</Text>
@@ -194,7 +202,7 @@ export default function LocalPlaceDetailScreen() {
 
           <View style={styles.emptyBox}>
             <Text style={styles.emptyBoxText}>
-              거리·시간은 실제 보행 경로 기준입니다.
+              거리·시간은 표시된 기준 장소에서의 예상치이며 현재 위치 기준이 아닙니다.
             </Text>
           </View>
 

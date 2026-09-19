@@ -1,3 +1,4 @@
+import { publicDestination } from './public-destination';
 import { apiClient } from './client';
 import type {
   ConcentrationForecast,
@@ -29,7 +30,7 @@ export async function getRealtimeCongestion(
   identifier: { poiId: string } | { contentId: string },
 ): Promise<RealtimeCongestion> {
   const response = await apiClient.get<{ data: RealtimeCongestion }>('/congestion', {
-    params: identifier,
+    params: publicDestination(identifier),
   });
   return response.data.data;
 }
@@ -66,7 +67,7 @@ export async function getNearbyLocalPlaces(
   radius = 2000,
 ): Promise<NearbyLocalPlaceResult[]> {
   const response = await apiClient.get<{ data: NearbyLocalPlaceResult[] }>('/local-places', {
-    params: { ...identifier, radius },
+    params: { ...publicDestination(identifier), radius },
   });
   return response.data.data;
 }
@@ -79,7 +80,7 @@ export async function getNearbyFestivals(
   const response = await apiClient.get<{ data: NearbyLocalPlaceResult[] }>(
     '/festivals/nearby',
     {
-      params: { ...identifier, radius },
+      params: { ...publicDestination(identifier), radius },
     },
   );
   return response.data.data;

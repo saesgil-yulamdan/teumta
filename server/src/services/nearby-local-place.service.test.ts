@@ -445,11 +445,10 @@ describe('getNearbyLocalPlacesByContentId — 검색으로 고른 목적지 기�
     expect(fetchTourPlacesByLocationMock).not.toHaveBeenCalled();
   });
 
-  it('상세 조회 실패는 오류로 전파된다(fallback 좌표 없음)', async () => {
+  it('상세 조회 실패는 NOT_FOUND로 처리한다(Tour 장애를 전체 502/504로 올리지 않음)', async () => {
     fetchTourPlaceDetailMock.mockRejectedValue(new ExternalApiError('tour', 'boom'));
-    await expect(getNearbyLocalPlacesByContentId('126508')).rejects.toBeInstanceOf(
-      ExternalApiError,
-    );
+    expect((await getNearbyLocalPlacesByContentId('126508')).status).toBe('NOT_FOUND');
+    expect(fetchTourPlacesByLocationMock).not.toHaveBeenCalled();
   });
 
   it('기준 목적지 자신(contentid 동일)은 결과에서 제외한다', async () => {

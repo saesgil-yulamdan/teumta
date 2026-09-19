@@ -1,196 +1,298 @@
 import { Image } from 'expo-image';
-import { Link, useFocusEffect } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Link } from 'expo-router';
+import { useMemo, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { getRealtimeCongestion } from '@/api/places';
-import { REALTIME_LEVEL_LABEL, REALTIME_LEVEL_TO_CONGESTION_LEVEL } from '@/constants/congestion';
-import { FEATURED_DESTINATIONS, type FeaturedDestination } from '@/constants/destinations';
-import { TeumtaHybrid, TeumtaHybridCongestion } from '@/constants/theme';
-import { resolveCongestionRefresh, type HomeCongestionEntry } from '@/utils/home-congestion';
-import { realtimeBasisLabel } from '@/utils/realtime-status';
+import {
+  ALL_REGIONS,
+  FEATURED_DESTINATIONS,
+  type FeaturedDestination,
+  type Region,
+} from '@/constants/destinations';
+import { TeumtaHybrid, TeumtaLayout } from '@/constants/theme';
 
-const REALTIME_CANDIDATES = FEATURED_DESTINATIONS.filter((destination) => destination.hasRealtimeCongestion);
-// 홈 미리보기는 3곳만 확인한다. 전체 장소 조회는 상세 화면에서 사용자가 직접 연다.
-const QUIET_NOW_CANDIDATE_COUNT = 3;
-const REFRESH_AFTER_MS = 5 * 60 * 1000;
+/** 리드 1 + 모자이크 4(2×2). 홈에서는 혼잡 API를 호출하지 않는다. */
+const PAGE_SIZE = 5;
 
-type QuietNowProps = { refreshSignal?: number; onRefreshed?: () => void };
+const WITH_IMAGES = FEATURED_DESTINATIONS.filter(
+  (destination): destination is FeaturedDestination & { imageUrl: string } =>
+    Boolean(destination.imageUrl),
+);
 
-export function QuietNow({ refreshSignal = 0, onRefreshed }: QuietNowProps) {
-  const [snapshot, setSnapshot] = useState<{
-    entries: HomeCongestionEntry[] | null; failed: boolean; partial: boolean;
-  }>({ entries: null, failed: false, partial: false });
-  const [expanded, setExpanded] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [retrySignal, setRetrySignal] = useState(0);
-  const [now, setNow] = useState(() => new Date());
-  const lastLoadedAt = useRef(0);
-  const handledRefresh = useRef(-1);
-  const handledRetry = useRef(-1);
+const REGION_OPTIONS = ALL_REGIONS.filter((region) =>
+  WITH_IMAGES.some((destination) => destination.region === region),
+);
 
-  useFocusEffect(useCallback(() => {
-    let ignored = false;
-    let pending = false;
-    const load = async (force = false) => {
-      if (pending || (!force && Date.now() - lastLoadedAt.current < REFRESH_AFTER_MS)) return;
-      pending = true;
-      setLoading(true);
-      const results = await Promise.allSettled(
-        selectQuietNowCandidates(refreshSignal + retrySignal).map(async (destination) => ({
-          destination,
-          congestion: await getRealtimeCongestion({ contentId: destination.tourApiContentId }),
-        })),
-      );
-      pending = false;
-      if (ignored) return;
-      // 실패 직후에도 자동 재시도 간격을 지키되, 버튼은 즉시 재시도한다.
-      lastLoadedAt.current = Date.now();
-      setSnapshot((previous) => resolveCongestionRefresh(previous.entries, results));
-      setLoading(false);
-      setNow(new Date());
-      onRefreshed?.();
-    };
-    const force = handledRefresh.current !== refreshSignal || handledRetry.current !== retrySignal;
-    handledRefresh.current = refreshSignal;
-    handledRetry.current = retrySignal;
-    // 진행 중 요청이 포커스를 잃어 취소된 경우에도 다시 조회한다.
-    void load(force || lastLoadedAt.current === 0);
-    const timer = setInterval(() => {
-      setNow(new Date());
-      if (AppState.currentState === 'active') void load();
-    }, 30_000);
-    const listener = AppState.addEventListener('change', (state) => {
-      if (state === 'active') { setNow(new Date()); void load(); }
-    });
-    return () => {
-      ignored = true;
-      listener.remove();
-      clearInterval(timer);
-      if (pending) { lastLoadedAt.current = 0; onRefreshed?.(); }
-    };
-  }, [refreshSignal, retrySignal, onRefreshed]));
+function placeHref(destination: FeaturedDestination) {
+  return {
+    pathname: '/places/[id]' as const,
+    params: {
+      id: destination.tourApiContentId,
+      source: 'TOUR',
+      name: destination.name,
+      address: destination.address,
+      imageUrl: destination.imageUrl ?? '',
+    },
+  };
+}
 
-  const { entries, failed, partial } = snapshot;
+export function QuietNow() {
+  const [region, setRegion] = useState<Region | null>(null);
+  const [page, setPage] = useState(0);
+
+  const pool = useMemo(
+    () =>
+      region
+        ? WITH_IMAGES.filter((destination) => destination.region === region)
+        : WITH_IMAGES,
+    [region],
+  );
+
+  const pageCount = Math.max(1, Math.ceil(pool.length / PAGE_SIZE));
+  const safePage = page % pageCount;
+  const pageItems = useMemo(
+    () => pool.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE),
+    [pool, safePage],
+  );
+  const lead = pageItems[0];
+  const mosaic = pageItems.slice(1);
+
   return (
-    <View style={styles.section}>
-      <View style={styles.sectionRow}>
-        <Text accessibilityRole="header" style={styles.sectionTitle}>혼잡도</Text>
-        <Text style={styles.liveLabel}>여유로운 순</Text>
-      </View>
-      {(failed || partial) && (
-        <View style={styles.notice} accessibilityLiveRegion="polite">
-          <Text style={styles.noticeText}>
-            {failed
-              ? entries?.length ? '갱신 실패 · 이전 정보입니다.' : '혼잡도를 불러오지 못했어요.'
-              : '일부 장소만 확인됐어요.'}
+    <View style={styles.root}>
+      <Text accessibilityRole="header" style={styles.heading}>
+        잠깐 둘러볼 곳
+      </Text>
+      <Text style={styles.caption}>
+        공개 관광정보에서 골라 둔 대표 장소예요. 현재 위치는 쓰지 않아요.
+      </Text>
+
+      <View style={styles.chipWrap} accessibilityRole="tablist">
+        <Pressable
+          accessibilityRole="tab"
+          accessibilityState={{ selected: region === null }}
+          style={[styles.chip, region === null && styles.chipSelected]}
+          onPress={() => {
+            setRegion(null);
+            setPage(0);
+          }}>
+          <Text
+            style={[
+              styles.chipLabel,
+              region === null && styles.chipLabelSelected,
+            ]}>
+            전체
           </Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="혼잡도 다시 확인"
-            disabled={loading} onPress={() => setRetrySignal((value) => value + 1)} style={styles.retry}>
-            <Text style={styles.retryText}>{loading ? '확인 중' : '다시 확인'}</Text>
-          </Pressable>
-        </View>
-      )}
-      {entries === null ? (
-        <View style={styles.loadingBox} accessibilityLabel="혼잡도 불러오는 중">
-          <ActivityIndicator color={TeumtaHybrid.navy} />
-        </View>
-      ) : entries.length > 0 ? (
-        <View>
-          {(expanded ? entries : entries.slice(0, 3)).map(({ destination, congestion }) => {
-            const palette = TeumtaHybridCongestion[REALTIME_LEVEL_TO_CONGESTION_LEVEL[congestion.level]];
-            return (
-              <Link key={destination.tourApiContentId} href={{
-                pathname: '/places/[id]',
-                params: {
-                  id: destination.tourApiContentId, source: 'TOUR', name: destination.name,
-                  address: destination.address,
-                  ...(destination.imageUrl ? { imageUrl: destination.imageUrl } : {}),
-                },
-              }} asChild>
-                <Pressable accessibilityRole="button" style={styles.card}>
-                  {destination.imageUrl ? (
-                    <Image source={{ uri: destination.imageUrl }} style={styles.cardImage}
-                      contentFit="cover" recyclingKey={destination.tourApiContentId} />
-                  ) : <View style={styles.cardImage} />}
-                  <View style={styles.cardBody}>
-                    <Text style={styles.cardName} numberOfLines={1}>{destination.name}</Text>
-                    <Text style={styles.cardMeta} numberOfLines={1}>{destination.areaLabel}</Text>
-                    <Text style={styles.timestamp}>
-                      {realtimeBasisLabel(congestion.measuredAt, now).replace('실시간 · ', '')}
-                    </Text>
-                    {failed && <Text style={styles.timestamp}>
-                      {realtimeBasisLabel(congestion.fetchedAt, now).replace('실시간 · ', '').replace(' 기준', ' 조회')}
-                    </Text>}
-                  </View>
-                  <View style={[styles.levelChip, { backgroundColor: palette.background }]}>
-                    <View style={[styles.levelDot, { backgroundColor: palette.dot }]} />
-                    <Text style={[styles.levelLabel, { color: palette.text }]}>
-                      {REALTIME_LEVEL_LABEL[congestion.level]}
-                    </Text>
-                  </View>
-                </Pressable>
-              </Link>
-            );
-          })}
-          {entries.length > 3 && (
-            <Pressable accessibilityRole="button" accessibilityState={{ expanded }}
-              onPress={() => setExpanded((value) => !value)} style={styles.expandButton}>
-              <Text style={styles.expandLabel}>{expanded ? '접기' : `전체 ${entries.length}곳 보기`}</Text>
+        </Pressable>
+        {REGION_OPTIONS.map((option) => {
+          const selected = region === option;
+          return (
+            <Pressable
+              key={option}
+              accessibilityRole="tab"
+              accessibilityState={{ selected }}
+              style={[styles.chip, selected && styles.chipSelected]}
+              onPress={() => {
+                setRegion(option);
+                setPage(0);
+              }}>
+              <Text
+                style={[
+                  styles.chipLabel,
+                  selected && styles.chipLabelSelected,
+                ]}>
+                {option}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {pageItems.length === 0 || !lead ? (
+        <Text style={styles.caption}>이 지역에 보여줄 사진이 아직 없어요.</Text>
+      ) : (
+        <>
+          <Link href={placeHref(lead)} asChild>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${lead.name}, ${lead.areaLabel}`}>
+              <View style={styles.lead}>
+                <Image
+                  source={{ uri: lead.imageUrl }}
+                  style={styles.leadImage}
+                  contentFit="cover"
+                  recyclingKey={lead.imageUrl}
+                />
+                <View style={styles.leadCopy}>
+                  <Text style={styles.leadEyebrow}>{lead.areaLabel}</Text>
+                  <Text style={styles.leadTitle}>{lead.name}</Text>
+                </View>
+              </View>
+            </Pressable>
+          </Link>
+
+          {mosaic.length > 0 && (
+            <View style={styles.mosaic}>
+              {mosaic.map((destination) => (
+                <Link
+                  key={destination.tourApiContentId}
+                  href={placeHref(destination)}
+                  asChild>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`${destination.name}, ${destination.areaLabel}`}
+                    style={styles.tile}>
+                    <Image
+                      source={{ uri: destination.imageUrl }}
+                      style={styles.tileImage}
+                      contentFit="cover"
+                      recyclingKey={destination.imageUrl}
+                    />
+                    <View style={styles.tileBody}>
+                      <Text style={styles.tileTitle} numberOfLines={1}>
+                        {destination.name}
+                      </Text>
+                      <Text style={styles.tileMeta} numberOfLines={1}>
+                        {destination.areaLabel}
+                      </Text>
+                    </View>
+                  </Pressable>
+                </Link>
+              ))}
+            </View>
+          )}
+
+          {pool.length > PAGE_SIZE && (
+            <Pressable
+              accessibilityRole="button"
+              style={styles.moreHit}
+              onPress={() => setPage((value) => (value + 1) % pageCount)}>
+              <Text style={styles.moreLabel}>다른 후보 보기 →</Text>
             </Pressable>
           )}
-        </View>
-      ) : null}
+        </>
+      )}
     </View>
   );
 }
 
-function selectQuietNowCandidates(refreshSignal: number): FeaturedDestination[] {
-  if (REALTIME_CANDIDATES.length <= QUIET_NOW_CANDIDATE_COUNT) {
-    return REALTIME_CANDIDATES;
-  }
-
-  const seed = `${todayKstDate()}:${refreshSignal}`;
-  const start = stableModulo(seed, REALTIME_CANDIDATES.length);
-  return Array.from({ length: QUIET_NOW_CANDIDATE_COUNT }, (_, index) => {
-    const candidateIndex = (start + index) % REALTIME_CANDIDATES.length;
-    return REALTIME_CANDIDATES[candidateIndex];
-  });
-}
-
-function todayKstDate(): string {
-  const now = new Date();
-  return new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
-}
-
-function stableModulo(value: string, modulo: number): number {
-  let hash = 2166136261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0) % modulo;
-}
-
 const styles = StyleSheet.create({
-  section: { gap: 8 },
-  sectionRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', paddingTop: 8 },
-  sectionTitle: { color: TeumtaHybrid.ink, fontSize: 17, fontWeight: '700', lineHeight: 24 },
-  liveLabel: { color: TeumtaHybrid.muted, fontSize: 12, lineHeight: 18 },
-  notice: { backgroundColor: TeumtaHybrid.canvas, borderRadius: 8, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  noticeText: { flex: 1, color: TeumtaHybrid.muted, fontSize: 12, lineHeight: 18, paddingVertical: 10 },
-  retry: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
-  retryText: { color: TeumtaHybrid.navy, fontSize: 12, fontWeight: '600' },
-  loadingBox: { alignItems: 'center', justifyContent: 'center', height: 240 },
-  card: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: TeumtaHybrid.line },
-  cardImage: { backgroundColor: TeumtaHybrid.canvas, borderRadius: 8, height: 48, width: 48 },
-  cardBody: { flex: 1, gap: 2 },
-  cardName: { color: TeumtaHybrid.ink, fontSize: 15, fontWeight: '600', lineHeight: 22 },
-  cardMeta: { color: TeumtaHybrid.muted, fontSize: 12, lineHeight: 18 },
-  timestamp: { color: TeumtaHybrid.muted, fontSize: 11, lineHeight: 16 },
-  levelChip: { alignItems: 'center', borderRadius: 6, flexDirection: 'row', gap: 5, paddingHorizontal: 8, paddingVertical: 5 },
-  levelDot: { borderRadius: 3, height: 6, width: 6 },
-  levelLabel: { fontSize: 12, fontWeight: '600', lineHeight: 18 },
-  expandButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  expandLabel: { color: TeumtaHybrid.muted, fontSize: 13, fontWeight: '600' },
+  root: {
+    gap: 14,
+  },
+  heading: {
+    color: TeumtaHybrid.ink,
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 26,
+  },
+  caption: {
+    color: TeumtaHybrid.muted,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  chipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    backgroundColor: TeumtaHybrid.canvas,
+    borderRadius: 999,
+    minHeight: 36,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    justifyContent: 'center',
+  },
+  chipSelected: {
+    backgroundColor: TeumtaHybrid.navySoft,
+  },
+  chipLabel: {
+    color: TeumtaHybrid.muted,
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  chipLabelSelected: {
+    color: TeumtaHybrid.navy,
+    fontWeight: '800',
+  },
+  lead: {
+    borderRadius: TeumtaLayout.cardRadius,
+    overflow: 'hidden',
+    backgroundColor: TeumtaHybrid.line,
+    height: 200,
+  },
+  leadImage: {
+    ...StyleSheet.absoluteFill,
+  },
+  leadCopy: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    gap: 4,
+    paddingHorizontal: 16,
+    paddingTop: 48,
+    paddingBottom: 16,
+    backgroundColor: 'rgba(20, 28, 40, 0.48)',
+  },
+  leadEyebrow: {
+    color: 'rgba(255,255,255,0.86)',
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  leadTitle: {
+    color: TeumtaHybrid.white,
+    fontSize: 22,
+    fontWeight: '800',
+    lineHeight: 30,
+  },
+  mosaic: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  tile: {
+    width: '48%',
+    flexGrow: 1,
+    flexBasis: '46%',
+    backgroundColor: TeumtaHybrid.paper,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: TeumtaHybrid.line,
+    overflow: 'hidden',
+  },
+  tileImage: {
+    width: '100%',
+    aspectRatio: 1,
+    backgroundColor: TeumtaHybrid.line,
+  },
+  tileBody: {
+    gap: 2,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  tileTitle: {
+    color: TeumtaHybrid.ink,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
+  },
+  tileMeta: {
+    color: TeumtaHybrid.muted,
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  moreHit: {
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  moreLabel: {
+    color: TeumtaHybrid.navy,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 22,
+  },
 });

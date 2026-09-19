@@ -34,7 +34,10 @@
 - foreground 위치 권한만 요청하며 background 위치 권한과 foreground service를 사용하지 않습니다.
 - 위치 구독은 화면 생명주기에 맞춰 해제합니다.
 - Haversine 거리와 도착 판정은 단말에서 수행합니다.
-- 현재 코스·진행 상태·최근 본 코스는 AsyncStorage에만 보존하고 완료 또는 종료 시 정리합니다.
+- 저장 장소·최근 검색/열람·현재 여행·회차별 결과는 기기 AsyncStorage에 독립된 목록으로 보관합니다. 완료/종료 시 현재 여행은 회차 기록으로 옮기며 자동 열람 기록의 개수 제한은 여행 결과에 적용하지 않습니다.
+- 회차 식별자는 단말 내부용이며 API 요청과 로그에 넣지 않습니다. 공개 장소 식별자는 전송 직전에 허용 필드만 선택합니다.
+- 위치·알림은 진행 화면에서 각각 선택해서 켭니다. 위치 권한 없이 수동 도착·복귀·완료가 가능합니다. 화면 이탈은 여행 종료가 아니며 예약 알림은 유지됩니다.
+- 여행 데이터 전체 삭제는 레거시 키·예약 알림·미리보기 메모리도 정리합니다. 온보딩과 표시 설정은 유지합니다.
 - 외부 지도 앱에는 목적지만 넘기며 틈타 서버에는 출발지 GPS를 보내지 않습니다.
 
 주요 구현:
@@ -43,7 +46,9 @@
 |---|---|
 | `mobile/src/hooks/use-current-location.ts` | foreground 위치와 구독 해제 |
 | `mobile/src/hooks/use-course-progress.ts` | 단말 코스 진행·복구 |
-| `mobile/src/stores/selected-course.ts` | 선택 코스 단말 저장 |
+| `mobile/src/stores/selected-course.ts` | 여행과 독립된 미리보기 메모리 |
+| `mobile/src/stores/travel-repository.ts` | 직렬화된 저장·이행·회차 기록·삭제 복구 |
+| `mobile/src/api/public-destination.ts` | 공개 요청 식별자 허용 목록 |
 | `mobile/src/utils/distance.ts` | 단말 거리 계산 |
 | `server/src/services/route-calculation.service.ts` | 장소 고정 좌표 간 TMAP 계산 |
 

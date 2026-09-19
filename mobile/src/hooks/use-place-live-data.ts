@@ -59,7 +59,7 @@ export function usePlaceLiveData(options: {
           if (ignored) return;
           setRefreshing(false);
           setCongestion(data);
-          setCongestionStatus('idle');
+          setCongestionStatus(data.isRealtime ? 'idle' : 'unavailable');
         })
         .catch((error: unknown) => {
           if (ignored) return;

@@ -1,5 +1,6 @@
+import { appAlert as Alert } from '@/utils/app-alert';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,11 +14,18 @@ import { courseDistanceMeters, courseStayMinutes } from '@/types/course';
 import { buildCourseRoutePath } from '@/utils/course-path';
 import { withRoJosa } from '@/utils/text';
 import { timeLabelAfter } from '@/utils/time';
+import { travel, useTravel, storageError } from '@/stores/travel';
 
 const DOT_START = TeumtaHybrid.ink;
 
 export default function CourseMapScreen() {
   const router = useRouter();
+  const { historical } = useLocalSearchParams<{ historical?: string }>();
+  const { active, deletionRevision } = useTravel();
+  const [openedRevision] = useState(deletionRevision);
+  const [starting, setStarting] = useState(false);
+  const [, tick] = useState(0);
+  useEffect(() => { const timer = setInterval(() => tick(v => v + 1), 30000); return () => clearInterval(timer); }, []);
   const [selected, setSelected] = useState(getSelectedCourse);
   const [loading, setLoading] = useState(!selected);
 
@@ -36,11 +44,11 @@ export default function CourseMapScreen() {
     return <View style={styles.emptyContainer}><ActivityIndicator color={TeumtaHybrid.navy} accessibilityLabel="코스 불러오는 중" /></View>;
   }
 
-  if (!selected) {
+  if (!selected || deletionRevision !== openedRevision) {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>선택한 코스 정보가 없어요.</Text>
-        <Pressable style={styles.emptyButton} onPress={() => router.canGoBack() ? router.back() : router.replace('/search')}>
+        <Pressable style={styles.emptyButton} onPress={() => router.canGoBack() ? router.back() : router.replace({ pathname: '/', params: { search: '1' } })}>
           <Text style={styles.emptyButtonLabel}>코스 다시 고르기</Text>
         </Pressable>
       </View>
@@ -48,6 +56,23 @@ export default function CourseMapScreen() {
   }
 
   const { course, destination } = selected;
+  const depart = () => {
+    if (historical === '1') {
+      router.push({ pathname: '/detours', params: { ...selected.destinationParams } });
+      return;
+    }
+    const expectedId = active?.id ?? null;
+    const start = async () => {
+      setStarting(true);
+      try { await travel.start(selected, expectedId); router.push('/trip'); }
+      catch (error) { storageError(error); }
+      finally { setStarting(false); }
+    };
+    if (active) Alert.alert('현재 여행을 종료하고 출발할까요?', active.selected.destination.name + ' 여행은 중간 종료 기록으로 남고 복귀 알림은 취소돼요.', [
+      { text: '기존 여행 유지', style: 'cancel' }, { text: '새 코스로 출발', onPress: () => void start() },
+    ]);
+    else void start();
+  };
   const distanceLabel = `${(courseDistanceMeters(course) / 1000).toFixed(1)}km`;
   const returnTimeLabel = timeLabelAfter(course.totalMinutes);
   const courseName = course.stops.map((stop) => stop.name).join(' · ');
@@ -123,7 +148,7 @@ export default function CourseMapScreen() {
       order: index + 1,
       imageUrl: stop.imageUrl,
       title: stop.name,
-      subtitle: `권장 체류 ${stop.stayMinutes}분${stop.address ? ` · ${stop.address}` : ''}`,
+      subtitle: `이전 지점에서 도보 ${stop.travelMinutesFromPrevious}분 · 권장 체류 ${stop.stayMinutes}분${stop.address ? ` · ${stop.address}` : ''}`,
       time: timeLabelAfter(arrivalMinutes[index]),
     })),
     {
@@ -139,7 +164,7 @@ export default function CourseMapScreen() {
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.screen}>
       <View style={styles.topBar}>
         <Pressable accessibilityRole="button" accessibilityLabel="뒤로 가기" style={styles.topButton}
-          onPress={() => router.canGoBack() ? router.back() : router.replace('/search')}>
+          onPress={() => router.canGoBack() ? router.back() : router.replace('/')}>
           <Image source={require('@/assets/images/icons/back.svg')} style={styles.topButtonIcon} contentFit="contain" />
         </Pressable>
         <Text style={styles.navigationTitle}>코스 상세</Text>
@@ -158,7 +183,7 @@ export default function CourseMapScreen() {
           <Text style={styles.description}>잠깐 들렀다, 다시 목적지로 돌아오는 여행</Text>
           <View style={styles.metrics}>
             {[
-              { value: `${course.totalMinutes}분`, label: '총 소요 시간' },
+              { value: `${course.totalMinutes}분`, label: '총 예상 시간' },
               { value: distanceLabel, label: '걷는 거리' },
               { value: `${courseStayMinutes(course)}분`, label: '추천 체류' },
             ].map((metric) => (
@@ -206,8 +231,8 @@ export default function CourseMapScreen() {
 
       <ScreenActionBar>
         <Text style={styles.returnText}>지금 출발하면 <Text style={styles.returnTime}>{returnTimeLabel}</Text> 복귀 예상</Text>
-        <Pressable accessibilityRole="button" style={styles.ctaButton} onPress={() => router.push('/trip')}>
-          <Text style={styles.ctaLabel}>이 코스로 출발하기</Text>
+        <Pressable accessibilityRole="button" accessibilityState={{ disabled: starting, busy: starting }} disabled={starting} style={styles.ctaButton} onPress={depart}>
+          <Text style={styles.ctaLabel}>{starting ? '여행 저장 중…' : historical === '1' ? '현재 조건으로 코스 다시 조회' : '이 코스로 출발하기'}</Text>
           <Text style={styles.ctaArrow}>→</Text>
         </Pressable>
       </ScreenActionBar>

@@ -12,18 +12,18 @@ const STORAGE_KEY = 'teumta:onboarding-seen:v1';
 const STEPS = [
   {
     key: 'check',
-    title: '혼잡도 확인',
-    body: '목적지의 현재 상태를 봅니다.',
+    title: '장소 선택',
+    body: '출발하고 돌아올 장소를 골라요.',
   },
   {
     key: 'detour',
-    title: '주변으로 우회',
-    body: '남는 시간에 맞춰 걸어봅니다.',
+    title: '주변 코스',
+    body: '30·60·90분에 맞는 코스를 살펴봐요.',
   },
   {
     key: 'return',
-    title: '제시간에 복귀',
-    body: '복귀시각을 계속 다시 계산합니다.',
+    title: '다시 돌아오기',
+    body: '직접 도착과 복귀를 기록할 수 있어요.',
   },
 ] as const;
 
@@ -95,12 +95,13 @@ export function Onboarding() {
           <View style={styles.privacyStrip}>
             <View style={styles.privacyDot} />
             <Text style={styles.privacyText}>
-              로그인 없이 사용 · 위치는 기기에서만 처리
+              회원가입 없이 이용 · 여행 정보는 이 기기에 보관
             </Text>
           </View>
         </ScrollView>
 
-        <Pressable style={styles.ctaButton} onPress={dismiss}>
+        <Pressable accessibilityRole="button" style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }} onPress={dismiss}><Text style={styles.stepBody}>건너뛰기</Text></Pressable>
+        <Pressable accessibilityRole="button" style={styles.ctaButton} onPress={dismiss}>
           <Text style={styles.ctaLabel}>시작하기</Text>
         </Pressable>
       </SafeAreaView>
