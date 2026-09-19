@@ -37,6 +37,10 @@ export default function RootLayout() {
             />
             <Stack.Screen name="detours" options={{ title: '틈타 코스', headerShown: false }} />
             <Stack.Screen name="course-map" options={{ title: '코스 상세', headerShown: false }} />
+            <Stack.Screen name="settings" options={{ headerShown: false }} />
+            <Stack.Screen name="history/[id]" options={{ headerShown: false }} />
+            <Stack.Screen name="my" options={{ headerShown: false }} />
+            <Stack.Screen name="search" options={{ headerShown: false }} />
             <Stack.Screen name="trip" options={{ title: '코스 진행', headerShown: false }} />
           </Stack>
         </CourseLogProvider>

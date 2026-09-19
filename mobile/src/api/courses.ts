@@ -1,3 +1,4 @@
+import { publicDestination } from './public-destination';
 import { apiClient, COURSE_API_TIMEOUT_MS } from './client';
 import type {
   CourseAlternativesResult,
@@ -65,7 +66,7 @@ export async function fetchCourses(
 
   const request = apiClient
     .get<{ data: CourseGenerationResult }>('/courses', {
-      params: { ...identifier, availableMinutes, variant },
+      params: { ...publicDestination(identifier), availableMinutes, variant },
       timeout: COURSE_API_TIMEOUT_MS,
     })
     .then((response) => {
@@ -102,7 +103,7 @@ export async function fetchCourseAlternatives(input: {
     {
       params: {
         originContentId: input.originContentId,
-        ...input.destination,
+        ...publicDestination(input.destination),
         availableMinutes: input.availableMinutes,
         excludeContentIds: input.excludeContentIds.join(','),
       },

@@ -61,7 +61,7 @@ export function ReportModal({ visible, onClose, kind, place }: ReportModalProps)
     } catch {
       Alert.alert(
         '메일 앱을 열 수 없어요',
-        '기기에 메일 앱을 설정한 뒤 다시 시도하거나 마이 화면의 지원·문의를 이용해 주세요.',
+        '기기에 메일 앱을 설정한 뒤 다시 시도하거나 설정·도움의 문의를 이용해 주세요.',
       );
     }
   };

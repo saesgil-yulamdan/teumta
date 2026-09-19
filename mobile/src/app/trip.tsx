@@ -1,9 +1,9 @@
+import { appAlert as Alert } from '@/utils/app-alert';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -18,21 +18,13 @@ import { CourseMapView } from '@/components/course-map-view';
 import { REALTIME_LEVEL_LABEL } from '@/constants/congestion';
 import { TeumtaHybrid, TeumtaLayout } from '@/constants/theme';
 import { ScreenActionBar, screenActionStyles } from '@/components/screen-action-bar';
-import { useCourseLog } from '@/hooks/use-course-log';
+import { travel, useTravel, storageError } from '@/stores/travel';
 import { useCourseProgress, type CourseStop } from '@/hooks/use-course-progress';
 import { useCurrentLocation } from '@/hooks/use-current-location';
 import { useDestinationCongestion } from '@/hooks/use-destination-congestion';
 import { useTripNotifications } from '@/hooks/use-trip-notifications';
 import { fetchCourseAlternatives } from '@/api/courses';
 import { getLocalPlaceDetail } from '@/api/places';
-import {
-  clearSelectedCourse,
-  getSelectedCourse,
-  loadSelectedCourse,
-  selectedCourseKey,
-  setSelectedCourse,
-  type SelectedCourse,
-} from '@/stores/selected-course';
 import type { GeneratedCourse } from '@/types/course';
 import type { LocalPlaceDetail } from '@/types/place';
 import { buildCourseRoutePath } from '@/utils/course-path';
@@ -41,6 +33,7 @@ import { distanceInMeters } from '@/utils/distance';
 import { evaluateOperatingStatus, type OperatingStatus } from '@/utils/operating-status';
 import { withRoJosa } from '@/utils/text';
 import { timeLabelAt } from '@/utils/time';
+import { realtimeBasisLabel } from '@/utils/realtime-status';
 import { courseStopId } from '@/utils/trip-summary';
 import {
   courseReturningAfterCurrent,
@@ -75,12 +68,12 @@ type OperatingInfoState =
 
 export default function TripScreen() {
   const router = useRouter();
-  const [selected, setSelected] = useState<SelectedCourse | null>(() => getSelectedCourse());
-  const [selectionReady, setSelectionReady] = useState(selected !== null);
+  const { active, ready: selectionReady, error: travelError } = useTravel();
+  const selected = active?.selected ?? null;
   const course = selected?.course;
   const destination = selected?.destination;
-  const [activeCourse, setActiveCourse] = useState<GeneratedCourse | null>(course ?? null);
-  const plannedCourse = activeCourse ?? course;
+  const plannedCourse = course;
+  const [focused, setFocused] = useState(true);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [adjustmentPrompt, setAdjustmentPrompt] = useState<AdjustmentPrompt | null>(null);
   const [alternatives, setAlternatives] = useState<AlternativeOption[]>([]);
@@ -96,19 +89,6 @@ export default function TripScreen() {
   const warnedOperatingStops = useRef(new Set<string>());
   const alternativeRequestId = useRef(0);
 
-  useEffect(() => {
-    if (selected) return;
-    let ignored = false;
-    void loadSelectedCourse().then((restored) => {
-      if (!ignored) {
-        setSelected(restored);
-        setSelectionReady(true);
-      }
-    });
-    return () => {
-      ignored = true;
-    };
-  }, [selected]);
 
   useEffect(() => {
     const timer = setInterval(() => setNowMs(Date.now()), CLOCK_TICK_MS);
@@ -136,7 +116,7 @@ export default function TripScreen() {
     [plannedCourse, destination],
   );
 
-  const { location, status, start: startLocation } = useCurrentLocation({ watch: true });
+  const { location, status, start: startLocation, stop: stopLocation } = useCurrentLocation({ watch: true });
   const {
     phase,
     ready: progressReady,
@@ -146,15 +126,18 @@ export default function TripScreen() {
     stayingSince,
     startedAt,
     outcomes,
-    start,
-    clearPersistedProgress,
+    arrive,
+    undoArrival,
     skipCurrent,
     finishCurrentStay,
     updateWithLocation,
-  } = useCourseProgress(courseStops, selected ? selectedCourseKey(selected) : null);
-  const { markCourseCompleted } = useCourseLog();
-  // 완료 기록은 코스당 1회 — 기록이 상태를 바꾸고 상태가 다시 기록을 부르는 순환 방지.
-  const completionLogged = useRef(false);
+  } = useCourseProgress(courseStops, active?.id);
+  const sessionId = active?.id;
+  useFocusEffect(useCallback(() => {
+    setFocused(true);
+    if (!sessionId) stopLocation();
+    return () => { setFocused(false); stopLocation(); };
+  }, [stopLocation, sessionId]));
 
   const completed = phase === 'completed';
   const currentCourseStop = plannedCourse?.stops[currentIndex] ?? null;
@@ -193,8 +176,9 @@ export default function TripScreen() {
     setTimeout(() => setNowMs(Date.now()), 0);
   }, []);
 
-  const { returnAlarmSet, cancelReturnReminder, notify } = useTripNotifications({
+  const { returnAlarmSet, enableReminder, notify } = useTripNotifications({
     enabled: Boolean(plannedCourse && destination),
+    sessionId: active?.id,
     active: phase === 'in_progress',
     destinationName: destination?.name ?? null,
     totalMinutesUntilReturn: Math.max(
@@ -204,30 +188,14 @@ export default function TripScreen() {
     returnWalkMinutes: reminderReturnWalkMinutes,
   });
 
-  const { congestion, congestionEased } = useDestinationCongestion({
+  const { congestion, congestionEased, status: congestionStatus } = useDestinationCongestion({
+    enabled: focused,
     identifier: selected?.destinationParams,
     destinationName: selected?.destination.name,
     onEased: notify,
     onForeground: refreshClock,
   });
 
-  useEffect(() => {
-    if (phase !== 'completed') {
-      return;
-    }
-    // 마지막 복귀 지점 도착 판정이 나면 "다녀온 코스"로 기기에만 남긴다.
-    if (selected && !completionLogged.current) {
-      completionLogged.current = true;
-      markCourseCompleted(selected, true);
-      clearSelectedCourse();
-    }
-  }, [phase, selected, markCourseCompleted]);
-
-  useEffect(() => {
-    if (!selectionReady || !selected || !progressReady || courseStops.length === 0) return;
-    start();
-    void startLocation();
-  }, [selectionReady, selected, progressReady, courseStops.length, start, startLocation]);
 
   useEffect(() => {
     if (location) {
@@ -302,9 +270,7 @@ export default function TripScreen() {
   const movingSubtitle =
     distanceToNext !== null && walkMinutes !== null
       ? `${formatDistance(distanceToNext)} · 도보 ${walkMinutes}분`
-      : status === 'denied'
-        ? '남은 거리 확인에 위치 권한이 필요해요'
-        : '위치 확인 중';
+      : '도착하면 아래에서 직접 알려주세요';
 
   const statusTitle = completed
     ? '코스 완료'
@@ -439,16 +405,18 @@ export default function TripScreen() {
     }
   };
 
-  const applyAlternative = (alternative: GeneratedCourse) => {
+  const applyAlternative = async (alternative: GeneratedCourse) => {
     if (!selected) {
       return;
     }
     const replanned = courseWithAlternative(plannedCourse, currentIndex, alternative);
-    setActiveCourse(replanned);
     const nextSelected = { ...selected, course: replanned };
-    setSelected(nextSelected);
-    setSelectedCourse(nextSelected);
-    skipCurrent(adjustmentPrompt?.outcome ?? 'skipped');
+    if (!active) return;
+    try {
+      await travel.replan(active.id, nextSelected, stayingAt
+        ? { type: 'finish_stay' }
+        : { type: 'skip', stop: courseStops[currentIndex], outcome: adjustmentPrompt?.outcome ?? 'skipped' });
+    } catch (error) { storageError(error); return; }
     alternativeRequestId.current += 1;
     setAdjustmentPrompt(null);
     setAlternatives([]);
@@ -456,7 +424,7 @@ export default function TripScreen() {
     refreshClock();
   };
 
-  const returnNow = () => {
+  const returnNow = async () => {
     if (!selected || !currentCourseStop) {
       return;
     }
@@ -471,11 +439,13 @@ export default function TripScreen() {
       minutes: returnMinutes,
       distanceMeters: Math.round(distanceMeters * 1.3),
     });
-    setActiveCourse(returningCourse);
     const nextSelected = { ...selected, course: returningCourse };
-    setSelected(nextSelected);
-    setSelectedCourse(nextSelected);
-    skipCurrent(adjustmentPrompt?.outcome ?? 'skipped');
+    if (!active) return;
+    try {
+      await travel.replan(active.id, nextSelected, stayingAt
+        ? { type: 'finish_stay' }
+        : { type: 'skip', stop: courseStops[currentIndex], outcome: adjustmentPrompt?.outcome ?? 'skipped' });
+    } catch (error) { storageError(error); return; }
     alternativeRequestId.current += 1;
     setAdjustmentPrompt(null);
     setAlternatives([]);
@@ -506,12 +476,7 @@ export default function TripScreen() {
   const skipActionLabel =
     currentIndex + 1 < plannedCourse.stops.length ? '건너뛰고 다음' : '건너뛰고 복귀';
 
-  const leaveTripScreen = () => {
-    Alert.alert('진행 화면을 나갈까요?', '코스는 진행 중으로 유지되며 홈에서 이어갈 수 있어요.', [
-      { text: '계속 보기', style: 'cancel' },
-      { text: '나가기', onPress: () => router.back() },
-    ]);
-  };
+  const leaveTripScreen = () => router.canGoBack() ? router.back() : router.replace('/trips');
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.screen}>
@@ -542,6 +507,7 @@ export default function TripScreen() {
         contentContainerStyle={styles.sheetContent}
         nestedScrollEnabled
         showsVerticalScrollIndicator={false}>
+        {travelError && <Pressable accessibilityRole="button" style={styles.noticeBox} onPress={() => void travel.retry().catch(storageError)}><Text style={styles.noticeBody}>{travelError} · 다시 시도</Text></Pressable>}
         <View style={styles.mapArea}>
           <CourseMapView
             detour={{
@@ -623,7 +589,7 @@ export default function TripScreen() {
         {congestionEased && !completed && (
           <View style={styles.easedBanner}>
             <View style={styles.easedDot} />
-            <Text style={styles.easedText}>{destination.name} 혼잡 완화 · 복귀하기 좋아요</Text>
+            <Text style={styles.easedText}>{destination.name} 혼잡 등급이 낮아졌어요 · 관측 정보 기준</Text>
           </View>
         )}
 
@@ -688,13 +654,24 @@ export default function TripScreen() {
           </View>
         )}
 
+        {(status === 'denied' || status === 'error') && <Text style={styles.noticeBody}>{status === 'denied' ? '위치 권한을 허용하지 않았어요.' : '위치를 확인하지 못했어요.'} 도착·복귀 버튼으로 계속 기록할 수 있어요.</Text>}
+        <View style={styles.stopActionRow}>
+          {!stayingAt && <Pressable accessibilityRole="button" style={[styles.stopActionButton, styles.stopActionButtonPrimary]} onPress={arrive}>
+            <Text style={[styles.stopActionLabel, styles.stopActionLabelPrimary]}>{returning ? '복귀했어요 · 여행 완료' : '도착했어요'}</Text>
+          </Pressable>}
+          {stayingAt && <Pressable accessibilityRole="button" style={styles.stopActionButton} onPress={undoArrival}><Text style={styles.stopActionLabel}>도착 취소 · 아직 이동 중</Text></Pressable>}
+          {status === 'granted' && <Pressable accessibilityRole="button" style={styles.stopActionButton} onPress={stopLocation}><Text style={styles.stopActionLabel}>위치 도착 확인 끄기</Text></Pressable>}
+          {status !== 'granted' && <Pressable accessibilityRole="button" style={styles.stopActionButton} onPress={() => void startLocation()}><Text style={styles.stopActionLabel}>위치로 도착 확인 켜기</Text></Pressable>}
+          <Pressable accessibilityRole="button" style={styles.stopActionButton} onPress={enableReminder}><Text style={styles.stopActionLabel}>{returnAlarmSet ? '복귀 알림 끄기' : '복귀 알림 켜기'}</Text></Pressable>
+        </View>
+        {canSkip && <Pressable accessibilityRole="button" style={styles.stopActionButton} onPress={() => setAdjustmentPrompt({ outcome: 'skipped', title: '바로 복귀할까요?', body: '남은 장소는 방문으로 기록하지 않아요. 복귀 예상시간은 현장 상황에 따라 달라질 수 있어요.' })}><Text style={styles.stopActionLabel}>바로 복귀 검토</Text></Pressable>}
         <View style={styles.noticeBox}>
           {/* 완료 후에는 예약이 취소되므로 알림 문구도 함께 내린다(상태 대신 파생 조건). */}
           <Text style={styles.noticeTitle}>
             {slackMinutes < 0
               ? `${Math.abs(slackMinutes)}분 늦을 수 있어요`
               : returnAlarmSet && !completed
-                ? '복귀 5분 전 알림'
+                ? '복귀 출발 전 알림'
                 : '복귀시각 자동 계산'}
           </Text>
           <Text style={styles.noticeBody}>
@@ -706,6 +683,7 @@ export default function TripScreen() {
           </Text>
         </View>
 
+        {congestion && <Text style={styles.noticeBody}>{congestionStatus === 'error' ? '갱신 실패 · ' : ''}{realtimeBasisLabel(congestion.measuredAt)}</Text>}
         <View style={styles.statsRow}>
           <View style={styles.statTile}>
             <Text style={styles.statLabel}>복귀 예정</Text>
@@ -714,7 +692,7 @@ export default function TripScreen() {
           <View style={styles.statTile}>
             <Text style={styles.statLabel}>목적지 혼잡</Text>
             <Text style={[styles.statValue, styles.statValueCongestion]}>
-              {congestion ? REALTIME_LEVEL_LABEL[congestion.level] : '확인 중'}
+              {congestionStatus === 'unavailable' ? '미제공' : congestionStatus === 'error' ? '조회 실패' : congestion ? REALTIME_LEVEL_LABEL[congestion.level] : '확인 중'}
             </Text>
           </View>
           <View style={[styles.statTile, styles.statTileLast]}>
@@ -738,15 +716,13 @@ export default function TripScreen() {
             accessibilityLabel="코스 종료 및 기록 저장"
             style={styles.endButton}
             onPress={() => {
-              cancelReturnReminder();
-              // 중간에 끝내도 다녀온 기록으로 남긴다(완주 여부는 구분해 저장).
-              if (selected && !completionLogged.current) {
-                completionLogged.current = true;
-                markCourseCompleted(selected, phase === 'completed');
-              }
-              clearPersistedProgress();
-              clearSelectedCourse();
-              router.dismissAll();
+              if (!active) return;
+              Alert.alert('여행을 중간 종료할까요?', '방문한 장소만 기록하고 복귀 알림을 취소해요.', [
+                { text: '계속 여행', style: 'cancel' },
+                { text: '종료하고 기록 보기', style: 'destructive', onPress: () => {
+                  void travel.end(active.id).then(id => router.replace({ pathname: '/history/[id]', params: { id } })).catch(storageError);
+                } },
+              ]);
             }}>
             <Text style={styles.endButtonLabel}>코스 종료</Text>
           </Pressable>
@@ -755,11 +731,12 @@ export default function TripScreen() {
             style={[styles.directionsButton, !nextStop && styles.directionsButtonDisabled]}
             disabled={!nextStop}
             onPress={() => {
+              if (stayingAt) { finishCurrentStay(); return; }
               if (nextStop) {
                 void openDirections(nextStop);
               }
             }}>
-            <Text style={styles.directionsButtonLabel}>길찾기 열기</Text>
+            <Text style={styles.directionsButtonLabel}>{stayingAt ? '다음 장소로' : returning ? '복귀 길찾기' : '다음 장소 길찾기'}</Text>
           </Pressable>
         </View>
       </ScreenActionBar>

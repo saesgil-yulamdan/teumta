@@ -1,9 +1,8 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -31,7 +30,7 @@ import {
   summarizeForecast,
   type ForecastTone,
 } from '@/utils/forecast';
-import { realtimeBasisLabel } from '@/utils/realtime-status';
+import { realtimeBasisLabel, isFreshObservation } from '@/utils/realtime-status';
 
 const CONGESTION_HEADLINE: Record<CongestionLevel, string> = {
   low: '지금은 여유로워요',
@@ -56,9 +55,9 @@ const CONGESTION_MESSAGE: Record<CongestionLevel, string> = {
 
 /** 중앙값 대비 오늘의 위치. KTO는 등급 미제공이라 상대 표현만. */
 const FORECAST_TONE_TITLE: Record<ForecastTone, string> = {
-  busy: '오늘은 평소보다 혼잡',
-  usual: '오늘은 평소 수준',
-  quiet: '오늘은 평소보다 여유',
+  busy: '오늘 예측 · 평소보다 혼잡',
+  usual: '오늘 예측 · 평소 수준',
+  quiet: '오늘 예측 · 평소보다 여유',
 };
 
 function festivalPeriodLabel(start?: string | null, end?: string | null): string {
@@ -111,21 +110,7 @@ export default function PlaceDetailScreen() {
     refresh,
   } = usePlaceLiveData({ id, source });
 
-  const [showCrowdedAlert, setShowCrowdedAlert] = useState(false);
   const [showReport, setShowReport] = useState(false);
-
-  useEffect(() => {
-    if (!congestion) return;
-    const level = REALTIME_LEVEL_TO_CONGESTION_LEVEL[congestion.level];
-    if (!shouldShowDetourPrompt(congestion, level)) return;
-
-    const showTimer = setTimeout(() => setShowCrowdedAlert(true), 0);
-    const hideTimer = setTimeout(() => setShowCrowdedAlert(false), 5000);
-    return () => {
-      clearTimeout(showTimer);
-      clearTimeout(hideTimer);
-    };
-  }, [congestion]);
 
   if (!id || !source || !name) {
     return (
@@ -210,7 +195,7 @@ export default function PlaceDetailScreen() {
           <View style={styles.heroImage} />
         )}
         <View style={styles.heroTitleBand}>
-          <Text style={styles.heroEyebrow}>장소 기록</Text>
+          <Text style={styles.heroEyebrow}>출발지 살펴보기</Text>
           <Text style={styles.heroTitle}>{name}</Text>
           {address && <Text style={styles.heroSubtitle}>{address}</Text>}
         </View>
@@ -242,7 +227,7 @@ export default function PlaceDetailScreen() {
               <>
                 <View style={styles.congestionHeader}>
                   <View style={styles.congestionTexts}>
-                    <Text style={styles.congestionTitle}>{headline}</Text>
+                    <Text style={styles.congestionTitle}>{isFreshObservation(congestion.measuredAt) ? headline : '관측 당시 · ' + REALTIME_LEVEL_LABEL[congestion.level]}</Text>
                     <View style={styles.dataBasisRow}>
                       <View
                         style={[
@@ -279,7 +264,7 @@ export default function PlaceDetailScreen() {
                     contentFit="contain"
                   />
                   <Text style={[styles.bannerText, crowdedNow && styles.bannerTextAlert]}>
-                    {CONGESTION_MESSAGE[congestionLevel]}
+                    {isFreshObservation(congestion.measuredAt) ? CONGESTION_MESSAGE[congestionLevel] : '이전 관측값이므로 지금 상황과 다를 수 있어요.'} 주변 코스의 한적함이나 복귀 시 혼잡 해소를 보장하지는 않아요.
                   </Text>
                 </View>
               </>
@@ -314,8 +299,61 @@ export default function PlaceDetailScreen() {
             </ScreenSection>
           )}
 
+          <ScreenSection title="근처 둘러볼 곳">
+
+            {nearbyStatus === 'loading' && <ActivityIndicator style={styles.stateBox} />}
+            {nearbyStatus === 'error' && (
+              <Text style={styles.stateText}>주변 장소를 불러오지 못했어요.</Text>
+            )}
+            {nearbyStatus === 'idle' && nearby.length === 0 && (
+              <Text style={styles.stateText}>주변에 추천할 로컬 장소가 없어요.</Text>
+            )}
+
+            <View style={styles.nearbyList}>
+              {nearby.map((place) => (
+                <Pressable
+                  key={`${place.name}-${place.latitude}-${place.longitude}`}
+                  style={styles.nearbyCard}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/local-places/[id]',
+                      params: {
+                        id: place.name,
+                        contentId: place.tourApiContentId,
+                        name: place.name,
+                        latitude: String(place.latitude),
+                        longitude: String(place.longitude),
+                        distanceMeters: String(place.distanceMeters),
+                        travelTimeMinutes: String(place.travelTimeMinutes),
+                        destinationName: name,
+                        ...(place.address ? { address: place.address } : {}),
+                        ...(place.imageUrl ? { imageUrl: place.imageUrl } : {}),
+                        ...(place.category ? { category: place.category } : {}),
+                      },
+                    })
+                  }>
+                  <PlaceThumbnail
+                    imageUrl={place.imageUrl}
+                    category={place.category}
+                    variant="card"
+                    style={styles.nearbyThumb}
+                  />
+                  <View style={styles.nearbyTexts}>
+                    <Text style={styles.nearbyName}>{place.name}</Text>
+                    <Text style={styles.nearbyMeta}>
+                      {/* 어떤 곳인지 먼저 보여야 갈지 말지 판단할 수 있다. */}
+                      {place.category ? `${place.category} · ` : ''}도보 {place.travelTimeMinutes}분 ·{' '}
+                      {place.distanceMeters}m
+                    </Text>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+
+          </ScreenSection>
+
           {forecastSummary && (
-            <ScreenSection title="덜 붐비는 날" meta="향후 30일">
+            <ScreenSection title="날짜별 혼잡 예측" meta="향후 30일 · 현재 관측과 별도">
 
               <View style={styles.forecastCard}>
                 <Text style={styles.forecastTitle}>
@@ -369,7 +407,7 @@ export default function PlaceDetailScreen() {
                   <View style={styles.forecastHint}>
                     <Text style={styles.forecastHintText}>
                       {formatForecastDate(forecastSummary.quietest.forecastDate)} · 오늘보다{' '}
-                      {forecastSummary.quietestDropPercent}% 한산
+                      {forecastSummary.quietestDropPercent}% 낮은 예측
                     </Text>
                   </View>
                 )}
@@ -433,59 +471,6 @@ export default function PlaceDetailScreen() {
 
           </ScreenSection>
 
-          <ScreenSection title="근처 둘러볼 곳">
-
-            {nearbyStatus === 'loading' && <ActivityIndicator style={styles.stateBox} />}
-            {nearbyStatus === 'error' && (
-              <Text style={styles.stateText}>주변 장소를 불러오지 못했어요.</Text>
-            )}
-            {nearbyStatus === 'idle' && nearby.length === 0 && (
-              <Text style={styles.stateText}>주변에 추천할 로컬 장소가 없어요.</Text>
-            )}
-
-            <View style={styles.nearbyList}>
-              {nearby.map((place) => (
-                <Pressable
-                  key={`${place.name}-${place.latitude}-${place.longitude}`}
-                  style={styles.nearbyCard}
-                  onPress={() =>
-                    router.push({
-                      pathname: '/local-places/[id]',
-                      params: {
-                        id: place.name,
-                        contentId: place.tourApiContentId,
-                        name: place.name,
-                        latitude: String(place.latitude),
-                        longitude: String(place.longitude),
-                        distanceMeters: String(place.distanceMeters),
-                        travelTimeMinutes: String(place.travelTimeMinutes),
-                        destinationName: name,
-                        ...(place.address ? { address: place.address } : {}),
-                        ...(place.imageUrl ? { imageUrl: place.imageUrl } : {}),
-                        ...(place.category ? { category: place.category } : {}),
-                      },
-                    })
-                  }>
-                  <PlaceThumbnail
-                    imageUrl={place.imageUrl}
-                    category={place.category}
-                    variant="card"
-                    style={styles.nearbyThumb}
-                  />
-                  <View style={styles.nearbyTexts}>
-                    <Text style={styles.nearbyName}>{place.name}</Text>
-                    <Text style={styles.nearbyMeta}>
-                      {/* 어떤 곳인지 먼저 보여야 갈지 말지 판단할 수 있다. */}
-                      {place.category ? `${place.category} · ` : ''}도보 {place.travelTimeMinutes}분 ·{' '}
-                      {place.distanceMeters}m
-                    </Text>
-                  </View>
-                </Pressable>
-              ))}
-            </View>
-
-          </ScreenSection>
-
           {/* 주변 로컬 장소 목록도 TourAPI 데이터라 목적지 출처와 무관하게 표기한다. */}
           {(source === 'TOUR' || nearby.length > 0 || festivals.length > 0) && (
             <TourApiAttribution style={styles.attribution} />
@@ -505,42 +490,11 @@ export default function PlaceDetailScreen() {
         <Pressable
           style={styles.ctaButton}
           accessibilityRole="button"
-          accessibilityLabel={crowdedNow ? '혼잡을 피해 코스 보기' : '주변 코스 보기'}
+          accessibilityLabel={'주변 코스 보기'}
           onPress={goToDetours}>
-          <Text style={styles.ctaLabel}>{crowdedNow ? '혼잡을 피해 코스 보기' : '주변 코스 보기'}</Text>
+          <Text style={styles.ctaLabel}>{'주변 코스 보기'}</Text>
         </Pressable>
       </ScreenActionBar>
-
-      <Modal
-        visible={showCrowdedAlert}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowCrowdedAlert(false)}>
-        <Pressable style={styles.alertBackdrop} onPress={() => setShowCrowdedAlert(false)}>
-          <Pressable style={styles.alertCard} onPress={() => { }}>
-            <Pressable
-              accessibilityLabel="혼잡 안내 닫기"
-              accessibilityRole="button"
-              hitSlop={8}
-              onPress={() => setShowCrowdedAlert(false)}
-              style={({ pressed }) => [styles.alertCloseButton, pressed && styles.buttonPressed]}>
-              <Text style={styles.alertCloseLabel}>×</Text>
-            </Pressable>
-            <Text style={styles.alertTitle}>잠시 우회할까요?</Text>
-            <Text style={styles.alertBody}>주변 코스를 둘러보고 다시 와보세요.</Text>
-            <Pressable
-              style={styles.alertButton}
-              onPress={() => {
-                setShowCrowdedAlert(false);
-                goToDetours();
-              }}>
-              <Text style={styles.alertButtonLabel}>
-                {congestion?.detourPrompt?.actionLabel ?? '틈타 코스 보기'}
-              </Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
 
       <ReportModal
         visible={showReport}

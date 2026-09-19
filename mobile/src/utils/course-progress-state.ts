@@ -17,6 +17,7 @@ export type ProgressAction =
   | { type: 'start'; at: number }
   | { type: 'restore'; state: ProgressState }
   | { type: 'reset' }
+  | { type: 'undo_arrival' }
   | { type: 'arrive'; stop: CourseStop; at: number; isReturn: boolean }
   | { type: 'leave' }
   | { type: 'skip'; stop: CourseStop; outcome: 'skipped' | 'unavailable' }
@@ -57,7 +58,13 @@ export function courseProgressReducer(
           stayingSince: null,
         };
       }
-      return { ...state, stayingAt: action.stop, stayingSince: action.at };
+      return { ...state, stayingAt: action.stop, stayingSince: action.at, outcomes: { ...state.outcomes, [action.stop.id]: 'visited' } };
+    case 'undo_arrival': {
+      if (!state.stayingAt) return state;
+      const outcomes = { ...state.outcomes };
+      delete outcomes[state.stayingAt.id];
+      return { ...state, stayingAt: null, stayingSince: null, outcomes };
+    }
     case 'leave':
     case 'finish_stay':
       if (state.phase !== 'in_progress' || !state.stayingAt) {

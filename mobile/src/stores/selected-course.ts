@@ -1,18 +1,10 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
 import type {
   CourseDestination,
   DestinationIdentifier,
   GeneratedCourse,
 } from '@/types/course';
 
-/**
- * 선택한 우회 코스를 화면 사이로 전달.
- *
- * 코스는 요청 시점 생성값이라 조회할 id가 없음. 라우트 파라미터로 넘기기엔 정류지·좌표까지
- * 담아야 해서 과대 → 메모리와 AsyncStorage에 보관(코스 목록 → 지도 → 진행).
- * 앱 재시작 시 저장본을 검증해 복구하고, 완료·종료 시 삭제한다.
- */
+/** 코스 비교용 메모리 스냅샷. 현재 여행의 영속 저장소와 독립적입니다. */
 
 export type SelectedCourse = {
   destination: CourseDestination;
@@ -23,13 +15,16 @@ export type SelectedCourse = {
 };
 
 let selected: SelectedCourse | null = null;
-const STORAGE_KEY = 'teumta:active-course:v1';
 
-function isSelectedCourse(value: unknown): value is SelectedCourse {
+
+export function isSelectedCourse(value: unknown): value is SelectedCourse {
   type StoredCandidate = {
     destination?: Partial<CourseDestination>;
     course?: {
       totalMinutes?: number;
+      returnTravelMinutes?: number;
+      returnDistanceMeters?: number;
+      returnPath?: unknown;
       stops?: Partial<GeneratedCourse['stops'][number]>[];
     };
     availableMinutes?: number;
@@ -40,19 +35,22 @@ function isSelectedCourse(value: unknown): value is SelectedCourse {
   const validIdentifier =
     (typeof params?.contentId === 'string' && params.contentId.length > 0) ||
     (typeof params?.poiId === 'string' && params.poiId.length > 0);
-  const validStops = candidate?.course?.stops?.every(
-    (stop) =>
-      typeof stop.name === 'string' &&
-      Number.isFinite(stop.latitude) &&
-      Number.isFinite(stop.longitude),
+  const nonnegative = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+  const nullableText = (v: unknown) => v == null || typeof v === 'string';
+  const path = (v: unknown) => v == null || (Array.isArray(v) && v.every(point => point && Number.isFinite(point.latitude) && Number.isFinite(point.longitude)));
+  const validStops = Array.isArray(candidate?.course?.stops) && candidate.course.stops.every(
+    stop => stop && typeof stop.name === 'string' && Number.isFinite(stop.latitude) &&
+      Number.isFinite(stop.longitude) && nullableText(stop.address) && nullableText(stop.imageUrl) && nullableText(stop.tourApiContentId) && path(stop.pathFromPrevious) && nonnegative(stop.stayMinutes) &&
+      nonnegative(stop.travelMinutesFromPrevious) && nonnegative(stop.distanceMetersFromPrevious),
   );
   return (
     typeof candidate?.destination?.name === 'string' &&
     Number.isFinite(candidate.destination.latitude) &&
     Number.isFinite(candidate.destination.longitude) &&
-    Number.isFinite(candidate.course?.totalMinutes) &&
+    nonnegative(candidate.course?.totalMinutes) &&
+    nonnegative(candidate.course?.returnTravelMinutes) && nonnegative(candidate.course?.returnDistanceMeters) &&
     Array.isArray(candidate.course?.stops) &&
-    validStops === true &&
+    validStops === true && path(candidate.course?.returnPath) &&
     Number.isFinite(candidate.availableMinutes) &&
     Number(candidate.availableMinutes) > 0 &&
     validIdentifier
@@ -70,34 +68,8 @@ export function selectedCourseKey(value: SelectedCourse): string {
   ].join('|');
 }
 
-export function setSelectedCourse(next: SelectedCourse): void {
-  selected = next;
-  AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(() => {});
-}
-
-export function getSelectedCourse(): SelectedCourse | null {
-  return selected;
-}
-
-/** 앱 프로세스가 종료된 뒤에도 진행 중 코스를 복구한다. */
-export async function loadSelectedCourse(): Promise<SelectedCourse | null> {
-  if (selected) return selected;
-  try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed: unknown = JSON.parse(raw);
-    if (!isSelectedCourse(parsed)) {
-      await AsyncStorage.removeItem(STORAGE_KEY);
-      return null;
-    }
-    selected = parsed;
-    return selected;
-  } catch {
-    return null;
-  }
-}
-
-export function clearSelectedCourse(): void {
-  selected = null;
-  AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
-}
+/** Preview only. Never writes or restores an active journey. */
+export function setSelectedCourse(next: SelectedCourse): void { selected = next; }
+export function getSelectedCourse(): SelectedCourse | null { return selected; }
+export async function loadSelectedCourse(): Promise<SelectedCourse | null> { return selected; }
+export function clearSelectedCourse(): void { selected = null; }

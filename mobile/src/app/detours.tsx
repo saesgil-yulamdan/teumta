@@ -85,10 +85,10 @@ export default function DetoursScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
-        <TeumtaHeader showBack title="틈타 코스" subtitle={`${destinationName} 주변을 둘러보고 돌아와요.`} />
+        <TeumtaHeader showBack title="틈타 코스" subtitle={`출발·복귀 장소 · ${destinationName}`} />
 
         <View style={styles.durationBlock}>
-          <Text style={styles.durationLabel}>얼마나 둘러볼까요?</Text>
+          <Text style={styles.durationLabel}>왕복 이동과 머무는 시간을 합해 얼마나 둘러볼까요?</Text>
           <View accessibilityRole="radiogroup" accessibilityLabel="둘러볼 시간" style={styles.chipRow}>
             {DURATION_OPTIONS.map((minutes) => {
               const chipSelected = minutes === availableMinutes;
@@ -139,10 +139,15 @@ export default function DetoursScreen() {
         {status === 'idle' && courses.length === 0 && (
           <View style={styles.stateBox}>
             <Text style={styles.stateText}>
-              {availableMinutes}분 코스가 없어요. 시간을 늘려보세요.
+              {availableMinutes < 90 ? `${availableMinutes}분 조건에 맞는 코스가 없어요. 시간을 늘리거나 출발지를 바꿔보세요.` : '90분 조건에도 맞는 코스가 없어요. 출발지를 바꾸거나 주변 장소를 개별로 살펴보세요.'}
             </Text>
           </View>
         )}
+
+        {((status === 'idle' && courses.length === 0) || status === 'error' || status === 'timeout' || status === 'rate-limited') && <View style={styles.durationBlock}>
+          <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={() => router.push('/search')}><Text style={styles.secondaryButtonLabel}>다른 출발지 찾기</Text></Pressable>
+          {identifier && <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={() => router.push({ pathname: '/places/[id]', params: { id: contentId ?? poiId ?? '', source: contentId ? 'TOUR' : 'TMAP', name: destinationName } })}><Text style={styles.secondaryButtonLabel}>주변 장소 개별로 보기</Text></Pressable>}
+        </View>}
 
         {status === 'idle' && destination && courses.length > 0 && (
           <View accessibilityRole="radiogroup" accessibilityLabel="코스 선택" style={styles.courseList}>
@@ -164,10 +169,8 @@ export default function DetoursScreen() {
             <View style={styles.infoBox}>
               <Text style={styles.infoTitle}>추천 기준</Text>
               <Text style={styles.infoBody}>
-                {availableMinutes <= 30
-                  ? '잠깐 들렀다가 제시간에 돌아오기 좋은 짧은 코스예요.'
-                  : '동네를 한 곳 더 둘러보고도 목적지로 돌아올 수 있는 코스예요.'}
-                {'\n'}실제 보행 경로와 권장 체류시간을 반영합니다.
+                선택한 장소 주변의 공개 장소·운영정보와 시간 조건으로 구성합니다. 주변이 한적하거나 복귀 시 혼잡이 해소됨을 보장하지 않습니다.
+                {'\n'}보행 경로(일부 추정)와 권장 체류시간을 반영한 예상치입니다.
               </Text>
             </View>
 
@@ -183,7 +186,7 @@ export default function DetoursScreen() {
         <ScreenActionBar>
           <Text style={styles.footerSummary}>선택한 코스 · 약 {courses[selectedIndex].totalMinutes}분</Text>
           <Pressable accessibilityRole="button" style={styles.ctaButton} onPress={handleStart}>
-            <Text style={styles.ctaLabel}>코스 상세 보기</Text>
+            <Text style={styles.ctaLabel}>선택한 코스 자세히 보기</Text>
             <Text style={styles.ctaArrow}>→</Text>
           </Pressable>
         </ScreenActionBar>

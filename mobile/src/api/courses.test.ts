@@ -66,3 +66,12 @@ describe('fetchCourses', () => {
     }));
   });
 });
+
+
+it('sends only public place/time conditions, even when a restored snapshot has extra private fields', async () => {
+  const destination = { contentId: '126508', latitude: 37.5, longitude: 127, sessionId: 'private', records: ['private'] };
+  await fetchCourses(destination, 60);
+  expect(getMock).toHaveBeenLastCalledWith('/courses', { params: { contentId: '126508', availableMinutes: 60, variant: 0 }, timeout: COURSE_API_TIMEOUT_MS });
+  await fetchCourseAlternatives({ destination, originContentId: '100', availableMinutes: 30, excludeContentIds: ['100'] });
+  expect(getMock).toHaveBeenLastCalledWith('/course-alternatives', { params: { originContentId: '100', contentId: '126508', availableMinutes: 30, excludeContentIds: '100' }, timeout: COURSE_API_TIMEOUT_MS });
+});

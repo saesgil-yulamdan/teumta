@@ -16,7 +16,7 @@ export function courseProgressStops(selected: SelectedCourse): CourseStop[] {
 }
 
 /** 홈에서는 진행 훅을 실행하지 않고 저장본만 검증해서 읽는다. */
-export function validRestoredProgress(value: unknown, stops: CourseStop[]): value is ProgressState {
+export function validRestoredProgress(value: unknown, stops: CourseStop[], knownStops: CourseStop[] = stops): value is ProgressState {
   const state = value as Partial<ProgressState> | null;
   if (!state || typeof state !== 'object') return false;
   const validTime = (time: unknown) => time === null || (typeof time === 'number' && Number.isFinite(time) && time >= 0);
@@ -25,6 +25,7 @@ export function validRestoredProgress(value: unknown, stops: CourseStop[]): valu
     ['not_started', 'in_progress', 'completed'].includes(String(state.phase)) &&
     Number.isInteger(state.currentIndex) && Number(state.currentIndex) >= 0 &&
     Number(state.currentIndex) <= stops.length &&
+    (state.phase !== 'in_progress' || Number(state.currentIndex) < stops.length) &&
     (state.stayingAt === null || (state.stayingAt?.id === current?.id && current?.id !== 'return' &&
       typeof state.stayingAt?.name === 'string' && Number.isFinite(state.stayingAt.latitude) && Number.isFinite(state.stayingAt.longitude))) &&
     validTime(state.stayingSince) && validTime(state.startedAt) &&
@@ -32,7 +33,7 @@ export function validRestoredProgress(value: unknown, stops: CourseStop[]): valu
     (state.stayingAt === null ? state.stayingSince === null : state.stayingSince !== null) &&
     typeof state.outcomes === 'object' && state.outcomes !== null && !Array.isArray(state.outcomes) &&
     Object.entries(state.outcomes).every(([id, outcome]) =>
-      stops.some((stop) => stop.id === id && id !== 'return') && ['visited', 'skipped', 'unavailable'].includes(outcome))
+      knownStops.some((stop) => stop.id === id && id !== 'return') && ['visited', 'skipped', 'unavailable'].includes(outcome))
   );
 }
 

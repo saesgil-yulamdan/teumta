@@ -1,134 +1,48 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useCallback, useEffect, useReducer, useState } from 'react';
-
-import { ARRIVAL_RADIUS_METERS } from '@/constants/location';
+import { useCallback, useRef } from 'react';
+import { useRouter } from 'expo-router';
+import { travel, useTravel, storageError } from '@/stores/travel';
+import { INITIAL_COURSE_PROGRESS, type CourseStop, type ProgressAction } from '@/utils/course-progress-state';
 import type { Coordinate } from '@/types/place';
 import { hasArrived } from '@/utils/arrival';
-import {
-  courseProgressReducer,
-  INITIAL_COURSE_PROGRESS,
-  type CourseStop,
-} from '@/utils/course-progress-state';
-import { distanceInMeters } from '@/utils/distance';
-import { PROGRESS_STORAGE_KEY } from '@/stores/trip-progress';
-import { validRestoredProgress } from '@/utils/trip-summary';
-
+import { ARRIVAL_RADIUS_METERS } from '@/constants/location';
 export type { CourseStop } from '@/utils/course-progress-state';
 
-/**
- * 도착 반경보다 넉넉히 벗어나야 "체류 끝"으로 본다.
- * 같은 반경을 쓰면 GPS 요동만으로 도착↔이동이 깜빡인다(히스테리시스).
- */
-const STAY_LEAVE_RADIUS_METERS = ARRIVAL_RADIUS_METERS * 1.5;
-
-/**
- * 코스 진행 상태(시작/도착/체류/다음/복귀/완료)를 **단말 local state로만** 관리한다.
- *
- * 개인정보 최소화 원칙:
- *  - 진행 상태와 도착 판정을 서버 TripEvent로 전송/저장하지 않는다.
- *  - 현재 위치가 다음 목적지 반경에 들어오면 로컬에서 도착 처리하고 다음 지점으로 넘어간다.
- *  - 서버에는 사용자가 특정 시각 특정 장소에 있었다는 정보가 남지 않는다.
- */
-export function useCourseProgress(stops: CourseStop[], persistenceKey?: string | null) {
-  const [state, dispatch] = useReducer(courseProgressReducer, INITIAL_COURSE_PROGRESS);
-  const [loadedKey, setLoadedKey] = useState<string | null>(null);
-  const ready = persistenceKey == null || loadedKey === persistenceKey;
-  const { phase, currentIndex, stayingAt, stayingSince, startedAt, outcomes } = state;
-
-  const nextStop: CourseStop | null = stops[currentIndex] ?? null;
-
-  useEffect(() => {
-    if (!persistenceKey || stops.length === 0) {
-      return;
+export function useCourseProgress(stops: CourseStop[], sessionId?: string | null) {
+  const { active, ready } = useTravel();
+  const router = useRouter();
+  const state = active && active.id === sessionId ? active.progress : INITIAL_COURSE_PROGRESS;
+  const nextStop = stops[state.currentIndex] ?? null;
+  const busy = useRef(false);
+  const correctedStop = useRef<string | null>(null);
+  const lastLocation = useRef<Coordinate | null>(null);
+  const dispatch = useCallback(async (action: ProgressAction) => {
+    if (!sessionId || busy.current) return;
+    busy.current = true;
+    try {
+      await travel.progress(sessionId, action);
+      if (!travel.state.active && travel.state.records.some(v => v.id === sessionId)) router.replace({ pathname: '/history/[id]', params: { id: sessionId } });
+    } catch (error) { storageError(error); }
+    finally { busy.current = false; }
+  }, [sessionId, router]);
+  const arrive = useCallback(() => {
+    if (nextStop) void dispatch({ type: 'arrive', stop: nextStop, at: Date.now(), isReturn: nextStop.id === 'return' });
+  }, [nextStop, dispatch]);
+  const updateWithLocation = useCallback((location: Coordinate) => {
+    if (location === lastLocation.current) return;
+    lastLocation.current = location;
+    if (nextStop?.id === correctedStop.current) {
+      if (hasArrived(location, nextStop, ARRIVAL_RADIUS_METERS)) return;
+      correctedStop.current = null;
     }
-    let ignored = false;
-    AsyncStorage.getItem(PROGRESS_STORAGE_KEY)
-      .then((raw) => {
-        if (!raw || ignored) return;
-        const parsed = JSON.parse(raw) as { key?: unknown; state?: unknown };
-        if (parsed.key === persistenceKey && validRestoredProgress(parsed.state, stops)) {
-          dispatch({ type: 'restore', state: parsed.state });
-        }
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!ignored) setLoadedKey(persistenceKey);
-      });
-    return () => {
-      ignored = true;
-    };
-  }, [persistenceKey, stops]);
-
-  useEffect(() => {
-    if (!ready || !persistenceKey) return;
-    if (state.phase === 'completed') {
-      AsyncStorage.removeItem(PROGRESS_STORAGE_KEY).catch(() => {});
-      return;
-    }
-    AsyncStorage.setItem(
-      PROGRESS_STORAGE_KEY,
-      JSON.stringify({ key: persistenceKey, state }),
-    ).catch(() => {});
-  }, [ready, persistenceKey, state]);
-
-  const start = useCallback(() => dispatch({ type: 'start', at: Date.now() }), []);
-
-  const reset = useCallback(() => dispatch({ type: 'reset' }), []);
-
-  const clearPersistedProgress = useCallback(() => {
-    AsyncStorage.removeItem(PROGRESS_STORAGE_KEY).catch(() => {});
-  }, []);
-
-  /**
-   * 다음 정류지를 방문 처리 없이 넘긴다(가게가 닫혀 있는 등).
-   * 마지막 지점(복귀)은 건너뛸 수 없다 — 코스를 끝내는 건 "코스 종료"의 몫.
-   */
-  const skipCurrent = useCallback((outcome: 'skipped' | 'unavailable' = 'skipped') => {
-    if (phase !== 'in_progress' || currentIndex >= stops.length - 1 || !nextStop) {
-      return;
-    }
-    dispatch({ type: 'skip', stop: nextStop, outcome });
-  }, [phase, currentIndex, stops.length, nextStop]);
-
-  const finishCurrentStay = useCallback(() => dispatch({ type: 'finish_stay' }), []);
-
-  /** foreground GPS 갱신 시 호출. 도착·체류 이탈을 판정한다(전부 로컬). */
-  const updateWithLocation = useCallback(
-    (current: Coordinate) => {
-      if (phase !== 'in_progress') {
-        return;
-      }
-      if (stayingAt) {
-        if (distanceInMeters(current, stayingAt) > STAY_LEAVE_RADIUS_METERS) {
-          dispatch({ type: 'leave' });
-        }
-        return;
-      }
-      if (!nextStop) {
-        return;
-      }
-      if (hasArrived(current, nextStop, ARRIVAL_RADIUS_METERS)) {
-        const isFinal = currentIndex + 1 >= stops.length;
-        dispatch({ type: 'arrive', stop: nextStop, at: Date.now(), isReturn: isFinal });
-      }
+    // Do not infer departure or final return from unobserved movement.
+    if (!state.stayingAt && nextStop && nextStop.id !== 'return' && hasArrived(location, nextStop, ARRIVAL_RADIUS_METERS)) arrive();
+  }, [state.stayingAt, nextStop, arrive]);
+  return { ...state, ready, nextStop, arrive,
+    undoArrival: () => { correctedStop.current = nextStop?.id ?? null; void dispatch({ type: 'undo_arrival' }); },
+    skipCurrent: (outcome: 'skipped' | 'unavailable' = 'skipped') => {
+      if (nextStop && nextStop.id !== 'return') void dispatch({ type: 'skip', stop: nextStop, outcome });
     },
-    [phase, stayingAt, nextStop, currentIndex, stops.length],
-  );
-
-  return {
-    phase,
-    ready,
-    currentIndex,
-    nextStop,
-    stayingAt,
-    stayingSince,
-    startedAt,
-    outcomes,
-    start,
-    reset,
-    clearPersistedProgress,
-    skipCurrent,
-    finishCurrentStay,
+    finishCurrentStay: () => void dispatch({ type: 'finish_stay' }),
     updateWithLocation,
   };
 }
