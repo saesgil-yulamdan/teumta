@@ -164,8 +164,9 @@ export function buildKeywordSearchQuery(params: TourKeywordSearchParams): Record
 /** 키워드 검색(searchKeyword2). 목적지 검색 흐름의 진입점. */
 export async function fetchTourPlacesByKeyword(
   params: TourKeywordSearchParams,
+  options?: { timeoutMs?: number },
 ): Promise<TourApiListResponse> {
-  return requestTourList(buildTourUrl('searchKeyword2', buildKeywordSearchQuery(params)));
+  return requestTourList(buildTourUrl('searchKeyword2', buildKeywordSearchQuery(params)), options);
 }
 
 /** 행사정보 조회(searchFestival2) 파라미터. */
@@ -283,8 +284,15 @@ export async function fetchTourPlaceIntro(
   });
 }
 
-async function requestTourList(url: string): Promise<TourApiListResponse> {
-  const response = await requestJson<TourApiListResponse>({ service: SERVICE, url });
+async function requestTourList(
+  url: string,
+  options?: { timeoutMs?: number },
+): Promise<TourApiListResponse> {
+  const response = await requestJson<TourApiListResponse>({
+    service: SERVICE,
+    url,
+    timeoutMs: options?.timeoutMs,
+  });
   assertTourApiOk(response);
   return response;
 }
