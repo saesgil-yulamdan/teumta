@@ -2,11 +2,20 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { TeumtaHybrid } from '@/constants/theme';
 
-export function EmptyState({ title, description, actionLabel, onAction }: {
+export function EmptyState({
+  title,
+  description,
+  actionLabel,
+  onAction,
+  secondaryActionLabel,
+  onSecondaryAction,
+}: {
   title: string;
   description: string;
   actionLabel?: string;
   onAction?: () => void;
+  secondaryActionLabel?: string;
+  onSecondaryAction?: () => void;
 }) {
   return (
     <View style={styles.container}>
@@ -15,6 +24,11 @@ export function EmptyState({ title, description, actionLabel, onAction }: {
       {actionLabel && onAction && (
         <Pressable accessibilityRole="button" style={styles.button} onPress={onAction}>
           <Text style={styles.buttonLabel}>{actionLabel}</Text>
+        </Pressable>
+      )}
+      {secondaryActionLabel && onSecondaryAction && (
+        <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={onSecondaryAction}>
+          <Text style={styles.secondaryLabel}>{secondaryActionLabel}</Text>
         </Pressable>
       )}
     </View>
@@ -54,6 +68,17 @@ const styles = StyleSheet.create({
     color: TeumtaHybrid.navy,
     fontSize: 14,
     fontWeight: '700',
+    lineHeight: 22,
+  },
+  secondaryButton: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  secondaryLabel: {
+    color: TeumtaHybrid.muted,
+    fontSize: 14,
+    fontWeight: '600',
     lineHeight: 22,
   },
 });
