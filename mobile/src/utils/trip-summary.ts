@@ -70,3 +70,49 @@ export function summarizeTrip(selected: SelectedCourse, progress: ProgressState 
       ? progress.startedAt + selected.course.totalMinutes * 60_000 : null,
   };
 }
+
+/** 완료·중단된 여행 회차 목록용 요약. 목적지에 사진이 없어 정류지 이미지로 커버를 고른다. */
+export function summarizeJourneyRecord(record: {
+  selected: SelectedCourse;
+  startedAt: number | null;
+  endedAt: number | null;
+  status: 'completed' | 'interrupted' | 'legacy';
+  completedAll: boolean | null;
+  outcomes: Record<string, 'visited' | 'skipped' | 'unavailable'>;
+}) {
+  const stops = record.selected.course.stops;
+  let visited = 0;
+  let skipped = 0;
+  for (let index = 0; index < stops.length; index += 1) {
+    const outcome = record.outcomes[courseStopId(stops[index], index)];
+    if (outcome === 'visited') visited += 1;
+    else if (outcome === 'skipped' || outcome === 'unavailable') skipped += 1;
+  }
+  const elapsedMinutes =
+    record.startedAt !== null && record.endedAt !== null
+      ? Math.max(0, Math.round((record.endedAt - record.startedAt) / 60_000))
+      : null;
+  const statusLabel =
+    record.status === 'legacy'
+      ? '이전 버전 기록'
+      : record.status === 'interrupted'
+        ? '중간 종료'
+        : record.completedAll
+          ? '모든 장소 방문 · 복귀 완료'
+          : '복귀 완료';
+  const coverImageUrl =
+    stops.find((stop) => typeof stop.imageUrl === 'string' && stop.imageUrl.length > 0)?.imageUrl ??
+    null;
+  return {
+    visited,
+    skipped,
+    total: stops.length,
+    elapsedMinutes,
+    statusLabel,
+    coverImageUrl,
+    dateLabel:
+      record.endedAt === null
+        ? '날짜 정보 없음'
+        : new Date(record.endedAt).toLocaleDateString('ko-KR'),
+  };
+}

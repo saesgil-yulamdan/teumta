@@ -299,59 +299,6 @@ export default function PlaceDetailScreen() {
             </ScreenSection>
           )}
 
-          <ScreenSection title="근처 둘러볼 곳">
-
-            {nearbyStatus === 'loading' && <ActivityIndicator style={styles.stateBox} />}
-            {nearbyStatus === 'error' && (
-              <Text style={styles.stateText}>주변 장소를 불러오지 못했어요.</Text>
-            )}
-            {nearbyStatus === 'idle' && nearby.length === 0 && (
-              <Text style={styles.stateText}>주변에 추천할 로컬 장소가 없어요.</Text>
-            )}
-
-            <View style={styles.nearbyList}>
-              {nearby.map((place) => (
-                <Pressable
-                  key={`${place.name}-${place.latitude}-${place.longitude}`}
-                  style={styles.nearbyCard}
-                  onPress={() =>
-                    router.push({
-                      pathname: '/local-places/[id]',
-                      params: {
-                        id: place.name,
-                        contentId: place.tourApiContentId,
-                        name: place.name,
-                        latitude: String(place.latitude),
-                        longitude: String(place.longitude),
-                        distanceMeters: String(place.distanceMeters),
-                        travelTimeMinutes: String(place.travelTimeMinutes),
-                        destinationName: name,
-                        ...(place.address ? { address: place.address } : {}),
-                        ...(place.imageUrl ? { imageUrl: place.imageUrl } : {}),
-                        ...(place.category ? { category: place.category } : {}),
-                      },
-                    })
-                  }>
-                  <PlaceThumbnail
-                    imageUrl={place.imageUrl}
-                    category={place.category}
-                    variant="card"
-                    style={styles.nearbyThumb}
-                  />
-                  <View style={styles.nearbyTexts}>
-                    <Text style={styles.nearbyName}>{place.name}</Text>
-                    <Text style={styles.nearbyMeta}>
-                      {/* 어떤 곳인지 먼저 보여야 갈지 말지 판단할 수 있다. */}
-                      {place.category ? `${place.category} · ` : ''}도보 {place.travelTimeMinutes}분 ·{' '}
-                      {place.distanceMeters}m
-                    </Text>
-                  </View>
-                </Pressable>
-              ))}
-            </View>
-
-          </ScreenSection>
-
           {forecastSummary && (
             <ScreenSection title="날짜별 혼잡 예측" meta="향후 30일 · 현재 관측과 별도">
 
@@ -415,6 +362,59 @@ export default function PlaceDetailScreen() {
               </View>
             </ScreenSection>
           )}
+
+          <ScreenSection title="근처 둘러볼 곳">
+
+            {nearbyStatus === 'loading' && <ActivityIndicator style={styles.stateBox} />}
+            {nearbyStatus === 'error' && (
+              <Text style={styles.stateText}>주변 장소를 불러오지 못했어요.</Text>
+            )}
+            {nearbyStatus === 'idle' && nearby.length === 0 && (
+              <Text style={styles.stateText}>주변에 추천할 로컬 장소가 없어요.</Text>
+            )}
+
+            <View style={styles.nearbyList}>
+              {nearby.map((place) => (
+                <Pressable
+                  key={`${place.name}-${place.latitude}-${place.longitude}`}
+                  style={styles.nearbyCard}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/local-places/[id]',
+                      params: {
+                        id: place.name,
+                        contentId: place.tourApiContentId,
+                        name: place.name,
+                        latitude: String(place.latitude),
+                        longitude: String(place.longitude),
+                        distanceMeters: String(place.distanceMeters),
+                        travelTimeMinutes: String(place.travelTimeMinutes),
+                        destinationName: name,
+                        ...(place.address ? { address: place.address } : {}),
+                        ...(place.imageUrl ? { imageUrl: place.imageUrl } : {}),
+                        ...(place.category ? { category: place.category } : {}),
+                      },
+                    })
+                  }>
+                  <PlaceThumbnail
+                    imageUrl={place.imageUrl}
+                    category={place.category}
+                    variant="card"
+                    style={styles.nearbyThumb}
+                  />
+                  <View style={styles.nearbyTexts}>
+                    <Text style={styles.nearbyName}>{place.name}</Text>
+                    <Text style={styles.nearbyMeta}>
+                      {/* 어떤 곳인지 먼저 보여야 갈지 말지 판단할 수 있다. */}
+                      {place.category ? `${place.category} · ` : ''}도보 {place.travelTimeMinutes}분 ·{' '}
+                      {place.distanceMeters}m
+                    </Text>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+
+          </ScreenSection>
 
           <ScreenSection title="근처 행사" meta="진행 중·예정">
 

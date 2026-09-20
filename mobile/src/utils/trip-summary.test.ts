@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { SelectedCourse } from '@/stores/selected-course';
 import { INITIAL_COURSE_PROGRESS, type ProgressState } from '@/utils/course-progress-state';
-import { courseProgressStops, parseTripProgress, summarizeTrip } from './trip-summary';
+import { courseProgressStops, parseTripProgress, summarizeJourneyRecord, summarizeTrip } from './trip-summary';
 
 const selected: SelectedCourse = {
   destination: { name: '출발지', latitude: 37.5, longitude: 127 },
@@ -44,5 +44,25 @@ describe('trip summary', () => {
       { ...started, outcomes: { 'stop-0': 'unknown' } },
       { ...started, outcomes: { 'other-course-stop': 'visited' } },
     ]) expect(parseTripProgress(JSON.stringify({ key: 'course', state }), 'course', stops)).toBeNull();
+  });
+
+  it('여행 기록 카드용 방문·경과·커버 이미지를 요약한다', () => {
+    expect(
+      summarizeJourneyRecord({
+        selected,
+        startedAt: 1_000,
+        endedAt: 1_000 + 40 * 60_000,
+        status: 'completed',
+        completedAll: false,
+        outcomes: { 'stop-0': 'visited', 'stop-1': 'skipped' },
+      }),
+    ).toMatchObject({
+      visited: 1,
+      skipped: 1,
+      total: 2,
+      elapsedMinutes: 40,
+      statusLabel: '복귀 완료',
+      coverImageUrl: null,
+    });
   });
 });
